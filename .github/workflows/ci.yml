@@ -7,8 +7,11 @@ on:
     branches: ["**"]
   pull_request:
 
+# Keyed on the commit, not the ref. A branch with an open pull request fires
+# both a push and a pull_request event for the same SHA; grouping on the ref
+# puts them in different groups and runs the whole suite twice.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.head.sha || github.sha }}
   cancel-in-progress: true
 
 # CI cannot read the deployment platform's environment values, which is why the
@@ -25,6 +28,7 @@ jobs:
   lint:
     name: lint
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup
@@ -33,6 +37,7 @@ jobs:
   format:
     name: format
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup
@@ -41,6 +46,7 @@ jobs:
   typecheck:
     name: typecheck
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup
@@ -51,6 +57,7 @@ jobs:
   test:
     name: test
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup
@@ -59,6 +66,7 @@ jobs:
   build:
     name: build
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup
@@ -67,10 +75,15 @@ jobs:
   e2e:
     name: e2e
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup
-      - run: pnpm exec playwright install --with-deps chromium
+      # No --with-deps. It shells out to apt-get, which hung for 34 minutes on
+      # this repository, and ubuntu-latest already ships the libraries Chromium
+      # needs. If a future runner image drops one, this fails fast and loudly
+      # rather than stalling.
+      - run: pnpm exec playwright install chromium
       - run: pnpm test:e2e
       - uses: actions/upload-artifact@v4
         if: ${{ !cancelled() }}
@@ -82,6 +95,7 @@ jobs:
   data-seam:
     name: data-seam
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup
