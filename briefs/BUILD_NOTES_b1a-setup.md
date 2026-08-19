@@ -26,8 +26,8 @@ automatically on every push.
 
 ## What was built
 
-Next.js 16.3.1, React 19.2.8, pnpm 11.21.0, TypeScript 5.9.3 strict. Thirteen
-commits, one logical change each.
+Next.js 16.3.1, React 19.2.8, pnpm 11.21.0, TypeScript 5.9.3 strict. Sixteen
+commits, one logical change each — one on `main`, fifteen on the branch.
 
 | Commit    | What                                                          |
 | --------- | ------------------------------------------------------------- |
@@ -44,9 +44,12 @@ commits, one logical change each.
 | `efb18dd` | `CLAUDE.md` and the full `README.md`                          |
 | `736a8f3` | Data-seam sweep narrowed to `src/`                            |
 | `982cd8a` | Committed format-on-save editor settings                      |
+| `7f4e777` | §10 checklist checked; these build-notes                      |
+| `9300dee` | Three `[owner]` items closed after GitHub access was granted  |
+| _final_   | Commit table and status corrected to match                    |
 
-`main` holds only `13f52a8`. `staging` and `chore/b1a-setup` were branched from
-it. Everything after the first commit is on `chore/b1a-setup`, unmerged.
+`main` and `staging` both hold only `13f52a8`. Everything after the first commit
+is on `chore/b1a-setup`, unmerged, awaiting Nate's review of the pull request.
 
 ### Names to know
 
