@@ -145,12 +145,24 @@ exceptions, no manual overrides.
 | Rules for agents            | `CLAUDE.md`                                              |
 | Project setup reference     | `PROJECT_SETUP_BMMP.md`                                  |
 | Canonical doc stack         | `docs/`                                                  |
-| Builder briefs, build-notes | `briefs/`                                                |
+| Builder briefs, build-notes | `BMMP Planning/briefs/`, outside this repository         |
 | Decision log                | project-level `Decision Log.md`, outside this repository |
 
 `docs/` carries 518 verified cross-document citations. The formatter is
-deliberately excluded from `docs/`, `briefs/` and `PROJECT_SETUP_BMMP.md` — a
-markdown reflow breaks a citation silently and no test catches it.
+deliberately excluded from `docs/` and `PROJECT_SETUP_BMMP.md` — a markdown
+reflow breaks a citation silently and no test catches it.
+
+Briefs and build-notes are **not** in this repository. They live in the
+planning folder:
+
+```
+C:\Users\nteiv\Documents\Claude\Projects\Jonathan AI Platforms\BMMP Planning\briefs\
+```
+
+A brief is written before the work exists and is read by people who never check
+out the repo, so it accumulates for the life of the engagement rather than the
+life of a branch. The repository holds the product; the planning folder holds
+the record of how the product got decided.
 
 ---
 

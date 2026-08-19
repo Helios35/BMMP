@@ -8,7 +8,7 @@ import { resolveAdapter } from "@/data";
  * an unset or misspelled variable silently serves fake data, and in production
  * that is a fake legal document with a real customer's name on it. These cases
  * were also broken by hand once and watched to fail; see
- * briefs/BUILD_NOTES_b1a-setup.md.
+ * BMMP Planning/briefs/BUILD_NOTES_b1a-setup.md.
  */
 describe("resolveAdapter", () => {
   it("throws when DATA_ADAPTER is unset", () => {

@@ -1,7 +1,7 @@
 # Runbook / Operations — BMMP
 **Version:** 1.0 · **Date:** 2026-08-11 · **Owner:** Nathan Ivy / Next Sketch LLC
 **Answers:** How do we run BMMP in production — and what do we do at 2am when it breaks?
-**Reads from:** `PROJECT_SETUP_BMMP.md` · `docs/TECHNICAL_SPEC.md` · `docs/ERD.md` · `docs/BUSINESS_RULES.md` · Roadmap v3.0 · SOW 1  ·  **Feeds:** `briefs/` (every build unit) · launch-readiness check · `docs/DECISION_LOG.md`
+**Reads from:** `PROJECT_SETUP_BMMP.md` · `docs/TECHNICAL_SPEC.md` · `docs/ERD.md` · `docs/BUSINESS_RULES.md` · Roadmap v3.0 · SOW 1  ·  **Feeds:** `BMMP Planning/briefs/` (every build unit, outside the repository) · launch-readiness check · `docs/DECISION_LOG.md`
 
 > ## REVIEW NOTES
 > None open. All review notes for this document were answered on 2026-08-19 — see `Decision Log.md` **D-20** for the full disposition, and D-21 through D-26 for the calls that carry their own rationale. Content below is unchanged.
@@ -92,7 +92,7 @@ All are required status checks. The data-seam check is what keeps the swap point
 
 **D15. Apply *destructive* migrations — later, in a separate deploy.** Never in the same window as the code that stopped using the column. See §1.3.
 
-**D16. Record.** Build-notes in `briefs/` for the unit. Any judgment call made along the way goes to `docs/DECISION_LOG.md`.
+**D16. Record.** Build-notes in `BMMP Planning/briefs/` for the unit. Any judgment call made along the way goes to `docs/DECISION_LOG.md`.
 
 ### 1.3 Database migrations and their order relative to a code deploy
 
@@ -195,7 +195,7 @@ If the document in step 5 is wrong in any way, stop and go to §5.
 
 ### 1.7 Hotfix path
 
-A hotfix is still a pull request and still passes CI. The only thing that changes is the branch source: cut from `main`, merge to `main`, then back-merge into `staging` the same day so the branches do not diverge. Skipping staging verification is permitted for a hotfix only when the fault is already causing a sev-1 and the fix is small enough to read in full. Note the exception in `briefs/` — an undocumented skipped gate becomes normal practice within a month.
+A hotfix is still a pull request and still passes CI. The only thing that changes is the branch source: cut from `main`, merge to `main`, then back-merge into `staging` the same day so the branches do not diverge. Skipping staging verification is permitted for a hotfix only when the fault is already causing a sev-1 and the fix is small enough to read in full. Note the exception in `BMMP Planning/briefs/` — an undocumented skipped gate becomes normal practice within a month.
 
 ---
 
