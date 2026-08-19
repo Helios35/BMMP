@@ -30,7 +30,10 @@ afterEach(async () => {
 
 describe("findDataSeamViolations", () => {
   it("passes a tree with no Supabase import at all", async () => {
-    await write("src/app/page.tsx", "export default function Page() { return null; }\n");
+    await write(
+      "src/app/page.tsx",
+      "export default function Page() { return null; }\n",
+    );
     expect(await findDataSeamViolations({ root })).toEqual([]);
   });
 

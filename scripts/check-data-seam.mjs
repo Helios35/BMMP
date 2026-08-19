@@ -18,7 +18,16 @@ export const ALLOWED_PREFIXES = ["src/data/supabase/", "src/lib/"];
 /** Folders swept. scripts/ is excluded: this file names the package it looks for. */
 export const SCANNED_ROOTS = ["src", "tests"];
 
-const SOURCE_EXTENSIONS = [".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".mts", ".cts"];
+const SOURCE_EXTENSIONS = [
+  ".ts",
+  ".tsx",
+  ".js",
+  ".jsx",
+  ".mjs",
+  ".cjs",
+  ".mts",
+  ".cts",
+];
 
 const IMPORT_PATTERNS = [
   /\b(?:from|import)\s*\(?\s*['"](@supabase\/[^'"]+)['"]/g,

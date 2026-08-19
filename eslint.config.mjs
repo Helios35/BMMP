@@ -49,7 +49,10 @@ const eslintConfig = defineConfig([
   {
     files: ["src/domain/**/*.{ts,tsx,mts,cts}"],
     rules: {
-      "no-restricted-imports": ["error", { patterns: DOMAIN_FORBIDDEN_IMPORTS }],
+      "no-restricted-imports": [
+        "error",
+        { patterns: DOMAIN_FORBIDDEN_IMPORTS },
+      ],
       // No env reads. A rule whose behaviour depends on the environment cannot
       // be unit-tested against a fixed input, which is the whole point of the
       // folder. Section 3.1.

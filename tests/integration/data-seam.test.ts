@@ -14,11 +14,15 @@ describe("the data seam", () => {
   });
 
   it("returns fake records under mock and live records under supabase", () => {
-    expect(resolveAdapter({ DATA_ADAPTER: "mock" }).adapter.describe()).toEqual({
-      name: "mock",
-      kind: "fake",
-    });
-    expect(resolveAdapter({ DATA_ADAPTER: "supabase" }).adapter.describe()).toEqual({
+    expect(resolveAdapter({ DATA_ADAPTER: "mock" }).adapter.describe()).toEqual(
+      {
+        name: "mock",
+        kind: "fake",
+      },
+    );
+    expect(
+      resolveAdapter({ DATA_ADAPTER: "supabase" }).adapter.describe(),
+    ).toEqual({
       name: "supabase",
       kind: "live",
     });

@@ -5,5 +5,9 @@ import { activeAdapterName, data } from "@/data";
 export const dynamic = "force-dynamic";
 
 export function GET() {
-  return Response.json({ status: "ok", adapter: data.describe(), activeAdapterName });
+  return Response.json({
+    status: "ok",
+    adapter: data.describe(),
+    activeAdapterName,
+  });
 }

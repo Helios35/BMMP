@@ -33,7 +33,9 @@ describe("the src/domain boundary", () => {
     ["next", 'import { cookies } from "next/headers";'],
     ["supabase", 'import { createClient } from "@supabase/supabase-js";'],
   ])("refuses an import from %s", async (_label, statement) => {
-    const ruleIds = await lintAsDomainFile(statement + "\nexport const proof = 1;\n");
+    const ruleIds = await lintAsDomainFile(
+      statement + "\nexport const proof = 1;\n",
+    );
     expect(ruleIds).toContain("no-restricted-imports");
   });
 

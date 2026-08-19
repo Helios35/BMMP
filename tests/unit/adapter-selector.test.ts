@@ -16,11 +16,15 @@ describe("resolveAdapter", () => {
   });
 
   it("throws when DATA_ADAPTER is empty", () => {
-    expect(() => resolveAdapter({ DATA_ADAPTER: "" })).toThrow(/DATA_ADAPTER must be/);
+    expect(() => resolveAdapter({ DATA_ADAPTER: "" })).toThrow(
+      /DATA_ADAPTER must be/,
+    );
   });
 
   it("throws when DATA_ADAPTER is whitespace", () => {
-    expect(() => resolveAdapter({ DATA_ADAPTER: "   " })).toThrow(/DATA_ADAPTER must be/);
+    expect(() => resolveAdapter({ DATA_ADAPTER: "   " })).toThrow(
+      /DATA_ADAPTER must be/,
+    );
   });
 
   it("throws when DATA_ADAPTER is misspelled, and names the value it got", () => {
@@ -43,13 +47,16 @@ describe("resolveAdapter", () => {
 
   it("allows mock outside production", () => {
     for (const env of [undefined, "preview", "development"]) {
-      expect(resolveAdapter({ DATA_ADAPTER: "mock", VERCEL_ENV: env }).name).toBe("mock");
+      expect(
+        resolveAdapter({ DATA_ADAPTER: "mock", VERCEL_ENV: env }).name,
+      ).toBe("mock");
     }
   });
 
   it("allows supabase in production", () => {
     expect(
-      resolveAdapter({ DATA_ADAPTER: "supabase", VERCEL_ENV: "production" }).name,
+      resolveAdapter({ DATA_ADAPTER: "supabase", VERCEL_ENV: "production" })
+        .name,
     ).toBe("supabase");
   });
 

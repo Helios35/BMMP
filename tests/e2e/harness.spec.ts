@@ -7,7 +7,9 @@ test("the application boots", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "BMMP" })).toBeVisible();
 });
 
-test("the health endpoint states which adapter is live", async ({ request }) => {
+test("the health endpoint states which adapter is live", async ({
+  request,
+}) => {
   const response = await request.get("/api/health");
   expect(response.status()).toBe(200);
 

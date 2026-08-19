@@ -21,7 +21,9 @@ export default defineConfig({
       // 'server-only' throws when imported outside a React Server Component.
       // Its job is to stop the seam leaking into the browser bundle at build
       // time; under Vitest there is no bundler, so it is stubbed out.
-      "server-only": fileURLToPath(new URL("./tests/stubs/server-only.ts", import.meta.url)),
+      "server-only": fileURLToPath(
+        new URL("./tests/stubs/server-only.ts", import.meta.url),
+      ),
     },
   },
 });
