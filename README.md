@@ -120,8 +120,10 @@ structurally cannot catch that because CI cannot read the deployment platform
 environment values — so the guard runs in the process serving the request
 (D-16).
 
-`pnpm check:data-seam` fails on any `@supabase/*` import outside
+`pnpm check:data-seam` fails on any `@supabase/*` import in `src/` outside
 `src/data/supabase/` or `src/lib/`. It runs in CI as a required status check.
+It does not sweep `tests/`, where an integration test legitimately talks to a
+test database.
 
 ## Deployment
 

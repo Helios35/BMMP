@@ -77,9 +77,12 @@ describe("findDataSeamViolations", () => {
     expect(violations[0]?.file).toBe("src/features/intake/leak.ts");
   });
 
-  it("catches the import in a test as well as in application code", async () => {
-    await write("tests/unit/leak.test.ts", 'import "@supabase/supabase-js";\n');
-    expect(await findDataSeamViolations({ root })).toHaveLength(1);
+  it("does not sweep tests/ — an integration test may use a test database", async () => {
+    await write(
+      "tests/integration/uses-test-db.test.ts",
+      'import "@supabase/supabase-js";\n',
+    );
+    expect(await findDataSeamViolations({ root })).toEqual([]);
   });
 
   it("does not fire on a mention of the package in prose", async () => {

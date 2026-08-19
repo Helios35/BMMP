@@ -61,7 +61,9 @@ flipping one variable. The same Playwright suite must pass both ways. **If a
 screen has to change, the seam leaked — fix the seam, not the screen.**
 
 `scripts/check-data-seam.mjs` runs in CI and fails the build on any
-`@supabase/*` import outside `src/data/supabase/` or `src/lib/`.
+`@supabase/*` import anywhere in `src/` outside `src/data/supabase/` or
+`src/lib/`. It does not sweep `tests/` — an integration test runs against a
+test database, so an import there is legitimate.
 
 ## `src/domain` is pure
 

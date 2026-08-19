@@ -15,8 +15,16 @@ import { fileURLToPath } from "node:url";
 /** The only two folders permitted to import the Supabase client. */
 export const ALLOWED_PREFIXES = ["src/data/supabase/", "src/lib/"];
 
-/** Folders swept. scripts/ is excluded: this file names the package it looks for. */
-export const SCANNED_ROOTS = ["src", "tests"];
+/**
+ * Folders swept — application source only.
+ *
+ * tests/ is deliberately not swept. Section 5 has integration tests running
+ * against a test database, so a Supabase import there is legitimate, and the
+ * fixtures in this checker's own test are literal import statements that would
+ * flag themselves. scripts/ is excluded for the same reason: this file names
+ * the package it looks for.
+ */
+export const SCANNED_ROOTS = ["src"];
 
 const SOURCE_EXTENSIONS = [
   ".ts",
