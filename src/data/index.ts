@@ -9,6 +9,17 @@ export type { DataAdapter, AdapterName, AdapterDescription } from "./contracts";
 const ADAPTERS = { mock: mockAdapter, supabase: supabaseAdapter } as const;
 
 /**
+ * The two variables the selector reads. Narrower than NodeJS.ProcessEnv on
+ * purpose: the guard is the thing under test, and a test should be able to hand
+ * it an environment of exactly two keys.
+ */
+export interface AdapterEnvironment {
+  DATA_ADAPTER?: string | undefined;
+  VERCEL_ENV?: string | undefined;
+  [key: string]: string | undefined;
+}
+
+/**
  * Resolve the adapter, or throw.
  *
  * Fails closed, and that is the point. A ternary defaulting to the mock means an
@@ -17,7 +28,7 @@ const ADAPTERS = { mock: mockAdapter, supabase: supabaseAdapter } as const;
  * that, because CI cannot read the deployment platform's environment values, so
  * the guard runs in the process that serves the request. D-16.
  */
-export function resolveAdapter(env: NodeJS.ProcessEnv = process.env): {
+export function resolveAdapter(env: AdapterEnvironment = process.env): {
   name: keyof typeof ADAPTERS;
   adapter: DataAdapter;
 } {
