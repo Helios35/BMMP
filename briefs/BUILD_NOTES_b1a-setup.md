@@ -26,8 +26,11 @@ automatically on every push.
 
 ## What was built
 
-Next.js 16.3.1, React 19.2.8, pnpm 11.21.0, TypeScript 5.9.3 strict. Sixteen
-commits, one logical change each — one on `main`, fifteen on the branch.
+Next.js 16.3.1, React 19.2.8, pnpm 11.21.0, TypeScript 5.9.3 strict. Nineteen
+commits, one logical change each — one on `main`, eighteen on the branch. The
+last four are the CI faults found by running it for real against GitHub Actions
+rather than only locally; they are listed because `b1a-00` inherits the pipeline
+and the reasoning behind its shape.
 
 | Commit    | What                                                          |
 | --------- | ------------------------------------------------------------- |
@@ -46,7 +49,10 @@ commits, one logical change each — one on `main`, fifteen on the branch.
 | `982cd8a` | Committed format-on-save editor settings                      |
 | `7f4e777` | §10 checklist checked; these build-notes                      |
 | `9300dee` | Three `[owner]` items closed after GitHub access was granted  |
-| _final_   | Commit table and status corrected to match                    |
+| `ec32657` | Commit table corrected                                        |
+| `3a783b3` | CI: `e2e` hang fixed, job timeouts added, duplicate runs deduped |
+| `3fcf014` | CI: `pull_request` trigger dropped — cancelled runs blocked the PR |
+| _last_    | This table brought up to date                                 |
 
 `main` and `staging` both hold only `13f52a8`. Everything after the first commit
 is on `chore/b1a-setup`, unmerged, awaiting Nate's review of the pull request.
