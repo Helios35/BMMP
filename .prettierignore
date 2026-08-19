@@ -1,0 +1,18 @@
+# The canonical documents. docs/ carries 518 verified cross-document citations
+# and briefs/ is the reviewable record of what each unit was asked to do.
+# A markdown reflow breaks a citation silently and no test catches it, so the
+# formatter is never pointed at any of this.
+docs/
+briefs/
+PROJECT_SETUP_BMMP.md
+
+# Generated or vendored — not ours to format.
+pnpm-lock.yaml
+next-env.d.ts
+node_modules/
+.next/
+out/
+build/
+coverage/
+playwright-report/
+test-results/

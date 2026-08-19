@@ -1,0 +1,118 @@
+name: CI
+
+# Every push to any branch. Code never reaches staging or production without
+# passing this first. Section 6.
+#
+# Deliberately no pull_request trigger. A branch with an open pull request would
+# fire both events for the same commit, and whichever run concurrency cancels
+# leaves cancelled check runs behind under the same seven names. Branch
+# protection refuses to treat a required context as passing while a cancelled
+# run for it exists on the head commit, so the pull request blocks on checks
+# that actually passed. One trigger, one run per commit, no ambiguity.
+#
+# What the pull_request trigger would otherwise buy is a run against the merge
+# preview rather than the branch tip. Branch protection already requires
+# branches to be up to date with base (strict), which covers the same ground.
+#
+# Consequence to know: a pull request from a fork would not run CI. There are no
+# forks on this project. If that changes, it is a decision to record, not a
+# silent workflow edit.
+on:
+  push:
+    branches: ["**"]
+
+# Superseded pushes to the same branch are cancelled. With a single trigger the
+# ref is an unambiguous key.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# CI cannot read the deployment platform's environment values, which is why the
+# adapter guard runs in the process serving the request rather than here (D-16).
+# What CI can do is pin itself to fake data and a fixture vision provider, so no
+# job reaches a real backend and no test spends money (D-25).
+env:
+  DATA_ADAPTER: mock
+  VISION_PROVIDER: fixture
+
+# Job names are the status-check names. These seven are the set branch
+# protection requires on main and staging.
+jobs:
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - run: pnpm lint
+
+  format:
+    name: format
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - run: pnpm format:check
+
+  typecheck:
+    name: typecheck
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      # next typegen first: Next 16 generates LayoutProps/PageProps into
+      # .next/types, so a bare tsc --noEmit fails on a clean clone. D-27.
+      - run: pnpm typecheck
+
+  test:
+    name: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - run: pnpm test
+
+  build:
+    name: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - run: pnpm build
+
+  e2e:
+    name: e2e
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      # No --with-deps. It shells out to apt-get, which hung for 34 minutes on
+      # this repository, and ubuntu-latest already ships the libraries Chromium
+      # needs. If a future runner image drops one, this fails fast and loudly
+      # rather than stalling.
+      - run: pnpm exec playwright install chromium
+      - run: pnpm test:e2e
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
+
+  data-seam:
+    name: data-seam
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      # Fails if any file outside src/data/supabase/ or src/lib/ imports
+      # @supabase/*. This is what keeps Section 3.2 true over 32 weeks instead
+      # of only on day one. D-16.
+      - run: pnpm check:data-seam
