@@ -7,3 +7,11 @@ This version has breaking changes — APIs, conventions, and file structure may 
 This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
 
 <!-- END:nextjs-agent-rules -->
+
+---
+
+# BMMP
+
+Read **CLAUDE.md** first. It carries the three rules that gate code review on
+this project, the data-seam rule, and the branch and review method. Everything
+in it applies to every agent, not only to Claude.
