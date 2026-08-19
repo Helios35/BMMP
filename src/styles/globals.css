@@ -1,0 +1,26 @@
+@import "tailwindcss";
+
+/* No font is declared here. The typeface is a design-system decision belonging
+   to unit b1a-00, self-hosted with next/font/local from docs/UX_SPEC.md. D-27. */
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+}
