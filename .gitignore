@@ -49,8 +49,12 @@ supabase/.temp/
 Thumbs.db
 *.pem
 
-# Editor files
-.vscode/
+# Editor files. Two exceptions, both committed on purpose: they carry the
+# format-on-save setting the checklist requires and the extension it needs,
+# and neither holds a secret or anything machine-specific.
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
 .idea/
 
 # Agent tooling — machine-local settings only. CLAUDE.md is committed.
