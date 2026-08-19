@@ -1,8 +1,13 @@
 import { fileURLToPath } from "node:url";
+import react from "@vitejs/plugin-react";
 import { defineConfig } from "vitest/config";
 
 export default defineConfig({
+  plugins: [react()],
   test: {
+    // Node by default. Component tests opt into jsdom with a per-file
+    // `// @vitest-environment jsdom` pragma, so a pure-domain test never pays
+    // for a DOM it does not use.
     environment: "node",
     // Playwright owns tests/e2e. Vitest must not try to run it.
     include: [
@@ -10,7 +15,7 @@ export default defineConfig({
       "tests/integration/**/*.test.{ts,tsx}",
       "src/**/*.test.{ts,tsx}",
     ],
-    setupFiles: ["tests/setup/env.ts"],
+    setupFiles: ["tests/setup/env.ts", "tests/setup/dom.ts"],
     // The domain-boundary gate runs ESLint in-process; loading the flat config
     // costs several seconds on the first call.
     testTimeout: 30_000,

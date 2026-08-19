@@ -1,26 +1,265 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
 
-/* No font is declared here. The typeface is a design-system decision belonging
-   to unit b1a-00, self-hosted with next/font/local from docs/UX_SPEC.md. D-27. */
+@custom-variant dark (&:is(.dark *));
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+/* ---------------------------------------------------------------------------
+   BMMP design tokens — docs/UX_SPEC.md §1.
+
+   Two environments, both hostile to decorative design: a warehouse at 60–80cm
+   in mixed lighting, and a phone in a storage room. Legibility beats elegance
+   in every disagreement (UX_SPEC.md §0).
+
+   Rule 1: app code uses semantic tokens only. No raw hex and no numbered
+   Tailwind colour in a component. Every literal colour is defined once, here.
+   --------------------------------------------------------------------------- */
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --font-sans: var(--font-sans);
+  --font-heading: var(--font-sans);
+  --font-mono: var(--font-mono);
+
+  /* UX_SPEC.md §1.4 — two radius values only. rounded-lg (8px) for cards,
+     dialogs and sheets; rounded-md (6px) for inputs, buttons and badges. */
+  --radius-sm: 0.25rem;
+  --radius-md: 0.375rem;
+  --radius-lg: 0.5rem;
+  --radius-xl: 0.5rem;
+  --radius-2xl: 0.5rem;
+  --radius-3xl: 0.5rem;
+  --radius-4xl: 0.5rem;
+
+  /* UX_SPEC.md §1.2 Rule 2 — five status intents, defined once, used
+     everywhere. A component never picks a colour for a status; it resolves an
+     intent through the single statusIntent map in
+     src/components/status/status-intent.ts. */
+  --color-intent-neutral-foreground: var(--intent-neutral-foreground);
+  --color-intent-neutral-background: var(--intent-neutral-background);
+  --color-intent-neutral-border: var(--intent-neutral-border);
+  --color-intent-ok-foreground: var(--intent-ok-foreground);
+  --color-intent-ok-background: var(--intent-ok-background);
+  --color-intent-ok-border: var(--intent-ok-border);
+  --color-intent-attention-foreground: var(--intent-attention-foreground);
+  --color-intent-attention-background: var(--intent-attention-background);
+  --color-intent-attention-border: var(--intent-attention-border);
+  --color-intent-critical-foreground: var(--intent-critical-foreground);
+  --color-intent-critical-background: var(--intent-critical-background);
+  --color-intent-critical-border: var(--intent-critical-border);
+  --color-intent-pending-foreground: var(--intent-pending-foreground);
+  --color-intent-pending-background: var(--intent-pending-background);
+  --color-intent-pending-border: var(--intent-pending-border);
+
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+:root {
+  --font-mono:
+    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono",
+    monospace;
+
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  /* Darkened from the shadcn default (0.556) to clear the 4.5:1 floor in
+     UX_SPEC.md §1.2 Rule 3. Metadata only — never a value, a status, a number
+     a user acts on, or a field label in the intake flow. */
+  --muted-foreground: oklch(0.47 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.505 0.2 27.5);
+  --border: oklch(0.9 0 0);
+  --input: oklch(0.87 0 0);
+  /* Focus ring at ≥ 3:1 against the page — UX_SPEC.md §1.2 Rule 3, §1.5. */
+  --ring: oklch(0.55 0 0);
+  --chart-1: oklch(0.87 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.439 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
+  --radius: 0.5rem;
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.9 0 0);
+  --sidebar-ring: oklch(0.55 0 0);
+
+  /* Status intents — light. Foreground on background clears 7:1, because a
+     badge's text is frequently the only carrier of the status
+     (UX_SPEC.md §1.2 Rule 3). Tailwind palette anchors named in the spec:
+     slate / emerald / amber / red / violet. */
+  --intent-neutral-foreground: oklch(0.372 0.026 258); /* slate-700 */
+  --intent-neutral-background: oklch(0.968 0.007 248); /* slate-100 */
+  --intent-neutral-border: oklch(0.869 0.02 252); /* slate-300 */
+
+  --intent-ok-foreground: oklch(0.372 0.077 168); /* emerald-800 */
+  --intent-ok-background: oklch(0.979 0.021 166); /* emerald-50  */
+  --intent-ok-border: oklch(0.845 0.109 165); /* emerald-300 */
+
+  --intent-attention-foreground: oklch(0.354 0.084 68); /* amber-900 */
+  --intent-attention-background: oklch(0.987 0.022 95); /* amber-50  */
+  --intent-attention-border: oklch(0.828 0.153 78); /* amber-400 */
+
+  --intent-critical-foreground: oklch(0.444 0.177 27); /* red-800 */
+  --intent-critical-background: oklch(0.971 0.013 18); /* red-50  */
+  --intent-critical-border: oklch(0.704 0.191 22); /* red-400 */
+
+  --intent-pending-foreground: oklch(0.438 0.218 304); /* violet-800 */
+  --intent-pending-background: oklch(0.969 0.016 293); /* violet-50  */
+  --intent-pending-border: oklch(0.811 0.111 293); /* violet-300 */
+}
+
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.75 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 16%);
+  --input: oklch(1 0 0 / 22%);
+  --ring: oklch(0.68 0 0);
+  --chart-1: oklch(0.87 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.439 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 16%);
+  --sidebar-ring: oklch(0.68 0 0);
+
+  /* Status intents — dark. UX_SPEC.md §1.2 Rule 6: dark mode is a first-class
+     target. Warehouse screens are dimmed and phones in a dark storage room
+     default to dark, so both themes ship in B1a. */
+  --intent-neutral-foreground: oklch(0.929 0.013 256); /* slate-200 */
+  --intent-neutral-background: oklch(0.279 0.041 260); /* slate-800 */
+  --intent-neutral-border: oklch(0.554 0.046 257); /* slate-600 */
+
+  --intent-ok-foreground: oklch(0.905 0.093 165); /* emerald-200 */
+  --intent-ok-background: oklch(0.262 0.051 173); /* emerald-950 */
+  --intent-ok-border: oklch(0.508 0.118 166); /* emerald-700 */
+
+  --intent-attention-foreground: oklch(0.962 0.059 95); /* amber-100 */
+  --intent-attention-background: oklch(0.279 0.077 46); /* amber-950 */
+  --intent-attention-border: oklch(0.666 0.179 58); /* amber-600 */
+
+  --intent-critical-foreground: oklch(0.885 0.062 18); /* red-200 */
+  --intent-critical-background: oklch(0.258 0.092 26); /* red-950 */
+  --intent-critical-border: oklch(0.505 0.213 27); /* red-700 */
+
+  --intent-pending-foreground: oklch(0.894 0.057 293); /* violet-200 */
+  --intent-pending-background: oklch(0.283 0.141 291); /* violet-950 */
+  --intent-pending-border: oklch(0.491 0.27 292); /* violet-700 */
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
   }
-}
 
-body {
-  background: var(--background);
-  color: var(--foreground);
+  /*
+   * UX_SPEC.md §1.3 — 17px below md, 16px at and above. Stated there as the
+   * single highest-leverage legibility decision in the spec, and explicitly
+   * not negotiable for aesthetic reasons. 14px is the floor anywhere in the
+   * product; nothing renders smaller.
+   */
+  html {
+    @apply font-sans;
+    font-size: 17px;
+  }
+
+  @media (width >= 48rem) {
+    html {
+      font-size: 16px;
+    }
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+
+  /*
+   * UX_SPEC.md §1.3 — tabular numerals on every table column, meter reading,
+   * clock, quantity and ID. Numbers that shift width while updating are
+   * unreadable at a glance.
+   */
+  table,
+  code,
+  kbd,
+  samp,
+  pre,
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /*
+   * UX_SPEC.md §1.6 — prefers-reduced-motion removes all translation and
+   * reduces every duration to 0ms. Layout must not depend on motion, and
+   * nothing in this product is decorative enough to justify moving.
+   */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
 }
