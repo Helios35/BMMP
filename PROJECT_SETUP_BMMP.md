@@ -460,8 +460,8 @@ REPOSITORY
 [x] .gitattributes normalises line endings (authored on Windows, built on Linux CI)
 [x] First commit is structure only — no feature code
 [x] main and staging branches exist
-[ ] Remote connected, both branches pushed                                  [owner]
-[ ] Branch protection on main and staging: PR required, status checks
+[x] Remote connected, both branches pushed                                  [owner]
+[x] Branch protection on main and staging: PR required, status checks
     required, force-push and deletion blocked                               [owner]
 
 ENVIRONMENT
@@ -497,7 +497,7 @@ CI/CD
 [x] Adapter selector proven to throw on an unset and on a misspelled DATA_ADAPTER
 [ ] Two Vercel projects and two Supabase projects, hard-isolated (D-21);
     staging auto-deploys, production requires manual promotion              [owner]
-[ ] Required status checks selected in branch protection                    [owner]
+[x] Required status checks selected in branch protection                    [owner]
 
 DOCUMENTATION
 [x] README complete with all required sections

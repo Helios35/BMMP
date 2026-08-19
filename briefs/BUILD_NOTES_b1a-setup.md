@@ -13,8 +13,9 @@ open items before writing that brief.
 ## Status
 
 Every box in `PROJECT_SETUP_BMMP.md` §10 that is not marked `[owner]` is
-checked — 29 of them. Five `[owner]` boxes are left unchecked and are listed at
-the bottom. Each checked box was verified by running the thing, not by writing
+checked — 29 of them. Of the five `[owner]` boxes, three were closed after the
+brief was written because Nate granted GitHub access mid-unit; two remain open.
+All five are listed at the bottom. Each checked box was verified by running the thing, not by writing
 the tick.
 
 The full CI sequence passes locally and on a fresh clone. All three gates were
@@ -353,18 +354,46 @@ setting is none of those. The enforceable guarantee is still pre-commit and CI.
 
 ---
 
-## Open `[owner]` items — five, none worked around
+## `[owner]` items — three closed, two open
 
-None of these was substituted with a lesser thing, and nothing was disabled to
-avoid needing an account.
+None was substituted with a lesser thing, and nothing was disabled to avoid
+needing an account.
 
-1. **Remote connected, both branches pushed.** No remote is configured. `main`,
-   `staging` and `chore/b1a-setup` exist locally.
-2. **Branch protection on `main` and `staging`** — PR required, status checks
-   required, branches up to date, force-push and deletion blocked.
-3. **Required status checks selected.** Select all seven by name: `lint`,
-   `format`, `typecheck`, `test`, `build`, `e2e`, `data-seam`. See deviation 4 —
-   this is more than the four §1 lists.
+### Closed after the brief was written
+
+Nate granted GitHub access mid-unit, so three items that a build agent normally
+cannot do were done and verified.
+
+1. **Remote connected, both branches pushed.** ✅
+   `git@github.com:Helios35/BMMP.git`. `main`, `staging` and `chore/b1a-setup`
+   are pushed; default branch is `main`. **The repository is public**, which was
+   raised before pushing — the `docs/` stack, `PROJECT_SETUP_BMMP.md` and every
+   brief carry a confidentiality line — and Nate directed the push as public
+   anyway. Recorded here because it is a standing property of the repository,
+   not a one-time choice: every later unit publishes the same way.
+2. **Branch protection on `main` and `staging`.** ✅ Pull request required,
+   status checks required, branches must be up to date (`strict`), force pushes
+   and deletion blocked, conversation resolution required, stale reviews
+   dismissed. Required approvals is **0** — a solo owner cannot approve his own
+   pull request, so the reviewer requirement is replaced by the human rule
+   (D-17), not weakened.
+   **`enforce_admins` is off.** With one owner and no second admin, locking
+   admins out of their own repository has no one to fall back on. Flip it if you
+   want "no manual overrides" enforced mechanically:
+   `gh api -X POST repos/Helios35/BMMP/branches/main/protection/enforce_admins`
+3. **Required status checks selected.** ✅ All seven by name: `lint`, `format`,
+   `typecheck`, `test`, `build`, `e2e`, `data-seam`. See deviation 4 — this is
+   more than the four §1 lists. First run on `chore/b1a-setup` was green on all
+   seven (run `32299720499`).
+
+Note that `main` and `staging` sit at the structure-only first commit, which
+predates `.github/workflows/ci.yml`, so no CI run exists on those branches yet.
+The required checks evaluate against a pull request's head, which does carry the
+workflow, so this resolves itself on the first merge.
+
+### Still open
+
+
 4. **Two Vercel projects and two Supabase projects, hard-isolated (D-21).**
    Staging auto-deploys from `staging`; production requires manual promotion.
    Each Vercel project needs `DATA_ADAPTER` set explicitly — an unset value stops
