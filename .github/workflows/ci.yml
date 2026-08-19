@@ -1,17 +1,30 @@
 name: CI
 
-# Every push to any branch, and every pull request. Code never reaches staging
-# or production without passing this first. Section 6.
+# Every push to any branch. Code never reaches staging or production without
+# passing this first. Section 6.
+#
+# Deliberately no pull_request trigger. A branch with an open pull request would
+# fire both events for the same commit, and whichever run concurrency cancels
+# leaves cancelled check runs behind under the same seven names. Branch
+# protection refuses to treat a required context as passing while a cancelled
+# run for it exists on the head commit, so the pull request blocks on checks
+# that actually passed. One trigger, one run per commit, no ambiguity.
+#
+# What the pull_request trigger would otherwise buy is a run against the merge
+# preview rather than the branch tip. Branch protection already requires
+# branches to be up to date with base (strict), which covers the same ground.
+#
+# Consequence to know: a pull request from a fork would not run CI. There are no
+# forks on this project. If that changes, it is a decision to record, not a
+# silent workflow edit.
 on:
   push:
     branches: ["**"]
-  pull_request:
 
-# Keyed on the commit, not the ref. A branch with an open pull request fires
-# both a push and a pull_request event for the same SHA; grouping on the ref
-# puts them in different groups and runs the whole suite twice.
+# Superseded pushes to the same branch are cancelled. With a single trigger the
+# ref is an unambiguous key.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.head.sha || github.sha }}
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 # CI cannot read the deployment platform's environment values, which is why the

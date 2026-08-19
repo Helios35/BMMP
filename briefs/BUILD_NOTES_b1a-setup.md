@@ -340,6 +340,19 @@ setting is none of those. The enforceable guarantee is still pre-commit and CI.
   in-process, which costs several seconds on the first call.
 - CI runs on Node 22 and pins `DATA_ADAPTER=mock` and `VISION_PROVIDER=fixture`,
   so no job reaches a real backend and no test spends money (D-25).
+- **CI triggers on `push` only, with no `pull_request` trigger.** Both triggers
+  fire for the same commit on a branch with an open pull request. Whichever run
+  concurrency cancels leaves cancelled check runs behind under the same seven
+  names, and branch protection will not treat a required context as passing
+  while a cancelled run for it exists — so the pull request blocks on checks
+  that passed. Found the hard way on PR #1. `strict` branch protection already
+  requires branches to be up to date with base, which is what a merge-preview
+  run would otherwise buy. **A pull request from a fork would not run CI**;
+  there are no forks, and changing that is a decision to record.
+- **Every job has a `timeout-minutes`** — 10, and 20 for `e2e`. Added after
+  `playwright install --with-deps chromium` hung for 34 minutes against
+  GitHub's six-hour default. `--with-deps` shells out to `apt-get` and buys
+  nothing on `ubuntu-latest`; it was removed and `e2e` now finishes in 48s.
 
 ---
 
