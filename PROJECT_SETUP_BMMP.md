@@ -455,57 +455,57 @@ Items marked **[owner]** need account access a build agent does not have. Nate d
 
 ```
 REPOSITORY
-[ ] Repo initialized, Next.js + TypeScript scaffolded with pnpm
-[ ] .gitignore created and complete
-[ ] .gitattributes normalises line endings (authored on Windows, built on Linux CI)
-[ ] First commit is structure only — no feature code
-[ ] main and staging branches exist
+[x] Repo initialized, Next.js + TypeScript scaffolded with pnpm
+[x] .gitignore created and complete
+[x] .gitattributes normalises line endings (authored on Windows, built on Linux CI)
+[x] First commit is structure only — no feature code
+[x] main and staging branches exist
 [ ] Remote connected, both branches pushed                                  [owner]
 [ ] Branch protection on main and staging: PR required, status checks
     required, force-push and deletion blocked                               [owner]
 
 ENVIRONMENT
-[ ] .env.local created
-[ ] .env.example committed with all keys, no values
-[ ] All secrets confirmed out of version control
-[ ] No secret sits behind a NEXT_PUBLIC_ prefix
+[x] .env.local created
+[x] .env.example committed with all keys, no values
+[x] All secrets confirmed out of version control
+[x] No secret sits behind a NEXT_PUBLIC_ prefix
 
 PROJECT STRUCTURE
-[ ] Directory structure matches Section 3.1
-[ ] src/data/contracts, src/data/mock, src/data/supabase and src/data/index.ts exist
-[ ] No business logic in the UI layer
-[ ] No database access outside src/data
-[ ] src/domain imports nothing from app, components, features, data or lib
+[x] Directory structure matches Section 3.1
+[x] src/data/contracts, src/data/mock, src/data/supabase and src/data/index.ts exist
+[x] No business logic in the UI layer
+[x] No database access outside src/data
+[x] src/domain imports nothing from app, components, features, data or lib
 
 CODE QUALITY
-[ ] ESLint installed and passing
-[ ] Prettier installed, running on save and pre-commit
-[ ] Canonical documents excluded from the formatter — markdown reflow must never
+[x] ESLint installed and passing
+[x] Prettier installed, running on save and pre-commit
+[x] Canonical documents excluded from the formatter — markdown reflow must never
     disturb the 518 cross-document citations
-[ ] tsc --noEmit passes with strict: true and noUncheckedIndexedAccess: true
-[ ] Naming conventions documented and in use
+[x] tsc --noEmit passes with strict: true and noUncheckedIndexedAccess: true
+[x] Naming conventions documented and in use
 
 TESTING
-[ ] Vitest installed, pnpm test works
-[ ] Playwright installed, pnpm test:e2e works
-[ ] At least one placeholder test of each type exists and passes
+[x] Vitest installed, pnpm test works
+[x] Playwright installed, pnpm test:e2e works
+[x] At least one placeholder test of each type exists and passes
 
 CI/CD
-[ ] CI runs on every push: lint, format, typecheck, test, build, e2e
-[ ] Data-seam check wired as a required status check and proven to fail on a
+[x] CI runs on every push: lint, format, typecheck, test, build, e2e
+[x] Data-seam check wired as a required status check and proven to fail on a
     deliberate bad import — the proof runs in CI, not once by hand
-[ ] Adapter selector proven to throw on an unset and on a misspelled DATA_ADAPTER
+[x] Adapter selector proven to throw on an unset and on a misspelled DATA_ADAPTER
 [ ] Two Vercel projects and two Supabase projects, hard-isolated (D-21);
     staging auto-deploys, production requires manual promotion              [owner]
 [ ] Required status checks selected in branch protection                    [owner]
 
 DOCUMENTATION
-[ ] README complete with all required sections
-[ ] docs/ and briefs/ folders exist and hold the canonical doc stack
-[ ] CLAUDE.md carries Section 8's three rules for every agent that opens the repo
+[x] README complete with all required sections
+[x] docs/ and briefs/ folders exist and hold the canonical doc stack
+[x] CLAUDE.md carries Section 8's three rules for every agent that opens the repo
 
 PROJECT-SPECIFIC
-[ ] Section 8's three rules recorded in docs/ and cited in the kickoff brief
+[x] Section 8's three rules recorded in docs/ and cited in the kickoff brief
 [ ] Error tracking wired — DSN needs an account                             [owner]
 ```
 
