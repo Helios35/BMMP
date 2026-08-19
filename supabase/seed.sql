@@ -1,0 +1,5 @@
+-- Intentionally empty.
+--
+-- D-19: the kickoff slice writes zero files to supabase/migrations/. The ERD is
+-- the design the mock-data prototype is measured against, not a schema
+-- commitment. There is nothing to seed until migration 0001 exists.

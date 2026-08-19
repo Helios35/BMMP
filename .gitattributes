@@ -1,0 +1,22 @@
+# Authored on Windows, built on Linux CI. Without this, a checkout on either
+# side reports every file as modified and a real diff becomes unreadable.
+* text=auto eol=lf
+
+# Lockfile: generated, and noisy in diffs.
+pnpm-lock.yaml linguist-generated=true -diff
+
+# Binary — never normalise.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.otf binary
+
+# Windows scripts need CRLF to run.
+*.bat text eol=crlf
+*.cmd text eol=crlf

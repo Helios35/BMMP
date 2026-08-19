@@ -1,0 +1,64 @@
+# Environment — ignored before any of these files is created.
+# .env.example is the one exception: it carries key names and no values.
+.env
+.env.local
+.env.development.local
+.env.staging
+.env.production
+.env*.local
+.env*
+!.env.example
+
+# Dependencies
+node_modules/
+.pnpm-store/
+.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# Build output
+.next/
+out/
+dist/
+build/
+.turbo/
+*.tsbuildinfo
+
+# Test output
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
+coverage/
+
+# Tooling
+.vercel/
+.eslintcache
+next-env.d.ts
+
+# Supabase local state
+supabase/.branches/
+supabase/.temp/
+
+# System files
+.DS_Store
+Thumbs.db
+*.pem
+
+# Editor files
+.vscode/
+.idea/
+
+# Agent tooling — machine-local settings only. CLAUDE.md is committed.
+.claude/settings.local.json
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
