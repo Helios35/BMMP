@@ -92,12 +92,30 @@ renumbering a rule breaks them silently and no test catches it.
 
 - `docs/_ANCHORS.md` fixes persona IDs, entity names, rule section numbers and
   the B1a page list. They do not move.
-- The formatter is excluded from `docs/`, `briefs/` and
-  `PROJECT_SETUP_BMMP.md`. Do not remove that exclusion.
+- The formatter is excluded from `docs/` and `PROJECT_SETUP_BMMP.md`. Do not
+  remove that exclusion.
 - A rule may move **within its section only**, and the PRD is updated in the
   same commit.
 - If a document appears wrong, that is a judgment call. Stop and raise it. Do
   not split the difference.
+
+## Where the planning record lives
+
+**This repository holds the product — code and specifications. The planning
+folder holds the record of how the product got decided — briefs, build-notes
+and the decision log.** The planning folder is outside this repository:
+
+```
+C:\Users\nteiv\Documents\Claude\Projects\Jonathan AI Platforms\BMMP Planning\
+```
+
+Briefs and build-notes live in its `briefs/` subfolder, not here. A
+specification belongs beside the code that implements it and versions with the
+branch that changes it; a brief does not — it is written before the work
+exists, it is read by people who never check out the repo, and it accumulates
+for the life of the engagement rather than the life of a branch.
+
+`docs/`, `PROJECT_SETUP_BMMP.md` and this file stay in the repository.
 
 ## Decisions
 
@@ -117,8 +135,8 @@ unit ID: `feature/b1a-03-label-intake-form`, `chore/b1a-01-ci-pipeline`.
 Nate reads and merges by hand. An agent that merges its own branch has broken
 the method, not just a rule. D-17.
 
-Every unit ends with `briefs/BUILD_NOTES_<unit>.md`. The next unit is written
-against it.
+Every unit ends with `BUILD_NOTES_<unit>.md`, written to the planning folder's
+`briefs/` — never into this repository. The next unit is written against it.
 
 ## Naming conventions
 

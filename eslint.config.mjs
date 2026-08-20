@@ -85,7 +85,6 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     // Canonical documents and generated output are not linted.
     "docs/**",
-    "briefs/**",
     "coverage/**",
     "playwright-report/**",
     "test-results/**",

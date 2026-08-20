@@ -194,7 +194,8 @@ bmmp/
 │   └── e2e/
 │
 ├── docs/                       # the canonical doc stack
-├── briefs/                     # builder briefs and build-notes, one file per unit
+│                               # builder briefs and build-notes are NOT in the
+│                               # repository — see Section 9
 │
 ├── .github/workflows/ci.yml
 ├── .env.local
@@ -440,7 +441,7 @@ Three rules that come from the roadmap and decision log rather than from general
 |---|---|---|
 | This setup reference | repo root, `PROJECT_SETUP_BMMP.md` | now |
 | Canonical doc stack | `docs/` | next — one file per doc, version in header |
-| Builder briefs + build-notes | `briefs/` | one file per unit |
+| Builder briefs + build-notes | planning folder, `BMMP Planning\briefs\` — **outside the repository** | one file per unit |
 | Decision log | `docs/DECISION_LOG.md` | ongoing, append-only |
 
 Every later brief points back to this document rather than restating it.
@@ -501,7 +502,8 @@ CI/CD
 
 DOCUMENTATION
 [x] README complete with all required sections
-[x] docs/ and briefs/ folders exist and hold the canonical doc stack
+[x] docs/ holds the canonical doc stack; briefs and build-notes live in the
+    planning folder outside the repository
 [x] CLAUDE.md carries Section 8's three rules for every agent that opens the repo
 
 PROJECT-SPECIFIC

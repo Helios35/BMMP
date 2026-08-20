@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
  *
  * Linted as if the source were a file inside src/domain, so the boundary rule is
  * exercised on every push without committing a deliberately broken file. Also
- * broken by hand once and watched to fail; see briefs/BUILD_NOTES_b1a-setup.md.
+ * broken by hand once and watched to fail; see BMMP Planning/briefs/BUILD_NOTES_b1a-setup.md.
  * Section 3.3.
  */
 const repoRoot = join(import.meta.dirname, "..", "..");
