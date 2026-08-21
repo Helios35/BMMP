@@ -1,7 +1,7 @@
 # Technical Spec — BMMP
 **Version:** 1.0 · **Date:** 2026-08-11 · **Owner:** Nathan Ivy / Next Sketch LLC
 **Answers:** How will it be built?
-**Reads from:** `_ANCHORS.md` · `PROJECT_SETUP_BMMP.md` · `PRD.md` · `SITE_ARCHITECTURE.md` · `UX_SPEC.md` · `BUSINESS_RULES.md` · `TAXONOMY.md`  ·  **Feeds:** `ERD.md` · `RUNBOOK.md` · `briefs/`
+**Reads from:** `_ANCHORS.md` · `PROJECT_SETUP_BMMP.md` · `PRD.md` · `SITE_ARCHITECTURE.md` · `UX_SPEC.md` · `BUSINESS_RULES.md` · `TAXONOMY.md`  ·  **Feeds:** `ERD.md` · `RUNBOOK.md` · `BMMP Planning/briefs/`
 
 > ## REVIEW NOTES
 > None open. All review notes for this document were answered on 2026-08-19 — see `Decision Log.md` **D-20** for the full disposition, and D-21 through D-26 for the calls that carry their own rationale. Content below is unchanged.
