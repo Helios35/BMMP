@@ -167,8 +167,12 @@ export interface BatteryRecord extends TenantScoped, Timestamped, Attributed {
   /**
    * How the charge reading was established (Rule 2.26).
    *
-   * `ERD.md` §5.1 does not cite a `TAXONOMY.md` system for this column and none
-   * exists — reported in this unit's build-notes.
+   * T-55 governs this column (D-38), and its module is
+   * `src/domain/taxonomy/state-of-charge-source`. **The field stays `string`
+   * pending a fixture migration** — the fixtures store
+   * `vehicle_diagnostic_readout` and `handler_observation`, where T-55 authors
+   * `device_indicator`, `handheld_meter`, `handler_estimate` and
+   * `not_observable`. Reported in this unit's build-notes.
    */
   readonly socSource: string | null;
   readonly socAssessedAt: IsoTimestamp | null;
@@ -179,8 +183,10 @@ export interface BatteryRecord extends TenantScoped, Timestamped, Attributed {
    * third-party health testers; it does not measure battery health itself, and
    * assessed and measured are never merged into one field (Rule 11.5).
    *
-   * No `TAXONOMY.md` system enumerates the condition vocabulary — reported in
-   * this unit's build-notes.
+   * T-49 governs this column (D-38), and its module is
+   * `src/domain/taxonomy/assessed-condition`. **The field stays `string`
+   * pending a fixture migration** — the fixtures store `damaged` where T-49
+   * authors `damaged_or_defective`. Reported in this unit's build-notes.
    */
   readonly assessedCondition: string | null;
   readonly conditionConfirmedBy: Uuid | null;
@@ -190,8 +196,10 @@ export interface BatteryRecord extends TenantScoped, Timestamped, Attributed {
    * photograph"** — Rule 2.10 admits exactly two sources, a matched catalog
    * entry or direct human entry.
    *
-   * `ERD.md` §5.1 says the values are in `TAXONOMY.md`; no system defines them —
-   * reported in this unit's build-notes.
+   * T-54 governs this column (D-38), and its module is
+   * `src/domain/taxonomy/chemistry-source`. **The field stays `string` pending
+   * a fixture migration** — the fixtures store `catalog_match_confirmed` where
+   * T-54 authors `catalog_match`. Reported in this unit's build-notes.
    */
   readonly chemistrySource: string | null;
   /**

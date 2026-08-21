@@ -281,19 +281,27 @@ export const STATUS_INTENTS: Readonly<Record<StatusSystem, IntentMap>> = {
 };
 
 /**
- * Provisional intents for `alert.severity`.
+ * The intents for `alert.severity` — T-48, three values, three intents (D-30).
  *
- * **`ERD.md` §6.5 says these values live in `TAXONOMY.md` and no `T-` system
- * defines them** — the gap is reported in this unit's build-notes. Until P6 adds
- * the system, an unrecognised severity resolves to `neutral` and is surfaced
- * rather than guessed, exactly as an unrecognised status is.
+ * T-48 has no module in `src/domain/taxonomy` and `alert.severity` is still
+ * typed `string`; both are reported in this unit's build-notes. The keys below
+ * are T-48's stored values and are the only three the system defines.
+ *
+ * **An unrecognised severity resolves to `neutral` and is surfaced rather than
+ * guessed**, exactly as an unrecognised status is. It is never guessed upward
+ * into `critical`: inventing an urgency in a compliance product is worse than
+ * showing none.
+ *
+ * `ok` and `pending` are deliberately unmapped — an alert is never a success
+ * state, and an alert waiting on something is `attention` with a body that says
+ * what it is waiting on.
  *
  * A severity never expresses a probability of ignition (Rules 1.25, 10.3).
  */
 export const ALERT_SEVERITY_INTENTS: IntentMap = {
-  info: "neutral",
-  attention: "attention",
   critical: "critical",
+  attention: "attention",
+  informational: "neutral",
 };
 
 /**

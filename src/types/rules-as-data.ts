@@ -77,10 +77,7 @@ export interface JurisdictionRule extends Timestamped, Attributed {
    * from the first reference-data migration** — not added at B3 (`_ANCHORS.md`
    * §0; Rules 8.3, 11.2).
    *
-   * The database column is `applies_to_application_classs` — the triple `s` is
-   * how `ERD.md` §4.2 spells it, and it is reported as a defect in this unit's
-   * build-notes rather than corrected here, because a canonical name is not a
-   * builder's to change.
+   * The database column is `applies_to_application_classes` (`ERD.md` §4.2).
    */
   readonly appliesToApplicationClasses: readonly ApplicationClass[] | null;
   /** Deactivation never deletes. */

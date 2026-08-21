@@ -73,8 +73,11 @@ export interface CatalogEntry extends Timestamped, Attributed {
   /**
    * Where the entry came from.
    *
-   * `ERD.md` §5.2 gives no `TAXONOMY.md` citation and no system defines the
-   * values — reported in this unit's build-notes.
+   * T-61 governs this column (D-38), and its module is
+   * `src/domain/taxonomy/catalog-entry-source-type`. **The field stays `string`
+   * pending a fixture migration** — the fixtures store `manufacturer_datasheet`
+   * where T-61 authors `manufacturer_published`. Reported in this unit's
+   * build-notes.
    */
   readonly sourceType: string;
   readonly sourceUrl: string | null;

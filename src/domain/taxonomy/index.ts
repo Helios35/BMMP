@@ -1,6 +1,6 @@
 /**
- * Every classification system in the product — `docs/TAXONOMY.md`, 47 systems,
- * T-01 through T-47.
+ * The classification systems in the product — `docs/TAXONOMY.md`, T-01 through
+ * T-61. T-48 is the one that is not here, and the comment beside it says why.
  *
  * One module per system, each exporting the value list constant, the union type
  * derived from it, and the label lookup (TAXONOMY.md §5.3). Shared read helpers
@@ -108,3 +108,34 @@ export * from "./classification-decision-status";
 export * from "./damage-assessment-status";
 // T-47 · Terms of Service acceptance status
 export * from "./tos-acceptance-status";
+// T-48 · Alert severity — **no module.** Its label for `attention` is "Needs
+// attention", and §4.5 forbids a label that contains its own stored value.
+// Bending the label and bending the rule are both P6's call — reported in this
+// unit's build-notes rather than settled here.
+//
+// T-49 · Assessed condition
+export * from "./assessed-condition";
+// T-50 · Intake photo type
+export * from "./intake-photo-type";
+// T-51 · Label crop method
+export * from "./label-crop-method";
+// T-52 · Review reason code
+export * from "./review-reason-code";
+// T-53 · Intake step
+export * from "./intake-step";
+// T-54 · Chemistry source
+export * from "./chemistry-source";
+// T-55 · State-of-charge source
+export * from "./state-of-charge-source";
+// T-56 · Date code precision
+export * from "./date-code-precision";
+// T-57 · Date code decode method
+export * from "./date-code-decode-method";
+// T-58 · Classification decision scope
+export * from "./classification-decision-scope";
+// T-59 · Damage assessment method
+export * from "./damage-assessment-method";
+// T-60 · Audit actor type
+export * from "./audit-actor-type";
+// T-61 · Catalog entry source type
+export * from "./catalog-entry-source-type";

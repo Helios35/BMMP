@@ -12,6 +12,9 @@ import type {
 } from "@/types/common";
 import type { ConfidenceBand } from "@/domain/taxonomy/confidence-band";
 import type { DataUseEligibility } from "@/domain/taxonomy/data-use-eligibility";
+import type { DateCodeDecodeMethod } from "@/domain/taxonomy/date-code-decode-method";
+import type { DateCodePrecision } from "@/domain/taxonomy/date-code-precision";
+import type { IntakePhotoType } from "@/domain/taxonomy/intake-photo-type";
 import type { IntakeSessionStatus } from "@/domain/taxonomy/intake-session-status";
 import type { LabelFieldCode } from "@/domain/taxonomy/label-field-code";
 
@@ -41,18 +44,27 @@ export interface IntakeSession extends TenantScoped, Timestamped {
   /**
    * Which pipeline step is next. Fixed order, code-owned (Rules 2.2, 2.3).
    *
-   * A pipeline step key rather than a taxonomy value — `ERD.md` §5.3 names no
-   * `TAXONOMY.md` system for it.
+   * **This is a taxonomy value, not a bare pipeline key.** T-53 governs this
+   * column (D-38), and its module is `src/domain/taxonomy/intake-step` —
+   * `INTAKE_STEPS` is the value list and the display order, and a stepper reads
+   * it rather than declaring its own. **The field stays `string` pending a
+   * fixture migration** — the fixtures store `completed` and
+   * `human_confirmation`, where T-53 authors `capture`, `extraction_review`,
+   * `confirm_and_place` and `complete`. Reported in this unit's build-notes.
    */
   readonly currentStep: string;
   /** Set true by the confidence gate. Drives `/review` (Rule 2.14). */
   readonly isReviewRequired: boolean;
   /**
-   * Which gate condition failed.
-   *
-   * `ERD.md` §5.3 says the values are in `TAXONOMY.md`; no system defines them —
-   * reported in this unit's build-notes. The conditions themselves are
+   * Which gate condition failed. The conditions themselves are
    * `TECHNICAL_SPEC.md` §11.1 step 5.
+   *
+   * T-52 governs this column (D-38), and its module is
+   * `src/domain/taxonomy/review-reason-code`. **The elements stay `string`
+   * pending a fixture migration** — the fixtures store
+   * `field_below_confidence_threshold`, `ambiguous_catalog_match` and
+   * `hard_gated_field_not_extracted`, none of which is in T-52's set. Reported
+   * in this unit's build-notes.
    */
   readonly reviewReasonCodes: readonly string[] | null;
   /**
@@ -85,13 +97,8 @@ export interface IntakePhoto extends TenantScoped, Created {
   readonly intakeSessionId: Uuid;
   /** **Non-null identifies a crop.** */
   readonly parentIntakePhotoId: Uuid | null;
-  /**
-   * What this image is.
-   *
-   * `ERD.md` §5.4 says the values are in `TAXONOMY.md`; no system defines them —
-   * reported in this unit's build-notes.
-   */
-  readonly photoType: string;
+  /** What this image is. T-50. */
+  readonly photoType: IntakePhotoType;
   /** Private bucket, `org/{organizationId}/…`. **Never public.** */
   readonly storageObjectPath: string;
   readonly contentHash: Sha256;
@@ -107,8 +114,11 @@ export interface IntakePhoto extends TenantScoped, Created {
    * a scuffed label on a mobility pack is an ordinary Tuesday, and the manual
    * path is always available and never hidden.
    *
-   * `ERD.md` §5.4 says the values are in `TAXONOMY.md`; no system defines them —
-   * reported in this unit's build-notes.
+   * T-51 governs this column (D-38), and its module is
+   * `src/domain/taxonomy/label-crop-method`. **The field stays `string` pending
+   * a fixture migration** — the fixtures store `region_detection` and
+   * `manual_selection`, where T-51 authors `auto_detected` and `manual`.
+   * Reported in this unit's build-notes.
    */
   readonly cropMethod: string | null;
   /** Read from EXIF **before** EXIF is stripped. */
@@ -218,24 +228,16 @@ export interface DateCodeDecode extends TenantScoped, Created {
   readonly formatKey: string;
   /** **Null when the code cannot be decoded — an honest null, not a guess.** */
   readonly decodedManufacturedOn: IsoDate | null;
-  /**
-   * How precisely the code resolves.
-   *
-   * `ERD.md` §5.6 says the values are in `TAXONOMY.md`; no system defines them —
-   * reported in this unit's build-notes.
-   */
-  readonly decodedPrecision: string | null;
+  /** How precisely the code resolves. T-56. */
+  readonly decodedPrecision: DateCodePrecision | null;
   /** Bumped when a decoder changes; **old rows keep their old answer**. */
   readonly decoderVersion: string;
   readonly confidence: Decimal | null;
   /**
-   * Whether a deterministic decoder or a person produced the date. **No value
-   * means "inferred by a model"** — nothing here is.
-   *
-   * `ERD.md` §5.6 says the values are in `TAXONOMY.md`; no system defines them —
-   * reported in this unit's build-notes.
+   * Whether a deterministic decoder or a person produced the date. T-57. **No
+   * value means "inferred by a model"** — nothing here is.
    */
-  readonly decodedByMethod: string;
+  readonly decodedByMethod: DateCodeDecodeMethod;
   /** Set on human override. */
   readonly decodedBy: Uuid | null;
 }

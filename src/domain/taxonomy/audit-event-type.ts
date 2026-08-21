@@ -12,11 +12,11 @@
  * a rejected P5 write and a prohibited-activity attempt are all audited, not merely
  * refused. Attempted actions are evidence.
  *
- * `ERD.md` §10.2 additionally names `document.render_failed`,
- * `document.reprinted` and `document.viewed` on `audit_event.event_type`. Those
- * three are **not** in T-43's value set — see the build-notes for this unit; the
- * gap is reported rather than closed here, because inventing a value is a review
- * rejection (TAXONOMY.md §1.1).
+ * **`document.render_failed`, `document.reprinted` and `document.viewed` are
+ * required by behaviour, not by convenience**: a failed render is recorded as an
+ * event because `document_render` rows are inserted only on success
+ * (`TECHNICAL_SPEC.md` §10.4), and every view and every reprint appends one
+ * because `document_render` carries no reprint counter (§8.4).
  *
  * Definitions for every value are in `docs/TAXONOMY.md` T-43, which is the
  * single source of truth. This module owns the stored value, the value order —
@@ -45,6 +45,9 @@ export const AUDIT_EVENT_TYPES = [
   "shipment.status_changed",
   "document_render.issued",
   "document_render.superseded",
+  "document.render_failed",
+  "document.reprinted",
+  "document.viewed",
   "membership.role_changed",
   "jurisdiction_rule.version_activated",
   "override.recorded",
@@ -82,6 +85,9 @@ export const AUDIT_EVENT_TYPE_LABELS: Readonly<Record<AuditEventType, string>> =
     "shipment.status_changed": "Shipment status changed",
     "document_render.issued": "Document issued",
     "document_render.superseded": "Document superseded",
+    "document.render_failed": "Document render failed",
+    "document.reprinted": "Document reprinted",
+    "document.viewed": "Document viewed",
     "membership.role_changed": "Role changed",
     "jurisdiction_rule.version_activated": "Rule version activated",
     "override.recorded": "Override recorded",
