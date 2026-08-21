@@ -36,7 +36,7 @@ env:
   VISION_PROVIDER: fixture
 
 # Job names are the status-check names. These seven are the set branch
-# protection requires on main and staging.
+# protection requires on main, the only long-lived branch (D-29).
 jobs:
   lint:
     name: lint

@@ -127,9 +127,11 @@ brief disagree, or a document contradicts another, stop and say so.
 
 ## Branching
 
-`main` is production-ready and is never worked on directly. `staging` is the
-integration branch. **One brief, one branch**, and the branch name carries the
-unit ID: `feature/b1a-03-label-intake-form`, `chore/b1a-01-ci-pipeline`.
+`main` is the only long-lived branch and is never worked on directly. A feature
+branch opens a pull request against `main` and merges when the checks pass and a
+human has read the diff (D-29). **One brief, one branch**, and the branch name
+carries the unit ID: `feature/b1a-03-label-intake-form`,
+`chore/b1a-01-ci-pipeline`.
 
 **No agent merges its own work.** Every unit ends in a pull request whose diff
 Nate reads and merges by hand. An agent that merges its own branch has broken

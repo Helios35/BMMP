@@ -74,9 +74,11 @@ with tests.
 
 ## Branch strategy
 
-- `main` — production-ready only. Never worked on directly.
-- `staging` — integration branch.
-- Feature branches — where all active work happens.
+- `main` — the only long-lived branch. Production-ready only, never worked on
+  directly.
+- Feature branches — where all active work happens. Each one opens a pull
+  request against `main` and merges when the checks pass and a human has read
+  the diff (D-29).
 
 **One brief, one branch.** The branch name carries the unit ID from the sprint
 plan, so the branch, the brief and the build-notes are traceable to each other:
@@ -87,11 +89,11 @@ fix/b1a-07-storage-clock-timezone
 chore/b1a-01-ci-pipeline
 ```
 
-Branch protection on `main` and `staging` requires a pull request, requires the
-CI status checks, requires branches to be up to date, and blocks force pushes
-and deletion. The reviewer requirement is replaced by a hard human rule: **no
-agent merges its own work.** Every unit ends in a pull request whose diff the
-owner reads and merges by hand (D-17).
+Branch protection on `main` requires a pull request, requires the CI status
+checks, requires branches to be up to date, and blocks force pushes and
+deletion. The reviewer requirement is replaced by a hard human rule: **no agent
+merges its own work.** Every unit ends in a pull request whose diff the owner
+reads and merges by hand (D-17).
 
 ## Data layer
 
@@ -131,7 +133,9 @@ CI runs on every push to any branch and on every pull request:
 `lint`, `format`, `typecheck`, `test`, `build`, `e2e`, `data-seam`. These seven
 are the checks branch protection requires.
 
-- **Staging** — Vercel deploys automatically from `staging` when CI passes.
+- **Staging** — every pull request gets its own Vercel preview deployment,
+  pointed at the staging Supabase project. The pull-request previews are the
+  staging deployment (D-29, D-21).
 - **Production** — Vercel deploys from `main` after CI passes **and** manual
   promotion in Vercel.
 

@@ -1,7 +1,7 @@
 # Runbook / Operations — BMMP
 **Version:** 1.0 · **Date:** 2026-08-11 · **Owner:** Nathan Ivy / Next Sketch LLC
 **Answers:** How do we run BMMP in production — and what do we do at 2am when it breaks?
-**Reads from:** `PROJECT_SETUP_BMMP.md` · `docs/TECHNICAL_SPEC.md` · `docs/ERD.md` · `docs/BUSINESS_RULES.md` · Roadmap v3.0 · SOW 1  ·  **Feeds:** `BMMP Planning/briefs/` (every build unit, outside the repository) · launch-readiness check · `docs/DECISION_LOG.md`
+**Reads from:** `PROJECT_SETUP_BMMP.md` · `docs/TECHNICAL_SPEC.md` · `docs/ERD.md` · `docs/BUSINESS_RULES.md` · Roadmap v3.0 · SOW 1  ·  **Feeds:** `BMMP Planning/briefs/` (every build unit, outside the repository) · launch-readiness check · the project-level `Decision Log.md` (beside `BMMP Planning/`, outside the repository)
 
 > ## REVIEW NOTES
 > None open. All review notes for this document were answered on 2026-08-19 — see `Decision Log.md` **D-20** for the full disposition, and D-21 through D-26 for the calls that carry their own rationale. Content below is unchanged.
@@ -38,8 +38,10 @@ This is an operations manual, not a description. It is written to be read while 
 |---|---|---|---|---|
 | Local | Working copy | `mock` (default) or `supabase` against a local/dev Supabase project | `pnpm dev` | No |
 | Vercel preview | Any feature branch with an open PR | `mock` — always | Automatic on push | No |
-| Vercel staging | `staging` branch | `supabase` — staging project | Automatic when CI passes | No — seeded and test data only |
+| Vercel staging | An owner setting still to be confirmed — see the note below | `supabase` — staging project | Automatic when CI passes | No — seeded and test data only |
 | Vercel production | `main` branch | `supabase` — production project | CI passes, then **manual promotion in Vercel** | **Yes** |
+
+> **Open — an owner call, named here and not settled here.** D-29 deleted the `staging` branch, so the staging row above no longer has a branch to deploy from. **Which Vercel project builds the pull-request preview, and on which adapter, is an open owner call.** D-29 reads the preview *as* the staging deployment, pointed at the staging Supabase project; the standing rule below and §2's credential posture hold that previews always run `mock` and that `SUPABASE_SERVICE_ROLE_KEY` is **never set** on a preview. Both cannot be true as written, and settling it D-29's way puts a service-role key into a preview environment — which no brief item authorizes. The **Deploys how** cell above still describes a branch deployment, and the D-step order in §1.2 is written on D-29's reading; both move with the call.
 
 Two rules that are not negotiable, both from `PROJECT_SETUP_BMMP.md` §6:
 
@@ -50,7 +52,7 @@ Two rules that are not negotiable, both from `PROJECT_SETUP_BMMP.md` §6:
 
 ### 1.2 The standard path — feature branch to production
 
-**D1. Branch.** Cut from `staging`. Name carries the unit ID from the sprint plan: `feature/b1a-03-label-intake-form`. One brief, one branch.
+**D1. Branch.** Cut from `main` — it is the only long-lived branch (D-29). Name carries the unit ID from the sprint plan: `feature/b1a-03-label-intake-form`. One brief, one branch.
 
 **D2. Build locally on `DATA_ADAPTER=mock`.** Screens and flows are developed against the mock adapter. Nothing outside `src/data/supabase/` and `src/lib/` imports `@supabase/*` — CI will fail the build if it does.
 
@@ -58,7 +60,9 @@ Two rules that are not negotiable, both from `PROJECT_SETUP_BMMP.md` §6:
 
 **D4. Update `.env.example` in the same commit** if the unit adds an environment variable. This is a `PROJECT_SETUP_BMMP.md` §2 rule and it is the only thing preventing a deploy that is missing a variable nobody remembers exists.
 
-**D5. Open a pull request into `staging`.** CI runs on every push:
+**D5. Apply *additive* migrations to the staging Supabase project — before the branch is pushed.** The staging deployment lands with the push, so pushing first would put new code in front of an old schema. See §1.3 for the ordering rule and the exact commands.
+
+**D6. Open a pull request into `main`.** CI runs on every push:
 
 ```
 pnpm install --frozen-lockfile
@@ -72,15 +76,13 @@ data-seam check          (zero @supabase/* imports outside src/data/supabase and
 
 All are required status checks. The data-seam check is what keeps the swap point real over 32 weeks rather than only on day one.
 
-**D6. Nate reads the diff and merges by hand.**
+**D7. Vercel deploys the pull-request preview — that deployment is staging.** It is pointed at the staging Supabase project (D-29).
 
-**D7. Apply *additive* migrations to the staging Supabase project — before the deploy lands.** See §1.3 for the ordering rule and the exact commands.
-
-**D8. Vercel auto-deploys `staging`.**
+**D8. Nate reads the diff.** No agent merges its own work (D-17). The merge itself is D11, once staging has been verified.
 
 **D9. Verify on staging.** §1.5 checklist. Do not skip the adapter probe — it is the first item for a reason.
 
-**D10. Open a pull request `staging` → `main`.** CI runs again against the merge result.
+**D10. Bring the branch up to date with `main`.** Branch protection requires it, and CI then runs again against the merge result. There is no second pull request — this is the same one opened at D6.
 
 **D11. Nate merges to `main`.**
 
@@ -92,7 +94,7 @@ All are required status checks. The data-seam check is what keeps the swap point
 
 **D15. Apply *destructive* migrations — later, in a separate deploy.** Never in the same window as the code that stopped using the column. See §1.3.
 
-**D16. Record.** Build-notes in `BMMP Planning/briefs/` for the unit. Any judgment call made along the way goes to `docs/DECISION_LOG.md`.
+**D16. Record.** Build-notes in `BMMP Planning/briefs/` for the unit. Any judgment call made along the way goes to the project-level `Decision Log.md`, outside this repository — it sits beside `BMMP Planning/`, it is shared across projects, and it is not a file in `docs/`. A settled call recorded anywhere else is a call the next person answers differently.
 
 ### 1.3 Database migrations and their order relative to a code deploy
 
@@ -162,7 +164,7 @@ Additionally, **every `document_render` row stamps the commit SHA and the active
 ### 1.5 Staging verification checklist
 
 ```
-[ ] GET /api/health → adapter: "supabase", env: staging, commit matches what you merged
+[ ] GET /api/health → adapter: "supabase", env: staging, commit matches what you pushed to the branch
 [ ] Sign in as a test handler (P1)
 [ ] Log a battery through /batteries/new — photo, extraction review, confirm
 [ ] A low-confidence field routes to /review and does not auto-commit
@@ -195,7 +197,7 @@ If the document in step 5 is wrong in any way, stop and go to §5.
 
 ### 1.7 Hotfix path
 
-A hotfix is still a pull request and still passes CI. The only thing that changes is the branch source: cut from `main`, merge to `main`, then back-merge into `staging` the same day so the branches do not diverge. Skipping staging verification is permitted for a hotfix only when the fault is already causing a sev-1 and the fix is small enough to read in full. Note the exception in `BMMP Planning/briefs/` — an undocumented skipped gate becomes normal practice within a month.
+**A hotfix is an ordinary pull request that happens to be urgent.** It cuts from `main` and merges to `main` like every other branch, it still passes CI, and Nate still reads the diff before it merges (D-17). With one long-lived branch there is nothing to diverge from and nothing to back-merge — the urgency is the only thing that is different. Skipping staging verification is permitted for a hotfix only when the fault is already causing a sev-1 and the fix is small enough to read in full. Note the exception in `BMMP Planning/briefs/` — an undocumented skipped gate becomes normal practice within a month.
 
 ---
 
@@ -339,7 +341,7 @@ Ranked by how much damage they do before anyone notices, not by how often they h
 3. **Preserve evidence.** Snapshot the relevant logs and `audit_event` rows before anything expires or rotates. Do not clean up.
 4. **Scope it.** From `audit_event`, determine which organizations, which records, which users, and over what window.
 
-**Then.** Fix the policy or the query. Add a regression test that asserts the boundary. Add the case to the staging checklist. Notify Jonathan the same day with the scope, in writing — breach-notification obligations are a legal question for the client, not a technical one, and the client cannot meet an obligation they have not been told about. Write it up in `docs/DECISION_LOG.md` and update this runbook.
+**Then.** Fix the policy or the query. Add a regression test that asserts the boundary. Add the case to the staging checklist. Notify Jonathan the same day with the scope, in writing — breach-notification obligations are a legal question for the client, not a technical one, and the client cannot meet an obligation they have not been told about. Write it up in the project-level `Decision Log.md` — outside this repository, beside `BMMP Planning/` — and update this runbook.
 
 **Prevent.** Row-level security policies ship in the same migration as the table they protect. The data layer asserts the organization on every returned row as defence in depth — policies are the control, the assertion is the alarm. Every deploy's staging checklist includes the two-organization visibility check.
 
@@ -493,7 +495,7 @@ In every one of those cases the cost of an extra ten minutes of investigation is
 5. Confirm the fault is gone by reproducing the original symptom.
 6. Note the time of both the bad promotion and the rollback. You need this window for §5.4.
 
-**Staging.** Revert the merge commit on `staging` and let CI redeploy. Staging is not worth a manual promotion dance.
+**Staging.** The staging deployment is a pull-request preview, so there is no merge commit to revert and no promotion to undo: push a corrected commit to the branch and let CI redeploy it, or close the pull request. Staging is not worth a manual promotion dance.
 
 **Important:** rolling back code does **not** roll back environment variables and does **not** roll back the database. If the fault was an environment variable (F-2), fix the variable and redeploy — a rollback alone will not help, because the old deployment reads the same variable store.
 
@@ -534,7 +536,7 @@ The map of who holds what — **not the credentials themselves**. No key, token,
 
 | System | What it holds | Who has access today | Notes |
 |---|---|---|---|
-| **GitHub** — `bmmp` repository | All source, migrations, CI configuration, the doc stack | Nathan Ivy (owner) | Sole admin. Branch protection on `main` and `staging`: PR required, status checks required, force-push and deletion blocked. Client access not granted as of this version — RN-1. |
+| **GitHub** — `bmmp` repository | All source, migrations, CI configuration, the doc stack | Nathan Ivy (owner) | Sole admin. `main` is the only long-lived branch (D-29). Branch protection on `main`: PR required, status checks required, branches up to date, force-push and deletion blocked. Client access not granted as of this version — RN-1. |
 | **Vercel** — BMMP project(s) | Hosting, deployments, **all deployed environment variable values including `SUPABASE_SERVICE_ROLE_KEY` and `VISION_API_KEY`** | Nathan Ivy (owner) | Production promotion is manual and only Nate can perform it. Highest-value account after Supabase. |
 | **Supabase** — BMMP project(s) | The database, auth, storage, row-level security policies, service-role key. **Every customer's compliance records.** | Nathan Ivy (owner) | The most sensitive system in the engagement. Whether staging and production are separate projects is RN-4. |
 | **Vision-model provider** | API key, model access, billing and spend cap | Nathan Ivy (owner) | Provider not yet named — RN-5. Carries direct spend, so it needs a cap regardless of which provider is chosen. |
