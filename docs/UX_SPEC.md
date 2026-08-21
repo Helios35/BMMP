@@ -219,7 +219,7 @@ Each row shows four things, always, in this order: **field name · value · wher
 | Field name | `label` token, `text-foreground` — **never** `text-muted-foreground` |
 | Value | `body-strong`. Mono for IDs, part numbers, serials and date codes. An illegible field renders as the literal text **"Not read"**, `attention` intent — never a blank cell, never a dash, and **never a guess, an interpolation from a similar product, or a fill from an unmatched catalog entry** (Rule 2.11). A value that fails shape validation is presented as not-read with the raw text shown beneath for the reviewer to judge (Rule 2.12). |
 | Source | A `Badge` with `neutral` intent and one of exactly five texts: **Read from label · Matched from catalog · Decoded · Detected from image · Entered by you** |
-| Confidence | A `Badge` with the band as text — **High / Medium / Low / None** — intent `ok` / `attention` / `critical` / `neutral`. The numeric value appears as `caption` beneath on desktop and in the badge tooltip on mobile. Bands and threshold per RN-2. |
+| Confidence | A `Badge` with the band as text — **High / Medium / Low / None** — intent `ok` / `attention` / `critical` / `neutral`. The numeric value appears as `caption` beneath on desktop and in the badge tooltip on mobile. Bands and threshold per D-22. |
 | Confirm control | See 2.1.4 |
 
 #### 2.1.3 The fields, their sources, and what is gated
@@ -248,7 +248,7 @@ This is the interaction the entire product rests on. Specify it exactly.
 2. **Correcting.** Tapping the value turns the row into an editable `Input` (or `Select` for bounded fields) with the extracted value pre-filled and fully selected. The button relabels to **Confirm corrected value**. The original extracted value stays visible beneath as `caption`: *"Read as: NCR18650B"*. **The original is never overwritten in the record** — the extracted/corrected pair is the training asset (D-7).
 3. **Confirmed.** The row collapses to a single line: check icon, the confirmed value, the confirming user's name, the timestamp, and a **Change** link. Intent `ok`. Confirmation is reversible up until commit; after commit, a change is a new edit on `/batteries/[id]` writing its own `audit_event`.
 4. **Bulk confirm.** A **Confirm all high-confidence fields** action appears above the rows when three or more fields sit in the High band. It **excludes the three hard-gated fields, always.** Those three are confirmed one at a time, deliberately, by a person, at every confidence level. There is no configuration, role, setting, import path or shortcut that changes this, for anyone including P6 (Rules 2.15, 2.17; `_ANCHORS.md` §6). **Only P1 and P6 may confirm an identification at all** (Rule 2.22). In a bulk intake, every record gates individually — fifty records produce fifty gate decisions, not one (Rule 2.33).
-5. **Gate banner.** When any single field is below threshold, **the whole record** is in review, not just that field (Rule 2.14). A `pending`-intent `Alert` sits above the rows: *"Needs review — N fields below the confidence threshold. Nothing is saved until you confirm."* It offers **Resolve now** (scrolls to the first flagged row) and **Save to review queue** (exits and files the `intake_session` on `/review`). See RN-1.
+5. **Gate banner.** When any single field is below threshold, **the whole record** is in review, not just that field (Rule 2.14). A `pending`-intent `Alert` sits above the rows: *"Needs review — N fields below the confidence threshold. Nothing is saved until you confirm."* It offers **Resolve now** (scrolls to the first flagged row) and **Save to review queue** (exits and files the `intake_session` on `/review`). See D-20.
 6. **Commit gate.** The primary action is disabled until: all three hard-gated fields are confirmed; every Low-band field is either corrected-and-confirmed or explicitly rejected; every required field holds a value. **A disabled primary action always renders its reason** as a checklist directly beneath it — *"Confirm chemistry · Confirm assessed condition · Resolve 1 low-confidence field"* — with each item scrolling to its row. A bare disabled button with no explanation is a defect.
 
 #### 2.1.5 What rejecting looks like
@@ -275,7 +275,7 @@ This is the interaction the entire product rests on. Specify it exactly.
 | **Hover** (row) | `bg-muted/50`, 120ms. Desktop only, and reveals nothing that is not already visible. |
 | **Focus** | 2px ring on the focused control; the whole row gets a 2px left bar so the focused row is identifiable at a glance on a large screen. |
 | **Active** (pressing Confirm) | Button scales to 98%, 120ms, no colour change. |
-| **Disabled** (offline, or an expired P6 support grant) | Every confirm, edit and reject control disabled, `opacity-60`, with a single `Alert` at the top of the card stating why — *"You're offline — confirmations can't be saved until you reconnect"* (RN-3), or *"Your support grant expired"* (Rule 1.28). Values stay fully readable. **This is not the read-only-role state:** the only roles that render this component are P1 and P6 (Rule 2.22), and P2 gets a different composition that does not include the card at all (§3.8b). Do not add a read-only mode to this component — there is no role that needs one. |
+| **Disabled** (offline, or an expired P6 support grant) | Every confirm, edit and reject control disabled, `opacity-60`, with a single `Alert` at the top of the card stating why — *"You're offline — confirmations can't be saved until you reconnect"* (D-20), or *"Your support grant expired"* (Rule 1.28). Values stay fully readable. **This is not the read-only-role state:** the only roles that render this component are P1 and P6 (Rule 2.22), and P2 gets a different composition that does not include the card at all (§3.8b). Do not add a read-only mode to this component — there is no role that needs one. |
 | **Loading** (extraction running) | The card renders its shell with `Skeleton` rows and a text status with an estimate: *"Reading label — about 5 seconds"*. A **Cancel** is always available. Beyond 20 seconds, the copy changes to *"Still reading — you can wait or enter the details by hand"* and manual entry becomes available in place. |
 | **Error** (extraction failed) | `critical` `Alert` in place of the field rows, stating what failed in plain language, with **Try again** and **Enter details manually**. Photos are preserved. The session is never lost. |
 | **Empty** (zero fields extracted) | The **no-read state**, distinct from low confidence. See §5, E-4. |
@@ -472,7 +472,7 @@ A disabled control tells a colleague she is missing a permission; an absent one 
 
 ### 2.10 `OfflineBanner` and the capture queue
 
-**Used on:** the `(app)` layout — every authenticated route. See RN-3.
+**Used on:** the `(app)` layout — every authenticated route. See D-20.
 
 **Anatomy.** A sticky `attention` bar below the top bar: *"You're offline. Showing information from 14:22. Photos will send when you reconnect."* Plus a queue chip with the pending capture count, tappable to a `Sheet` listing each queued item with its status.
 
@@ -482,7 +482,7 @@ A disabled control tells a colleague she is missing a permission; an absent one 
 | Offline | Banner present. Reads serve from cache with the staleness time stated **as a timestamp, not as "recently"**. |
 | Offline — capture | Photos capture normally and queue locally. Each queued thumbnail shows **Queued**. |
 | Offline — extraction | **Not run.** Step 2 shows *"We'll read this label when you're back online"* with the option to enter details manually now. |
-| Offline — commit | **Blocked for any hard-gated confirmation** (RN-3). The primary action is disabled with that reason stated. |
+| Offline — commit | **Blocked for any hard-gated confirmation** (D-20). The primary action is disabled with that reason stated. |
 | Reconnecting | Banner turns `neutral`: *"Back online — sending 3 photos"* with a determinate `Progress` |
 | Sync error | `critical`: *"2 photos couldn't be sent"* with **Retry** and per-item detail. Nothing is discarded without the user saying so. |
 | Slow (not offline) | Any request over 3s raises a `neutral` inline notice: *"This is taking longer than usual"*. Every long operation keeps a **Cancel**. |
@@ -1128,7 +1128,7 @@ Every empty state has exactly four parts: **what is true · why · the single mo
 2. Two automatic retries with backoff, each visible as a state, never silent.
 3. The photo stays in the local queue (§2.10). The user may keep shooting.
 4. The user may leave. The `intake_session` persists as a draft and appears on `/review` as an unprocessed session with its pending capture count. **Work is never lost.**
-5. **The flow does not advance to step 2 without at least one uploaded label photo** — the extraction has nothing to read. Manual entry is offered instead, subject to RN-1.
+5. **The flow does not advance to step 2 without at least one uploaded label photo** — the extraction has nothing to read. Manual entry is offered instead, per D-20.
 6. Permanent failure after reconnection: `critical` `Alert` naming each failed photo with **Retry** and **Remove**. Removal requires an explicit act; nothing is discarded on the user's behalf.
 
 ---
@@ -1244,7 +1244,7 @@ Entering by hand puts every field in the `Entered by you` source state; the thre
 
 ### E-10 — Offline or a slow warehouse network
 
-**Where:** everywhere. §2.10, RN-3.
+**Where:** everywhere. §2.10, D-20.
 
 | Situation | Behaviour |
 |---|---|

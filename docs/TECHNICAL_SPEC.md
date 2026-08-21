@@ -100,10 +100,10 @@ Every row is fixed by `PROJECT_SETUP_BMMP.md` §1 unless marked **added here**. 
 | E2E | **Playwright** | The same suite runs against `DATA_ADAPTER=mock` and `DATA_ADAPTER=supabase`. That is the proof the seam held (§5.5). |
 | Lint / format | **ESLint flat config + Prettier + `prettier-plugin-tailwindcss`** | Plus two project-specific rules that enforce the layering (§5.4). |
 | CI | **GitHub Actions** | Per setup §6, including the data-seam check as a required status check. |
-| Hosting | **Vercel** | Staging auto-deploys, production requires manual promotion. |
+| Hosting | **Vercel** | Pull-request previews are the staging deployment, each pointed at the staging Supabase project; `main` deploys to production (D-29). |
 | Error reporting | **Sentry, optional** — *added here* | Behind `SENTRY_DSN`. If unset, the reporter is a no-op and structured stdout logging is the whole story. Never a required dependency for a document to render. |
 
-**Deliberately not used:** an ORM (the adapter contract is the abstraction; a second one would fight RLS), a client-side data-fetching library, Postgres `enum` types (§4.5), Edge runtime for application routes, any vision vendor SDK imported outside `src/lib/vision/providers/`.
+**Deliberately not used:** an ORM (the adapter contract is the abstraction; a second one would fight RLS), a client-side data-fetching library, Postgres `enum` types (§3.2), Edge runtime for application routes, any vision vendor SDK imported outside `src/lib/vision/providers/`.
 
 **New environment variables introduced by this spec.** Each is added to `.env.example` in the same commit that first reads it, per setup §2.
 
@@ -172,7 +172,7 @@ Per Roadmap Principle 6, the [Battery Pass data model](https://github.com/batter
 | `removability` | Statutory criteria in the state producer-obligation rules that B1b evaluates. Battery Pass records them for design purposes, not for threshold evaluation. |
 | Chemistry provenance: `chemistry_source`, `chemistry_confirmed_by`, `chemistry_confirmed_at`, `catalog_entry_id` | Battery Pass states a chemistry as fact. BMMP must record **how it was established** — matched from the catalog and confirmed by a human. Chemistry is never inferred from an image. |
 | Tenancy, lifecycle, containment: `organization_id`, `record_number`, `status`, `container_id`, `intake_session_id` | Application concerns Battery Pass has no opinion on. |
-| `passport_extension jsonb` | Battery Pass attributes no BMMP rule reads and no BMMP document prints. See RN-5 in `ERD.md` for the boundary rule. |
+| `passport_extension jsonb` | Battery Pass attributes no BMMP rule reads and no BMMP document prints. See `Decision Log.md` **D-23** for the boundary rule — a Battery Pass attribute becomes a typed column if any rule evaluates it, any document prints it, or any list filters or sorts on it; everything else lives here. |
 
 ### 4.2 Sized wide from the first migration — and what that means concretely
 
@@ -921,7 +921,7 @@ Ranking is in the domain rather than in SQL for one specific reason: if ranking 
 
 **Any gated field not at the top confidence band routes the whole record to `/review` (Rules 2.14, T-10).** Not the field — the record, because a bad read on one field is evidence the read as a whole is unreliable. `intake_session.is_review_required` is set true with `review_reason_codes`, and `intake_session.gate_thresholds_applied` plus each field row's `confidence_band` and `band_cutoffs_applied` are stored so the decision reproduces even after the cutoffs change (**Rule 2.16**).
 
-The thresholds are constants in `src/domain/intake/thresholds.ts`. They are **not** environment variables, **not** per-tenant settings, and **not** admin-editable. Per `_ANCHORS.md` §6 the gate is a hard rule, not a tunable default; changing it requires a code change, a PR and a Decision Log entry. They are also not jurisdiction rules — they are not regulatory, so they do not belong in `rule_version`, and putting them there would blur the boundary that makes §6 credible.
+The thresholds are **platform configuration data owned by P6, never constants in code** (**D-22**): a platform-wide floor that a tenant may **raise** and can never lower (**Rule 2.16**). The applied set is read through `src/data` like every other read and **passed into the gate as an argument** (**D-40**); `src/domain/intake/thresholds.ts` holds the *shape* of a threshold set and its validation, and never a value — §1.3's `src/domain` receives data as arguments and reaches for nothing. Per `_ANCHORS.md` §6 the gate is a hard rule, not a tunable default: its **existence** is not configurable, no role including P6 may disable, bypass, defer or lower it below the platform floor (**Rules 2.13, 2.17**), and raising the floor is a configuration change with an audit trail rather than a deploy. They are also not jurisdiction rules — they are not regulatory, so they do not belong in `rule_version`, and putting them there would blur the boundary that makes §6 credible.
 
 **And the gate never auto-commits.** Passing routes to the ordinary confirmation screen with values pre-filled; failing routes to `/review`. **Human confirmation of chemistry, model and condition is required on both paths** — they are the hard-gated fields in `TAXONOMY.md` T-09, and **Rule 2.15** holds even at perfect confidence. The gate decides which queue, not whether a human is involved. A record leaves the queue only by confirmation or by a stated void; it never times out into a confirmed state (**Rule 2.23**).
 

@@ -194,12 +194,12 @@ The **stable identity** of a rule, independent of any version of its content. Th
 | `domain` | `text` | NO | | Which `BUSINESS_RULES.md` section it serves (§3 classification, §4 storage, §5 transport, §6 damage, §8 producer, §9 fire code) |
 | `title` | `text` | NO | | Human name, shown in the reasoning trail |
 | `description` | `text` | YES | | |
-| `applies_to_application_classs` | `text[]` | YES | | Which categories it governs. **Includes the medium-format category covering scooter and mobility packs from the first reference-data migration** — not added at B3. Null means all categories |
+| `applies_to_application_classes` | `text[]` | YES | | Which categories it governs. **Includes the medium-format category covering scooter and mobility packs from the first reference-data migration** — not added at B3. Null means all categories |
 | `is_active` | `boolean` | NO | | `default true`. Deactivation never deletes |
 | `created_at` / `updated_at` | `timestamptz` | NO | | |
 | `created_by` / `updated_by` | `uuid` | YES | FK → `"user".id` | P6 only |
 
-**Indexes:** `unique(jurisdiction_id, rule_key)`, `index(domain)`, GIN `index(applies_to_application_classs)`.
+**Indexes:** `unique(jurisdiction_id, rule_key)`, `index(domain)`, GIN `index(applies_to_application_classes)`.
 
 ### 4.3 `rule_version`
 
@@ -348,13 +348,13 @@ One record type for a power-wheelchair pack, a mobility scooter pack, a consumer
 |---|---|---|---|---|
 | `state_of_charge_band` | `text` | NO | | **T-21.** `default 'not_captured'`. The band, not a number — the storage limit that defines it is jurisdiction data, so the band name carries no threshold (Rule 1.23) |
 | `state_of_charge_percent_at_intake` | `numeric(5,2)` | YES | | The observed figure behind the band, where the handler could read one. Never the filter column |
-| `soc_source` | `text` | YES | | How it was established (Rule 2.26) |
+| `soc_source` | `text` | YES | | **T-55.** How it was established (Rule 2.26) |
 | `soc_assessed_at` | `timestamptz` | YES | | |
 | `disposition_route` | `text` | NO | | **T-32.** `default 'pending'`. B2 sets it; the column exists from `0005` |
-| `assessed_condition` | `text` | YES | | **Assessed**, never *measured* (`_ANCHORS.md` §7.5) |
+| `assessed_condition` | `text` | YES | | **T-49.** **Assessed**, never *measured* (`_ANCHORS.md` §7.5) |
 | `condition_confirmed_by` | `uuid` | YES | FK → `"user".id` | Human confirmation of condition |
 | `condition_confirmed_at` | `timestamptz` | YES | | |
-| `chemistry_source` | `text` | YES | | How chemistry was established. Values in `TAXONOMY.md`. **No value in the set means "read from a photograph"** |
+| `chemistry_source` | `text` | YES | | **T-54.** How chemistry was established. Values in `TAXONOMY.md`. **No value in the set means "read from a photograph"** |
 | `chemistry_confirmed_by` | `uuid` | YES | FK → `"user".id` | **Human confirmation of chemistry. Required before this record can produce a document** |
 | `chemistry_confirmed_at` | `timestamptz` | YES | | |
 | `ddr_flags` | `text[]` | NO | | **T-30.** `default '{}'` — an empty array is the normal state, not a null. Set by rule evaluation (Rules 6.4, 6.5). Any non-empty value makes the record damaged, defective or recalled |
@@ -369,7 +369,7 @@ One record type for a power-wheelchair pack, a mobility scooter pack, a consumer
 | `source_device_model_year` | `integer` | YES | | |
 | `provenance_source_type` | `text` | NO | | **T-11.** `default 'unknown_provenance'`. B1a captures the source reference; verification and the formal binding are B2 (**Rules 2.30, 10.9**) |
 | `provenance_recorded_at` | `timestamptz` | YES | | |
-| `passport_extension` | `jsonb` | YES | | Battery Pass attributes no BMMP rule reads and no document prints. See **RN-5** |
+| `passport_extension` | `jsonb` | YES | | Battery Pass attributes no BMMP rule reads and no document prints. See **D-23** |
 
 **Indexes:** `unique(organization_id, record_number)`; `unique(battery_passport_identifier) where not null`; `index(organization_id, created_at desc)`; `index(organization_id, status)`; `index(container_id)`; `index(catalog_entry_id)`; `index(intake_session_id)`; `index(organization_id, application_class)`; `index(organization_id, serial_number)`; partial `index(organization_id) where is_air_transport_prohibited`; partial `index(organization_id) where cardinality(ddr_flags) > 0`.
 
@@ -391,7 +391,6 @@ Known battery products. **Platform-owned when `organization_id is null`; tenant-
 | `removability` | `text` | NO | | **T-05.** `default 'unknown'`. A product attribute, so it lives on the catalog entry — a statutory input the B1b format engine reads (Rule 8.2) |
 | `chemistry` | `text` | NO | | **T-01.** `default 'unknown'`. What a match proposes; **a human confirms it onto the record** (Rules 2.10, 2.18) |
 | `cell_form_factor` | `text` | YES | | |
-| `cell_form_factor` | `text` | YES | | |
 | `nominal_voltage_v` | `numeric(10,3)` | YES | | Numeric agreement inputs for scoring |
 | `rated_capacity_ah` | `numeric(12,3)` | YES | | |
 | `rated_energy_wh` | `numeric(12,3)` | YES | | |
@@ -403,7 +402,7 @@ Known battery products. **Platform-owned when `organization_id is null`; tenant-
 | `un38_3_summary_url` | `text` | YES | | |
 | `label_text_patterns` | `jsonb` | YES | | Known label phrasings, used as scoring hints |
 | `date_code_format_key` | `text` | YES | | Which deterministic decoder applies |
-| `source_type` | `text` | NO | | Where the entry came from |
+| `source_type` | `text` | NO | | **T-61.** Where the entry came from |
 | `source_url` | `text` | YES | | |
 | `status` | `text` | NO | | **T-07.** `default 'proposed'`. Only a published entry is available for intake matching |
 | `verified_by` | `uuid` | YES | FK → `"user".id` | P6 for global entries |
@@ -426,9 +425,9 @@ One run of the pipeline. The unit `/review` operates on.
 | `organization_id` | `uuid` | NO | FK → `organization.id` | |
 | `battery_record_id` | `uuid` | YES | FK → `battery_record.id` | Set on commit |
 | `status` | `text` | NO | | **T-08.** `default 'open'`. Includes `failed` — a pipeline step that could not complete leaves the session recoverable with its photos retained; work is never lost because a step failed (EC-14) |
-| `current_step` | `text` | NO | | Which pipeline step is next. Fixed order, code-owned (**Rules 2.2, 2.3**) |
+| `current_step` | `text` | NO | | **T-53.** Which pipeline step is next. Fixed order, code-owned (**Rules 2.2, 2.3**) |
 | `is_review_required` | `boolean` | NO | | `default false`. Set true by the confidence gate. Drives `/review` (Rule 2.14) |
-| `review_reason_codes` | `text[]` | YES | | Which gate condition failed. Values in `TAXONOMY.md`; the conditions themselves are `TECHNICAL_SPEC.md` §11.1 step 5 |
+| `review_reason_codes` | `text[]` | YES | | **T-52.** Which gate condition failed. Values in `TAXONOMY.md`; the conditions themselves are `TECHNICAL_SPEC.md` §11.1 step 5 |
 | `gate_thresholds_applied` | `jsonb` | NO | | The band cutoffs and match thresholds in force at evaluation, so the gate decision reproduces (Rule 2.16) |
 | `reviewed_by` | `uuid` | YES | FK → `"user".id` | |
 | `reviewed_at` | `timestamptz` | YES | | |
@@ -454,14 +453,14 @@ Both the original photo and its label crop. A crop is a row whose `parent_intake
 | `organization_id` | `uuid` | NO | FK → `organization.id` | |
 | `intake_session_id` | `uuid` | NO | FK → `intake_session.id` | |
 | `parent_intake_photo_id` | `uuid` | YES | FK → `intake_photo.id` | **Self-FK.** Non-null identifies a crop |
-| `photo_type` | `text` | NO | | What this image is. Values in `TAXONOMY.md`; a crop is additionally identified by `parent_intake_photo_id` |
+| `photo_type` | `text` | NO | | **T-50.** What this image is. Values in `TAXONOMY.md`; a crop is additionally identified by `parent_intake_photo_id` |
 | `storage_object_path` | `text` | NO | | Private bucket, `org/{organization_id}/...`. Never public |
 | `content_hash` | `text` | NO | | SHA-256 of the stored bytes |
 | `byte_size` | `integer` | NO | | |
 | `mime_type` | `text` | NO | | |
 | `width_px` / `height_px` | `integer` | NO | | |
 | `crop_geometry` | `jsonb` | YES | | `{x,y,width,height,sourceWidth,sourceHeight}`. Present on crops |
-| `crop_method` | `text` | YES | | Whether the geometry came from automatic region detection or from a person drawing the box. Values in `TAXONOMY.md`. **Both are ordinary outcomes; neither is an error state** |
+| `crop_method` | `text` | YES | | **T-51.** Whether the geometry came from automatic region detection or from a person drawing the box. Values in `TAXONOMY.md`. **Both are ordinary outcomes; neither is an error state** |
 | `captured_at` | `timestamptz` | YES | | Read from EXIF **before** EXIF is stripped |
 | `data_use_eligibility` | `text` | NO | | **T-12.** `default 'pending_determination'`. Stamped once at capture and **never recomputed or edited by any role, including P6** (Rules 7.6, 7.7) |
 | `is_exif_stripped` | `boolean` | NO | | `default true`. GPS and device identifiers are not retained (Rule 7.21) |
@@ -521,10 +520,10 @@ Deterministic decoding of a printed date code to a manufacture date. Rules, vers
 | `raw_code` | `text` | NO | | |
 | `format_key` | `text` | NO | | Which decoder applied |
 | `decoded_manufactured_on` | `date` | YES | | Null when the code cannot be decoded — an honest null, not a guess |
-| `decoded_precision` | `text` | YES | | How precisely the code resolves. Values in `TAXONOMY.md` |
+| `decoded_precision` | `text` | YES | | **T-56.** How precisely the code resolves. Values in `TAXONOMY.md` |
 | `decoder_version` | `text` | NO | | Bumped when a decoder changes; old rows keep their old answer |
 | `confidence` | `numeric(4,3)` | YES | | |
-| `decoded_by_method` | `text` | NO | | Whether a deterministic decoder or a person produced the date. Values in `TAXONOMY.md`. No value means "inferred by a model" |
+| `decoded_by_method` | `text` | NO | | **T-57.** Whether a deterministic decoder or a person produced the date. Values in `TAXONOMY.md`. No value means "inferred by a model" |
 | `decoded_by` | `uuid` | YES | FK → `"user".id` | Set on human override |
 | `created_at` | `timestamptz` | NO | | |
 
@@ -652,7 +651,7 @@ Everything that happens to a container, a clock or a battery's storage state.
 | `id` | `uuid` | NO | PK | |
 | `organization_id` | `uuid` | NO | FK → `organization.id` | |
 | `alert_type` | `text` | NO | | **T-44.** Required, no default. Values in `TAXONOMY.md` |
-| `severity` | `text` | NO | | Values in `TAXONOMY.md`. **Never expresses a probability of ignition** (Rules 1.25, 10.3; T-44) |
+| `severity` | `text` | NO | | **T-48.** Values in `TAXONOMY.md`. **Never expresses a probability of ignition** (Rules 1.25, 10.3; T-44) |
 | `title` | `text` | NO | | Plain language, rendered from the alert's own data — never a stored regulatory phrase |
 | `body` | `text` | NO | | States the condition and the required handling, never a chance of anything |
 | `storage_clock_id` | `uuid` | YES | FK → `storage_clock.id` | Subject arc |
@@ -691,7 +690,7 @@ The light waste category versus full hazardous decision, **with its reasoning re
 |---|---|---|---|---|
 | `id` | `uuid` | NO | PK | |
 | `organization_id` | `uuid` | NO | FK → `organization.id` | |
-| `decision_scope` | `text` | NO | | Which subject was decided. Values in `TAXONOMY.md`; matches whichever FK below is non-null |
+| `decision_scope` | `text` | NO | | **T-58.** Which subject was decided. Values in `TAXONOMY.md`; matches whichever FK below is non-null |
 | `battery_record_id` | `uuid` | YES | FK → `battery_record.id` | |
 | `container_id` | `uuid` | YES | FK → `container.id` | |
 | `shipment_id` | `uuid` | YES | FK → `shipment.id` | |
@@ -857,7 +856,7 @@ Every generated PDF instance. Immutable bytes, immutable row.
 
 ### 8.1 `damage_assessment` — **APPEND-ONLY**
 
-Visible damage indicators and the resulting assessed condition. Also the landing place for a third-party battery-health tester reading (`TECHNICAL_SPEC.md` §12.4, **RN-2**).
+Visible damage indicators and the resulting assessed condition. Also the landing place for a third-party battery-health tester reading (`TECHNICAL_SPEC.md` §12.4, **D-20**).
 
 | Column | Type | N | Key | Notes |
 |---|---|---|---|---|
@@ -865,11 +864,11 @@ Visible damage indicators and the resulting assessed condition. Also the landing
 | `organization_id` | `uuid` | NO | FK → `organization.id` | |
 | `battery_record_id` | `uuid` | NO | FK → `battery_record.id` | |
 | `intake_photo_id` | `uuid` | YES | FK → `intake_photo.id` | The damage photo, when there is one |
-| `assessment_method` | `text` | NO | | How the assessment was produced. Values in `TAXONOMY.md`; an instrument-sourced row also carries the `instrument_*` columns below |
+| `assessment_method` | `text` | NO | | **T-59.** How the assessment was produced. Values in `TAXONOMY.md`; an instrument-sourced row also carries the `instrument_*` columns below |
 | `status` | `text` | NO | | **T-46.** `default 'not_assessed'`. **Neither assessed state is terminal** — **Rule 6.11** provides exactly one clearing path: a superseding human assessment finding no indicator present, with a stated reason and at least one supporting photograph. Replaces the `is_current` boolean; `assessed_*` versus `superseded` is the same fact |
 | `finding_types` | `text[]` | NO | | **T-29.** Minimum one; `none_observed` is a real finding, not an empty array. Vocabulary in `TAXONOMY.md` (Rule 6.3) |
 | `finding_detail` | `jsonb` | YES | | Per finding: severity, note, photo reference |
-| `assessed_condition` | `text` | NO | | **Assessed**, never *measured* (`_ANCHORS.md` §7.5) |
+| `assessed_condition` | `text` | NO | | **T-49.** **Assessed**, never *measured* (`_ANCHORS.md` §7.5) |
 | `is_air_transport_prohibited` | `boolean` | NO | | Read by the shipment trigger |
 | `governing_rule_version_id` | `uuid` | YES | FK → `rule_version.id` | |
 | `evaluation_trace` | `jsonb` | YES | | |
@@ -894,7 +893,7 @@ Visible damage indicators and the resulting assessed condition. Also the landing
 
 ### 8.2 `grade` — **APPEND-ONLY** · B2
 
-The published transparent grading scheme's output. Created empty in the first migration set (**RN-4**).
+The published transparent grading scheme's output. Created empty in the first migration set (**D-24**).
 
 | Column | Type | N | Key | Notes |
 |---|---|---|---|---|
@@ -984,7 +983,7 @@ Candidate recall matches from the free government sources. Mutable, because a hu
 
 ## 9. Producer obligations · B1b
 
-Created in the first migration set, empty until B1b (**RN-4**). The medium-format category that covers scooter and mobility packs is carried by `jurisdiction_rule.applies_to_application_classs` from the first reference-data migration — B3 activates rows, it does not add columns.
+Created in the first migration set, empty until B1b (**D-24**). The medium-format category that covers scooter and mobility packs is carried by `jurisdiction_rule.applies_to_application_classes` from the first reference-data migration — B3 activates rows, it does not add columns.
 
 ### 9.1 `producer_obligation`
 
@@ -1068,7 +1067,7 @@ Every state change: **who, what, when, before, after, and which rule version app
 | `sequence_no` | `bigint` | NO | U | `generated by default as identity`. Total order |
 | `organization_id` | `uuid` | YES | FK → `organization.id` | Null for platform-level events |
 | `actor_user_id` | `uuid` | YES | FK → `"user".id` | **Who** |
-| `actor_type` | `text` | NO | | Whether the actor was a person, a scheduled job or an integration. Values in `TAXONOMY.md` |
+| `actor_type` | `text` | NO | | **T-60.** Whether the actor was a person, a scheduled job or an integration. Values in `TAXONOMY.md` |
 | `actor_label` | `text` | YES | | For non-user actors: which job, which integration |
 | `event_type` | `text` | NO | | **What.** Includes `document.render_failed`, `document.reprinted`, `document.viewed` |
 | `entity_table` | `text` | NO | | |
@@ -1114,7 +1113,7 @@ All `on delete restrict` unless noted. **N:1** is read child → parent.
 | `membership.organization_id` | `organization` | N:1 | |
 | `membership.user_id` | `user` | N:1 | Nullable until invitation accepted |
 | `tos_acceptance.user_id` | `user` | N:1 | |
-| `tos_acceptance.organization_id` | `organization` | N:1 | Nullable |
+| `tos_acceptance.organization_id` | `organization` | N:1 | **Not nullable.** Consent is organisational, not personal (**Rule 7.19**) |
 | `organization.primary_jurisdiction_id` | `jurisdiction` | N:1 | Most specific scope; chain walked upward |
 | `jurisdiction.parent_jurisdiction_id` | `jurisdiction` | N:1 **self** | The chain |
 | `jurisdiction_rule.jurisdiction_id` | `jurisdiction` | N:1 | |

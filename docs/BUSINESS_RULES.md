@@ -207,7 +207,7 @@ Page-level access follows the fixed page list in `_ANCHORS.md` §5. Where this s
 
 **How to read these tables, and how they relate to `TAXONOMY.md`.** This document owns the **set** of states, what each one means, what triggers it and what it transitions to. `TAXONOMY.md` owns the **stored value, its casing and its display label**. Both are shown below so the two documents can be diffed mechanically rather than read for agreement. **The two must state identical sets.** Where a rule's prose elsewhere in this document uses a state's plain-english name, the stored value in these tables is what governs. Where this document and `TAXONOMY.md` ever disagree again, this document wins on the set and the meaning, `TAXONOMY.md` wins on the stored string — and the disagreement is a defect to be closed in one pass, not a choice a builder makes.
 
-Nine entities have a status. Every one is listed here and every one has a matching `TAXONOMY.md` system, cited by its `T-` number.
+Eleven entities have a status. Every one is listed here and every one has a matching `TAXONOMY.md` system, cited by its `T-` number.
 
 ### battery_record — `TAXONOMY.md` T-22
 
@@ -1055,39 +1055,48 @@ Nine entities have a status. Every one is listed here and every one has a matchi
 
 *Rules not yet decided. Each carries a recommendation and a named decider. Nothing here may be implemented until it is decided and this document is versioned to reflect it.*
 
-**OQ-1 — Are D-6 and D-7 locked?** Both are still status `Proposed`, decision required 2026-08-14. Sections 2, 3, 5 and 6 are built on them entirely.
+**OQ-1 — DECIDED, D-12, 2026-08-14. Are D-6 and D-7 locked?** Both are still status `Proposed`, decision required 2026-08-14. Sections 2, 3, 5 and 6 are built on them entirely.
 *Recommendation:* lock both at Gate 0 before any brief cites those sections. **Decider: Nate, with Jonathan, at Gate 0.** (RN-1.)
+*Decision:* **Both are locked.** D-6 and D-7 moved from `Proposed` to `Locked` at Gate 0, confirmed by Jonathan in writing, and briefs may cite sections 2, 3, 5 and 6 without reservation. **Closed by: D-12**, which recorded Gate 0 passing.
 
-**OQ-2 — Confidence threshold: platform-wide, or per tenant?** The gate is hard either way (Rule 2.13); only the value is in question.
+**OQ-2 — DECIDED, D-22, 2026-08-19. Confidence threshold: platform-wide, or per tenant?** The gate is hard either way (Rule 2.13); only the value is in question.
 *Recommendation:* a platform-wide floor set by P6, which a tenant may raise and can never lower. **Decider: Nate.** (RN-4.)
+*Decision:* **A platform-wide floor set by P6. A tenant may raise it and can never lower it.** The value is platform configuration data owned by P6, versioned like any other data — **never a constant in code**. Stricter than the platform is allowed; looser is refused at the system level. **Closed by: D-22.**
 
 **OQ-3 — Does revoking the training-rights grant claw back eligibility already stamped on captured records?** Rule 7.18 says no.
 *Recommendation:* hold Rule 7.18 as written and obtain a written opinion before the first training-set export. **Decider: counsel, instructed by Nate.** (RN-2, EC-35.)
 
-**OQ-4 — Does B1a ship a working P5 login, or only P5 read-only enforcement plus audit export?** P5 is a B1b persona on a B1a page.
+**OQ-4 — DECIDED, D-31, 2026-08-21. Does B1a ship a working P5 login, or only P5 read-only enforcement plus audit export?** P5 is a B1b persona on a B1a page.
 *Recommendation:* enforcement and export in B1a; the external grant workflow in B1b. **Decider: Nate, at Gate 1.** (RN-3.)
+*Decision:* **Enforcement and export in B1a; the grant management workflow in B1b.** The grant row, its scope and its expiry exist and are enforced in B1a — a grant without an expiry cannot be created (Rule 1.15), and an expired or revoked grant terminates access immediately, inside an already-open session (Rule 1.28). P5 read-only enforcement is enforced at the data layer and in every server action, not by hiding buttons (Rule 1.14), and export within grant scope ships in B1a (Rules 12.9, 12.19). Renewal reminders, the scope editor and P5 onboarding are B1b. **Closed by: D-31.**
 
-**OQ-5 — In a full-hazardous jurisdiction, does B1a block the shipment or document everything except the manifest?**
+**OQ-5 — DECIDED, D-36, 2026-08-21. In a full-hazardous jurisdiction, does B1a block the shipment or document everything except the manifest?**
 *Recommendation:* document everything else, hard-flag the gap, never present the shipment as fully documented. **Decider: Nate, with Jonathan, at Gate 1.** (RN-5, EC-19.)
+*Decision:* **Document everything the product can document correctly, and hard-flag the manifest obligation** on all four surfaces — the record, the container, the shipment, and the shipping paper's accompanying checklist. **The shipment is never presented as fully documented**: no green tick, no "ready to ship". The gap is stated, never silent. **Closed by: D-36.**
 
-**OQ-6 — Who holds an organization's binding authority after the founding member leaves?** Rule 7.3 requires it exist; Rule 1.12 requires one always be present. The assignment mechanism is not specified.
+**OQ-6 — DECIDED, D-35, 2026-08-21. Who holds an organization's binding authority after the founding member leaves?** Rule 7.3 requires it exist; Rule 1.12 requires one always be present. The assignment mechanism is not specified.
 *Recommendation:* binding authority is an attribute of a P2 membership, assignable only by an existing holder or by P6 under an audited grant. **Decider: Nate.**
+*Decision:* **Binding authority is an attribute of a P2 membership**, assignable by a current holder or by P6 under a recorded support grant. An organization always retains at least one (Rule 1.12), and the UI names the remedy rather than only refusing — a P2 attempting to remove the last holder is told who can assign it first. **P6 can never accept a tenant's Terms of Service under any circumstance, including under a support grant** (Rules 7.4, 1.19), and that is unchanged. **Closed by: D-35.**
 
-**OQ-7 — What is the re-verification interval for the 24-hour emergency number?** Rule 5.6 requires verification; EC-43 assumes an interval exists.
+**OQ-7 — DECIDED, D-32, 2026-08-21. What is the re-verification interval for the 24-hour emergency number?** Rule 5.6 requires verification; EC-43 assumes an interval exists.
 *Recommendation:* hold it as organization configuration with a platform default, and treat a lapsed verification as absent. **Decider: Nate, at Gate 1.**
+*Decision:* **Twelve months**, held as organization configuration with a platform default. **A lapsed verification is treated exactly as an absent one** — it blocks document generation and is never replaced with a placeholder (Rules 5.6, 5.7). **Closed by: D-32.**
 
-**OQ-8 — Does an idle intake session expire, and after how long?** The intake session status table names an idle-expiry trigger for abandonment.
+**OQ-8 — DECIDED, D-33, 2026-08-21. Does an idle intake session expire, and after how long?** The intake session status table names an idle-expiry trigger for abandonment.
 *Recommendation:* expire to abandoned after a configured idle period, retaining photos, and let the handler resume from the photos rather than restart. **Decider: Nate.**
+*Decision:* **No. An intake session does not expire in B1a.** The interval is configuration and it is unset: a draft stays a draft indefinitely, its photos are retained, and it appears on `/review` as an unprocessed session. **`abandoned` remains reachable by a handler abandoning a session**, which is a person acting — Rule 2.23 already forbids a review item ageing out into a confirmed state. **Closed by: D-33.**
 
 **OQ-9 — DECIDED, v1.1, 2026-08-11. Can a container hold batteries whose classification decisions differ (light category and full hazardous together)?**
 *Decision:* **No.** A container's segregation class is a composite of classification outcome and condition state, so two different waste classifications can never share a container. **Rule 4.28 is amended in place** to say so, and `TAXONOMY.md` T-23 is now the cross of the two dimensions rather than a flat list in which a quarantine container could mix outcomes.
 *Also decided (`TAXONOMY.md` RN-8a):* the column stays **`container.container_type`**. "Segregation class" is this document's term for the same thing. Four downstream documents build against the column name and a rename costs five files and buys nothing. **Decided by: Nate, on the coordinator's reconciliation pass.**
 
-**OQ-10 — Are storage-clock alerts delivered in-product only, or also by email?** Rule 4.14 names the recipients but not the channel.
+**OQ-10 — DECIDED, D-34, 2026-08-21. Are storage-clock alerts delivered in-product only, or also by email?** Rule 4.14 names the recipients but not the channel.
 *Recommendation:* in-product for B1a with email for the overdue tier only, expanding at Gate 1 based on what the first real user actually reads. **Decider: Nate, at Gate 1.**
+*Decision:* **In-product only for B1a. No email, no push, no SMS.** The alert bell and the dashboard alert region are the delivery. Revisit at Gate 1 with a real customer's answer rather than a guess. **Closed by: D-34.**
 
-**OQ-11 — Does the European Battery Passport bet get taken?** Roadmap Phase 0 flags this as a Gate 0 decision with a firm 18 February 2027 deadline. If taken, sections 2 and 12 acquire completeness and export rules that do not currently exist.
+**OQ-11 — DECIDED, D-13, 2026-08-11. Does the European Battery Passport bet get taken?** Roadmap Phase 0 flags this as a Gate 0 decision with a firm 18 February 2027 deadline. If taken, sections 2 and 12 acquire completeness and export rules that do not currently exist.
 *Recommendation:* do not take the bet in this engagement; the Battery Pass data model adopted in B1a keeps the option cheap either way. **Decider: Jonathan, at Gate 0.**
+*Decision:* **Out.** BMMP does not build European Battery Passport export within this engagement. It is not deferred to a later phase — it is out of this program, and revisiting it is a new scope conversation with its own dates and its own fee. The Battery Pass data model already in the canonical battery record keeps a future export a mapping exercise rather than a rebuild. **Closed by: D-13.**
 
 **OQ-12 — What is the redaction standard for training exports?** Rule 7.21 requires redaction handling; the standard is not defined.
 *Recommendation:* define it with counsel at Gate 1, before any corpus is exported, and until then permit no training export at all. **Decider: Nate, with counsel.** (EC-37.)
