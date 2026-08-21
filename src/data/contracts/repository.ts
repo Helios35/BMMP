@@ -15,6 +15,21 @@ export interface Page<T> {
 export interface PageRequest {
   readonly limit: number;
   readonly cursor?: string | null;
+  /**
+   * Page-indexed access for a numbered pager. **Mutually exclusive with
+   * {@link PageRequest.cursor} — supplying both is a caller defect and every
+   * adapter rejects it rather than silently preferring one.**
+   *
+   * A cursor cannot express "jump to page 4", which is exactly what the numbered
+   * `Pagination` in `UX_SPEC.md` §2.7 renders. The alternative — reading the
+   * mock's cursor, which happens today to be a stringified offset — is the seam
+   * leaking: it would work on `mock` and break on `supabase`, which is the one
+   * failure the contract exists to prevent (D-16, D-19).
+   *
+   * Supabase implements it with `.range(offset, offset + limit - 1)`; the mock
+   * slices from it. Cursor paging stays for callers that stream a whole table.
+   */
+  readonly offset?: number;
 }
 
 /** A standard mutable entity. */

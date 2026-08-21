@@ -2,6 +2,7 @@ import type { RequestContext } from "@/data/contracts/context";
 import type { Page, PageRequest } from "@/data/contracts/repository";
 import type { Uuid } from "@/types/common";
 import {
+  DataIntegrityError,
   IntegrationError,
   NotFoundError,
   TenantScopeError,
@@ -24,6 +25,35 @@ export interface MockRow {
 
 export interface TenantRow extends MockRow {
   readonly organizationId: Uuid;
+}
+
+/**
+ * The index the requested page starts at — the one place either paging mode is
+ * read, so the two table classes cannot drift.
+ *
+ * `PageRequest` carries a cursor **or** an offset. Both together is a caller
+ * defect rather than a user-facing failure, so it is generic to the user and
+ * fully detailed in the log (`TECHNICAL_SPEC.md` §10.3).
+ *
+ * The mock's cursor is a stringified offset, which is an implementation detail
+ * of this file and of nothing else: a caller that wants numbered pages sends
+ * `offset` and gets the same behaviour from `.range()` under Supabase.
+ */
+export function pageStart(query: PageRequest, correlationId?: string): number {
+  const hasCursor = query.cursor !== undefined && query.cursor !== null;
+  if (query.offset !== undefined) {
+    if (hasCursor) {
+      throw new DataIntegrityError({
+        userMessage: "That list could not be read.",
+        correlationId,
+        context: { offset: query.offset, cursor: query.cursor },
+      });
+    }
+    return query.offset < 0 ? 0 : Math.trunc(query.offset);
+  }
+  if (!hasCursor) return 0;
+  const parsed = Number.parseInt(String(query.cursor), 10);
+  return Number.isNaN(parsed) || parsed < 0 ? 0 : parsed;
 }
 
 /** A table whose rows carry `organization_id`. 27 of the 32 do. */
@@ -65,11 +95,7 @@ export class TenantTable<T extends TenantRow> {
     const filtered = this.scoped(ctx).filter(matches);
     const ordered =
       compare === undefined ? filtered : [...filtered].sort(compare);
-    const offset =
-      query.cursor === undefined || query.cursor === null
-        ? 0
-        : Number.parseInt(query.cursor, 10);
-    const start = Number.isNaN(offset) ? 0 : offset;
+    const start = pageStart(query, ctx.correlationId);
     const items = ordered.slice(start, start + query.limit);
     const nextOffset = start + items.length;
     return {
@@ -228,11 +254,7 @@ export class PlatformTable<T extends MockRow> {
     const filtered = this.rows.filter(matches);
     const ordered =
       compare === undefined ? filtered : [...filtered].sort(compare);
-    const offset =
-      query.cursor === undefined || query.cursor === null
-        ? 0
-        : Number.parseInt(query.cursor, 10);
-    const start = Number.isNaN(offset) ? 0 : offset;
+    const start = pageStart(query, ctx.correlationId);
     const items = ordered.slice(start, start + query.limit);
     const nextOffset = start + items.length;
     return {

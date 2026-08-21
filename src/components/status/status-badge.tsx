@@ -1,24 +1,11 @@
-import {
-  CircleAlert,
-  CircleCheck,
-  CircleDashed,
-  CircleHelp,
-  Clock,
-  Minus,
-  TriangleAlert,
-  type LucideIcon,
-} from "lucide-react";
+import { CircleDashed, CircleHelp } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { INTENT_SURFACE_CLASSES } from "./intent-classes";
-import {
-  statusIntent,
-  statusLabel,
-  type StatusIntent,
-  type StatusSystem,
-} from "./status-intent";
+import { INTENT_BADGE_ICON } from "./intent-icons";
+import { statusIntent, statusLabel, type StatusSystem } from "./status-intent";
 
 /**
  * `StatusBadge` — `UX_SPEC.md` §2.3.
@@ -32,14 +19,6 @@ import {
  * the single `statusIntent` map, and the label through the system's own lookup
  * in `src/domain/taxonomy` — the one place a label for that system exists.
  */
-
-const INTENT_ICONS: Readonly<Record<StatusIntent, LucideIcon>> = {
-  neutral: Minus,
-  ok: CircleCheck,
-  attention: TriangleAlert,
-  critical: CircleAlert,
-  pending: Clock,
-};
 
 /** 24px and 28px per §2.3. Text never below 13px, and 14px is the product floor. */
 const SIZE_CLASSES = {
@@ -117,7 +96,7 @@ export function StatusBadge({
     );
   }
 
-  const Icon = INTENT_ICONS[intent];
+  const Icon = INTENT_BADGE_ICON[intent];
 
   return (
     <Badge

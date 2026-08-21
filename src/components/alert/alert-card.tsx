@@ -1,14 +1,5 @@
 import Link from "next/link";
-import {
-  BellOff,
-  CircleAlert,
-  CircleCheck,
-  Clock,
-  Info,
-  Pin,
-  TriangleAlert,
-  type LucideIcon,
-} from "lucide-react";
+import { BellOff, CircleCheck, Pin } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -18,6 +9,7 @@ import {
   ALERT_SEVERITY_INTENTS,
   type StatusIntent,
 } from "@/components/status/status-intent";
+import { INTENT_ICON } from "@/components/status/intent-icons";
 import {
   INTENT_BORDER_CLASSES,
   INTENT_TEXT_CLASSES,
@@ -46,14 +38,6 @@ import type { Alert } from "@/types/storage";
  * the condition and the required handling, never a chance of anything
  * (Rules 1.25, 10.3).
  */
-
-const INTENT_ICONS: Readonly<Record<StatusIntent, LucideIcon>> = {
-  neutral: Info,
-  ok: CircleCheck,
-  attention: TriangleAlert,
-  critical: CircleAlert,
-  pending: Clock,
-};
 
 /** Alert types that pin to the top and cannot be dismissed by anyone. */
 const PINNED_ALERT_TYPES: readonly AlertType[] = ["storage_clock"];
@@ -92,7 +76,7 @@ export function AlertCard({
 }: AlertCardProps) {
   const intent: StatusIntent =
     ALERT_SEVERITY_INTENTS[alert.severity] ?? "neutral";
-  const Icon = INTENT_ICONS[intent];
+  const Icon = INTENT_ICON[intent];
   const isPinned =
     PINNED_ALERT_TYPES.includes(alert.alertType) && alert.resolvedAt === null;
 
