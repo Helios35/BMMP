@@ -13,6 +13,7 @@ import { canWriteRoute } from "@/domain/access/route-capability";
 import { APP_ROUTE_NAMES } from "@/domain/access/routes";
 import { batteryColumns } from "@/features/battery-record/battery-columns";
 import { BatteryEmptyState } from "@/features/battery-record/battery-empty-state";
+import { readIntakeGate } from "@/features/consent/read-intake-gate";
 import {
   BATTERY_LIST_PATH,
   batteryFilters,
@@ -67,10 +68,16 @@ export default async function BatteriesPage({
   const params = await searchParams;
   const asOf = nowIso();
 
-  const [containerPage, clockPage] = await Promise.all([
+  const [containerPage, clockPage, intakeGate] = await Promise.all([
     data.containers.list(ctx, { limit: DECORATION_LIMIT }),
     data.storageClocks.list(ctx, { limit: DECORATION_LIMIT }),
+    readIntakeGate(ctx),
   ]);
+
+  // E-12 — where no acceptance is in force, intake is blocked organisation-wide
+  // (Rules 7.1, 7.2) and every intake affordance is absent rather than disabled.
+  // The dashboard makes the same call; the two screens must not disagree.
+  const isIntakeBlocked = intakeGate.status === "blocked";
 
   const containersById = new Map<Uuid, Container>(
     containerPage.items.map((container) => [container.id, container]),
@@ -142,13 +149,23 @@ export default async function BatteriesPage({
         basePath={BATTERY_LIST_PATH}
         searchPlaceholder="Search by record ID, serial number or model"
         filters={batteryFilters(containerCodes)}
-        emptyState={<BatteryEmptyState role={ctx.role} />}
+        emptyState={
+          <BatteryEmptyState
+            role={ctx.role}
+            isIntakeBlocked={isIntakeBlocked}
+          />
+        }
         filteredEmpty={{
           noun: "batteries",
           searchSuggestion: "Try a record ID, a serial number or a model.",
         }}
         error={result.error}
-        toolbar={<LogABatteryAction role={ctx.role} />}
+        toolbar={
+          <LogABatteryAction
+            role={ctx.role}
+            isIntakeBlocked={isIntakeBlocked}
+          />
+        }
       />
     </div>
   );
@@ -228,9 +245,13 @@ async function readBatteryRecords(
  */
 function LogABatteryAction({
   role,
+  isIntakeBlocked,
 }: {
   readonly role: Parameters<typeof canWriteRoute>[0];
+  /** E-12 — blocked organisation-wide means the action is absent, not disabled. */
+  readonly isIntakeBlocked: boolean;
 }) {
+  if (isIntakeBlocked) return null;
   if (!canWriteRoute(role, "/batteries/new")) return null;
   return (
     <Button asChild size="lg" className="min-h-11 rounded-md">

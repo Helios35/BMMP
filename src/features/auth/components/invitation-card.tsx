@@ -149,7 +149,11 @@ export function InvitationCard({
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-h2">{headline}</CardTitle>
+        <CardTitle className="text-h2">
+          <h1 id="page-title" tabIndex={-1}>
+            {headline}
+          </h1>
+        </CardTitle>
       </CardHeader>
       <CardContent className="grid gap-4">
         <p className="flex flex-wrap items-center gap-2 text-body">

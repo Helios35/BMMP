@@ -83,15 +83,31 @@ const EMPTY_STATE: Readonly<Record<RoleCode, EmptyStateVariant>> = {
 
 export function BatteryEmptyState({
   role,
+  isIntakeBlocked = false,
 }: {
   readonly role: RoleCode;
+  /**
+   * E-12 — the organisation has no Terms of Service acceptance in force, so
+   * intake is blocked organisation-wide (Rules 7.1, 7.2).
+   *
+   * The intake action is then **omitted, not disabled.** §2.9's decision table
+   * makes "disabled with a reason" the *auditor* pattern — a permission
+   * difference between colleagues. E-12 is "nobody in this organisation can do
+   * this yet", and that is absent. The dashboard makes the same call, and the
+   * two screens have to agree or a handler is offered a button on one page and
+   * not the other.
+   */
+  readonly isIntakeBlocked?: boolean;
 }): ReactElement {
   const variant = EMPTY_STATE[role];
   const { action } = variant;
+  const isBlockedByConsent =
+    isIntakeBlocked && action.route === "/batteries/new";
   const isOffered =
-    action.capability === "write"
+    !isBlockedByConsent &&
+    (action.capability === "write"
       ? canWriteRoute(role, action.route)
-      : canReadRoute(role, action.route);
+      : canReadRoute(role, action.route));
 
   return (
     <div

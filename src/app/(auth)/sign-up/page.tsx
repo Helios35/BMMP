@@ -71,7 +71,9 @@ export default async function SignUpPage({
       <Card>
         <CardHeader>
           <CardTitle className="text-h2">
-            {APP_ROUTE_NAMES["/sign-up"]}
+            <h1 id="page-title" tabIndex={-1}>
+              {APP_ROUTE_NAMES["/sign-up"]}
+            </h1>
           </CardTitle>
         </CardHeader>
         <CardContent className="grid gap-4">

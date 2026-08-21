@@ -488,10 +488,15 @@ function NotLinkedPrimary({
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
+              {/*
+                `min-h-11` because this is focusable and hoverable, which makes
+                it a target under `UX_SPEC.md` §1.5 — 44px applies on desktop
+                too. The e2e bounding-box sweep measured it at 24px tall.
+              */}
               <span
                 tabIndex={0}
                 data-row-reason-trigger="true"
-                className="rounded-md focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none"
+                className="inline-flex min-h-11 items-center rounded-md focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none"
               >
                 {children}
               </span>
@@ -629,7 +634,7 @@ function FilteredEmpty({
         {kind === "search"
           ? (copy?.searchSuggestion ??
             "Nothing here matched that search. Widen it, or clear it to see everything you can reach.")
-          : `Every ${noun} you can reach is still here — these filters just exclude all of them.`}
+          : "Everything you can reach is still here — these filters just exclude all of it."}
       </p>
       <Button
         asChild

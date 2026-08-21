@@ -86,8 +86,15 @@ export default async function SignInPage({
 
       <Card>
         <CardHeader>
+          {/*
+            A real `h1`. `CardTitle` is a generated `div` and is never hand-edited,
+            so the heading nests inside it — the front door of the product had no
+            level-one heading at all, which is a screen-reader dead end.
+          */}
           <CardTitle className="text-h2">
-            {APP_ROUTE_NAMES["/sign-in"]}
+            <h1 id="page-title" tabIndex={-1}>
+              {APP_ROUTE_NAMES["/sign-in"]}
+            </h1>
           </CardTitle>
         </CardHeader>
         <CardContent className="grid gap-4">
