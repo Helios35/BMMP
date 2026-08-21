@@ -12,6 +12,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { INTENT_SURFACE_CLASSES } from "./intent-classes";
 import {
   statusIntent,
   statusLabel,
@@ -38,23 +39,6 @@ const INTENT_ICONS: Readonly<Record<StatusIntent, LucideIcon>> = {
   attention: TriangleAlert,
   critical: CircleAlert,
   pending: Clock,
-};
-
-/**
- * Foreground, background and border per intent, from the tokens in
- * `globals.css`. No raw hex and no numbered Tailwind colour reaches a component
- * (§1.2 Rule 1).
- */
-const INTENT_CLASSES: Readonly<Record<StatusIntent, string>> = {
-  neutral:
-    "bg-intent-neutral-background text-intent-neutral-foreground border-intent-neutral-border",
-  ok: "bg-intent-ok-background text-intent-ok-foreground border-intent-ok-border",
-  attention:
-    "bg-intent-attention-background text-intent-attention-foreground border-intent-attention-border",
-  critical:
-    "bg-intent-critical-background text-intent-critical-foreground border-intent-critical-border",
-  pending:
-    "bg-intent-pending-background text-intent-pending-foreground border-intent-pending-border",
 };
 
 /** 24px and 28px per §2.3. Text never below 13px, and 14px is the product floor. */
@@ -95,7 +79,7 @@ export function StatusBadge({
         className={cn(
           "rounded-md border font-medium",
           SIZE_CLASSES[size],
-          INTENT_CLASSES.neutral,
+          INTENT_SURFACE_CLASSES.neutral,
           className,
         )}
       >
@@ -120,7 +104,7 @@ export function StatusBadge({
         className={cn(
           "rounded-md border font-medium",
           SIZE_CLASSES[size],
-          INTENT_CLASSES.neutral,
+          INTENT_SURFACE_CLASSES.neutral,
           className,
         )}
       >
@@ -143,7 +127,7 @@ export function StatusBadge({
       className={cn(
         "rounded-md border font-medium",
         SIZE_CLASSES[size],
-        INTENT_CLASSES[intent],
+        INTENT_SURFACE_CLASSES[intent],
         className,
       )}
     >

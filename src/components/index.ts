@@ -9,6 +9,8 @@
  */
 
 export * from "./status/status-intent";
+export * from "./status/intent-classes";
 export * from "./status/status-badge";
 export * from "./confidence/confidence-band-display";
 export * from "./alert/alert-card";
+export * from "./theme/theme-provider";

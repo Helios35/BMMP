@@ -16,6 +16,7 @@ import {
   type ConfidenceBand,
 } from "@/domain/taxonomy/confidence-band";
 import type { StatusIntent } from "@/components/status/status-intent";
+import { INTENT_SURFACE_CLASSES } from "@/components/status/intent-classes";
 
 /**
  * `ConfidenceBandDisplay` — the per-field extraction confidence on
@@ -52,18 +53,6 @@ const BAND_ICONS: Readonly<Record<ConfidenceBand, LucideIcon>> = {
   medium: TriangleAlert,
   low: CircleAlert,
   not_extracted: CircleDashed,
-};
-
-const INTENT_CLASSES: Readonly<Record<StatusIntent, string>> = {
-  neutral:
-    "bg-intent-neutral-background text-intent-neutral-foreground border-intent-neutral-border",
-  ok: "bg-intent-ok-background text-intent-ok-foreground border-intent-ok-border",
-  attention:
-    "bg-intent-attention-background text-intent-attention-foreground border-intent-attention-border",
-  critical:
-    "bg-intent-critical-background text-intent-critical-foreground border-intent-critical-border",
-  pending:
-    "bg-intent-pending-background text-intent-pending-foreground border-intent-pending-border",
 };
 
 function isConfidenceBand(value: string): value is ConfidenceBand {
@@ -105,7 +94,7 @@ export function ConfidenceBandDisplay({
           data-confidence-state="empty"
           className={cn(
             "h-7 gap-1.5 rounded-md border px-2 text-sm font-medium",
-            INTENT_CLASSES.neutral,
+            INTENT_SURFACE_CLASSES.neutral,
           )}
         >
           <CircleDashed aria-hidden="true" />
@@ -126,7 +115,7 @@ export function ConfidenceBandDisplay({
           title="Retired or unrecognised confidence band"
           className={cn(
             "h-7 gap-1.5 rounded-md border px-2 text-sm font-medium",
-            INTENT_CLASSES.neutral,
+            INTENT_SURFACE_CLASSES.neutral,
           )}
         >
           <CircleHelp aria-hidden="true" />
@@ -148,7 +137,7 @@ export function ConfidenceBandDisplay({
         data-intent={intent}
         className={cn(
           "h-7 gap-1.5 rounded-md border px-2 text-sm font-medium",
-          INTENT_CLASSES[intent],
+          INTENT_SURFACE_CLASSES[intent],
         )}
       >
         <Icon aria-hidden="true" />
@@ -160,17 +149,14 @@ export function ConfidenceBandDisplay({
       {typeof rawConfidence === "string" && rawConfidence !== "" ? (
         <span
           data-confidence-score
-          className="tabular text-[0.8125rem] leading-[1.125rem] text-muted-foreground"
+          className="tabular text-caption text-muted-foreground"
         >
           {`Score ${rawConfidence}`}
         </span>
       ) : null}
 
       {isHardGated ? (
-        <span
-          data-confidence-hard-gated
-          className="text-[0.8125rem] leading-[1.125rem] font-medium"
-        >
+        <span data-confidence-hard-gated className="text-caption font-medium">
           Always confirmed by a person
         </span>
       ) : null}

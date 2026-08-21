@@ -84,6 +84,11 @@
 }
 
 :root {
+  /* Native controls, form widgets and scrollbars follow the theme too
+     (UX_SPEC.md §1.2 Rule 6). Without this the browser paints a light
+     scrollbar and a light date picker over a dark page. */
+  color-scheme: light;
+
   --font-mono:
     ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono",
     monospace;
@@ -106,8 +111,26 @@
   --accent: oklch(0.97 0 0);
   --accent-foreground: oklch(0.205 0 0);
   --destructive: oklch(0.505 0.2 27.5);
+  /* --border is STRUCTURAL and is exempt from the 3:1 floor. The exemption is
+     stated rather than assumed. UX_SPEC.md §1.2 Rule 3 scopes that floor to
+     *interactive* borders, and §1.4 makes the card border a structural device:
+     this token draws card edges, table row separators and the sidebar edge —
+     never a control boundary and never a state indicator (WCAG 1.4.11). It
+     measures 1.35:1 light and 1.53:1 dark, and that is accepted.
+
+     The rule that keeps the exemption honest, and it is a review item:
+     **an interactive boundary uses border-input or an intent border, and
+     border-border never bounds a control.** A navigable table row is identified
+     by its text and takes ring-ring on focus, so its separator is structural
+     too. tests/unit/design-tokens.test.ts excludes this token with the same
+     reason written there, never with a scattered ignore comment. */
   --border: oklch(0.9 0 0);
-  --input: oklch(0.87 0 0);
+  /* INTERACTIVE border — inputs, selects, outline buttons, comboboxes. Raised
+     from the shadcn default 0.87, which measures 1.48:1 and fails the 3:1 floor
+     in UX_SPEC.md §1.2 Rule 3. Now 3.36:1 on --background and on --card. This
+     unit is the first to install Input and Select, so it is the first unit in
+     which the token renders at all. */
+  --input: oklch(0.64 0 0);
   /* Focus ring at ≥ 3:1 against the page — UX_SPEC.md §1.2 Rule 3, §1.5. */
   --ring: oklch(0.55 0 0);
   --chart-1: oklch(0.87 0 0);
@@ -151,6 +174,8 @@
 }
 
 .dark {
+  color-scheme: dark;
+
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);
   --card: oklch(0.205 0 0);
@@ -166,8 +191,15 @@
   --accent: oklch(0.269 0 0);
   --accent-foreground: oklch(0.985 0 0);
   --destructive: oklch(0.704 0.191 22.216);
+  /* Structural, and exempt for the reason stated on :root --border. */
   --border: oklch(1 0 0 / 16%);
-  --input: oklch(1 0 0 / 22%);
+  /* Raised from 22%, which measures 1.91:1. Now 3.77:1 on --background and
+     3.82:1 on --card. One knock-on, checked and accepted: the generated Button
+     outline variant carries dark:bg-input/30 and dark:hover:bg-input/50, so
+     those surfaces lighten slightly in dark mode. The token moved; the
+     primitive did not (UX_SPEC.md §1.1 — src/components/ui is never
+     hand-edited). */
+  --input: oklch(1 0 0 / 40%);
   --ring: oklch(0.68 0 0);
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
@@ -262,4 +294,77 @@
       scroll-behavior: auto !important;
     }
   }
+}
+
+/* ---------------------------------------------------------------------------
+   UX_SPEC.md §1.3 — the type scale, once. A builder writes the token, never a
+   size. New code writes one of these and never text-sm, text-base or
+   text-[...]. text-xs (12px) is forbidden outright: it is below the floor.
+
+   Values are in rem so they scale with the 17px-mobile / 16px-desktop base set
+   in @layer base above, which is the entire point of that base. Never restate
+   one of these sizes in px.
+
+   Reaching rules, so eight tokens do not become eight readings of the table:
+   - page title: text-h1 below lg, text-display at lg and above
+   - a field value that carries a decision, and a table's primary column:
+     text-body-strong
+   - IDs, serials, part numbers, date codes: text-mono, beside a copy button at
+     a 44px target
+   - prose measure caps at max-w-[72ch]; sentence case everywhere
+   --------------------------------------------------------------------------- */
+
+@utility text-display {
+  font-size: 1.875rem;
+  line-height: 2.25rem;
+  font-weight: 600;
+}
+
+@utility text-h1 {
+  font-size: 1.5rem;
+  line-height: 2rem;
+  font-weight: 600;
+}
+
+@utility text-h2 {
+  font-size: 1.25rem;
+  line-height: 1.75rem;
+  font-weight: 600;
+}
+
+@utility text-body {
+  font-size: 1rem;
+  line-height: 1.5;
+  font-weight: 400;
+}
+
+@utility text-body-strong {
+  font-size: 1rem;
+  line-height: 1.5;
+  font-weight: 600;
+}
+
+@utility text-label {
+  font-size: 0.9375rem;
+  line-height: 1.25rem;
+  font-weight: 500;
+}
+
+/* Metadata only — timestamps, record counts, helper text. Held at 0.8125rem
+   (13px desktop, 13.8px at the 17px mobile base) exactly as the three shipped
+   components already render it. §1.3's "14px is the floor" sentence and its own
+   caption row disagree; that is an owner call, and this token does not silently
+   raise the size or silently lower the floor while it is open. */
+@utility text-caption {
+  font-size: 0.8125rem;
+  line-height: 1.125rem;
+  font-weight: 400;
+}
+
+@utility text-mono {
+  font-family: var(--font-mono);
+  font-size: 0.9375rem;
+  line-height: 1.375rem;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
 }
