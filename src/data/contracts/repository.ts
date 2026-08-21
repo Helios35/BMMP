@@ -88,3 +88,19 @@ export interface BaseQuery {
   /** Free-text search over the entity's searchable fields. */
   readonly search?: string;
 }
+
+/**
+ * Explicit, typed sort. **No adapter accepts a raw sort string** (see
+ * `./index.ts`) — a sort field arrives from a URL query parameter, and a
+ * `sortBy` typed `string` is a column name a caller chose.
+ *
+ * Each entity declares its own sortable field union, so a field that is not
+ * sortable is a type error rather than an adapter that silently ignores it. The
+ * default direction and the default field belong to the adapter, not here: two
+ * adapters that disagree about what "unsorted" means is how a Playwright
+ * assertion on row order passes on mock and fails on Supabase.
+ */
+export interface SortRequest<TField extends string> {
+  readonly sortBy?: TField;
+  readonly sortDirection?: "asc" | "desc";
+}

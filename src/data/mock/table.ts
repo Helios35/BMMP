@@ -122,6 +122,40 @@ export class TenantTable<T extends TenantRow> {
     return row;
   }
 
+  /**
+   * The `security definer` insert — `TECHNICAL_SPEC.md` §10.5,
+   * `app.write_audit_event()`.
+   *
+   * **It skips the policy check and nothing else.** The tenant scope, the
+   * latency simulation and the seeded failure all still apply, and the row's
+   * attribution still comes from whatever the caller built out of `ctx` — the
+   * elevated privilege is on the write, never on who the write claims to be.
+   *
+   * It exists for `audit_event` and for nothing else. §9.5 gives that table's
+   * INSERT to no tenant role at all, because Postgres writes those rows from a
+   * trigger and never from a user statement (Rules 12.3, 12.4) — so the caller
+   * who was just denied, whose denial has to be recorded, is precisely the
+   * caller who holds no INSERT (Rules 1.16, 12.6). **A repository reaching for
+   * this to get around a `PermissionError` on some other table has misread the
+   * denial: record it and let it stand.**
+   */
+  async insertAsDefiner(ctx: RequestContext, row: T): Promise<T> {
+    await this.begin(ctx, "insert", null);
+    if (row.organizationId !== ctx.organizationId) {
+      throw new TenantScopeError({
+        userMessage: "That action is not available.",
+        correlationId: ctx.correlationId,
+        context: {
+          entity: this.entityName,
+          rowOrganizationId: row.organizationId,
+          contextOrganizationId: ctx.organizationId,
+        },
+      });
+    }
+    this.rows.push(row);
+    return row;
+  }
+
   async update(ctx: RequestContext, id: Uuid, patch: Partial<T>): Promise<T> {
     await this.begin(ctx, "update", "update");
     const index = this.rows.findIndex(
@@ -141,10 +175,11 @@ export class TenantTable<T extends TenantRow> {
     return next;
   }
 
+  /** `action: null` is the `security definer` path — see {@link TenantTable.insertAsDefiner}. */
   private async begin(
     ctx: RequestContext,
     method: string,
-    action: "select" | "insert" | "update",
+    action: "select" | "insert" | "update" | null,
   ): Promise<void> {
     const key = `${this.entityName}.${method}`;
     await simulateLatency(key);
@@ -156,7 +191,7 @@ export class TenantTable<T extends TenantRow> {
         context: { seededFailure: key },
       });
     }
-    assertPolicy(ctx, this.policyTable, action);
+    if (action !== null) assertPolicy(ctx, this.policyTable, action);
   }
 }
 

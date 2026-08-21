@@ -22,13 +22,29 @@ import type { Uuid } from "@/types/common";
 
 export type CreateOrganization = CreateInput<
   Organization,
-  "batteryRecordSeq" | "containerSeq" | "lotSeq" | "shipmentSeq"
+  | "batteryRecordSeq"
+  | "containerSeq"
+  | "lotSeq"
+  | "shipmentSeq"
+  | "emergencyVerifiedAt"
+  | "emergencyVerifiedBy"
 >;
 
 /**
  * `slug` is immutable after creation; `handlerSizeClass` is set by rule
  * evaluation and **never typed by a user** (Rules 3.18–3.20); the four sequence
  * counters are allocated by the database.
+ *
+ * `emergencyVerifiedAt` and `emergencyVerifiedBy` are absent from both shapes
+ * for a different reason: **verification is a recorded act, not a field**
+ * (D-32, Rule 5.6). A profile edit that can stamp its own verification date is
+ * not a verification, and the actor has to come from `ctx` the way `createdBy`
+ * does rather than from whatever the caller sent. They move through a dedicated
+ * method, which the unit that builds the write path adds — **so nothing in this
+ * unit can set them, which is correct: every organization reads as unverified
+ * and that is exactly the state D-32 defines the behaviour for.**
+ * `emergencyReverificationIntervalMonths` stays settable: it is configuration,
+ * not evidence.
  */
 export type UpdateOrganization = UpdateInput<
   Organization,
@@ -38,6 +54,8 @@ export type UpdateOrganization = UpdateInput<
   | "containerSeq"
   | "lotSeq"
   | "shipmentSeq"
+  | "emergencyVerifiedAt"
+  | "emergencyVerifiedBy"
 >;
 
 export interface OrganizationQuery extends BaseQuery {
@@ -62,9 +80,20 @@ export interface UserQuery extends BaseQuery {
 
 // --- membership -------------------------------------------------------------
 
+/**
+ * `holdsBindingAuthority` is not settable at creation. **Assigning it is its own
+ * recorded act** (D-35) — a member who can sign on the organization's behalf
+ * (Rule 7.3) does not acquire that quietly inside an invitation, and an
+ * invitation that could confer it would be one act producing two grants. A new
+ * membership starts without it; {@link UpdateMembership} is the assignment path.
+ *
+ * The three grant fields **are** settable here, and deliberately: Rule 1.15 says
+ * a grant without an expiry cannot be created, which is only enforceable if the
+ * expiry arrives with the insert.
+ */
 export type CreateMembership = CreateInput<
   Membership,
-  "acceptedAt" | "revokedAt" | "revokedBy"
+  "acceptedAt" | "revokedAt" | "revokedBy" | "holdsBindingAuthority"
 >;
 
 /**
@@ -81,11 +110,30 @@ export type UpdateMembership = UpdateInput<
   "invitedEmail" | "inviteTokenHash" | "invitedBy" | "invitedAt"
 >;
 
+/**
+ * **Every field here narrows within the active organization, `userId` included.**
+ *
+ * `membership` is tenant-scoped, so `list` returns the active organization's
+ * rows and nothing else — `userId` here asks *"this user's membership **here**"*,
+ * never *"this user's memberships"*. That is correct for every screen and it is
+ * useless for the organization switcher, which has to name the organizations the
+ * caller is **not** currently acting in, before an active organization exists at
+ * all.
+ *
+ * **That read is `identity.listSessionMemberships` (see `./identity.ts`) and it
+ * is the only unscoped one in the contract.** It is bounded to the caller's own
+ * user id and returns no tenant row. Do not add a second cross-organization read
+ * here: an unscoped method on a tenant repository is the shape a tenancy leak
+ * takes, and one of them with a written justification is a seam — two is a
+ * habit.
+ */
 export interface MembershipQuery extends BaseQuery {
   readonly userId?: Uuid;
   readonly role?: RoleCode;
   /** `accepted_at is not null and revoked_at is null` — both halves of "active". */
   readonly isActive?: boolean;
+  /** D-35. The `/settings/users` binding-authority column, and Rule 1.12's "at least one" check. */
+  readonly holdsBindingAuthority?: boolean;
   readonly invitedEmail?: string;
 }
 

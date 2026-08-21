@@ -74,6 +74,19 @@ const describe = (): AdapterDescription => ({ name: "supabase", kind: "live" });
 export const supabaseAdapter: DataAdapter = {
   describe,
 
+  // Identity refuses exactly like the other twenty-six. **No Supabase Auth call
+  // is written in this unit** (D-39): the screens, the guard, the tenancy and
+  // the audit are real against the mock, and when Auth lands this object gains
+  // an implementation while nothing in `src/app`, `src/features`,
+  // `src/components` or `src/domain` moves.
+  identity: unimplemented("identity", [
+    "verifyCredentials",
+    "createAccount",
+    "readInvitation",
+    "acceptInvitation",
+    "resolveSession",
+    "listSessionMemberships",
+  ]),
   organizations: unimplemented("organizations", CRUD),
   users: unimplemented("users", CRUD),
   memberships: unimplemented("memberships", CRUD),
@@ -123,7 +136,10 @@ export const supabaseAdapter: DataAdapter = {
   ]),
 
   damageAssessments: unimplemented("damageAssessments", APPEND_ONLY),
-  auditEvents: unimplemented("auditEvents", APPEND_ONLY),
+  // `write` is the `security definer` door (§10.5, `app.write_audit_event()`).
+  // It refuses here like everything else — an adapter that answered it silently
+  // would be an audit trail nobody could tell was empty.
+  auditEvents: unimplemented("auditEvents", [...APPEND_ONLY, "write"]),
 
   objects: unimplemented("objects", ["put", "get", "signedUrl"]),
 };

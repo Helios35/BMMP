@@ -5,6 +5,7 @@ import type {
   BaseQuery,
   CreateInput,
   Repository,
+  SortRequest,
   UpdateInput,
 } from "./repository";
 import type { BatteryRecord } from "@/types/battery-record";
@@ -18,6 +19,7 @@ import type {
 import type { ApplicationClass } from "@/domain/taxonomy/application-class";
 import type { BatteryRecordStatus } from "@/domain/taxonomy/battery-record-status";
 import type { CatalogEntryStatus } from "@/domain/taxonomy/catalog-entry-status";
+import type { CellFormFactor } from "@/domain/taxonomy/cell-form-factor";
 import type { Chemistry } from "@/domain/taxonomy/chemistry";
 import type { ConfidenceBand } from "@/domain/taxonomy/confidence-band";
 import type { DdrFlag } from "@/domain/taxonomy/ddr-flag";
@@ -56,14 +58,42 @@ export type UpdateBatteryRecord = UpdateInput<
   "recordNumber" | "ddrFlags" | "isAirTransportProhibited"
 >;
 
-export interface BatteryRecordQuery extends BaseQuery {
+/**
+ * What `/batteries` may be sorted by. **`format_category` is deliberately not
+ * here and never will be**: a format band is a `format_classification` keyed on
+ * `(battery_record, jurisdiction, rule_version)`, one record carries several,
+ * and a column that sorts by one of them has asserted an organization-wide
+ * format value (`SITE_ARCHITECTURE.md` §7.6b).
+ */
+export type BatteryRecordSortField =
+  "recordNumber" | "manufacturerName" | "assessedCondition" | "createdAt";
+
+export interface BatteryRecordQuery
+  extends BaseQuery, SortRequest<BatteryRecordSortField> {
   readonly status?: BatteryRecordStatus;
   readonly containerId?: Uuid;
+  /**
+   * The `/batteries` storage-clock-tier filter resolves to a **set** of
+   * containers, not to one: a tier is a property of a container's clock, so the
+   * screen reads the clocks at that tier first and narrows this list by the
+   * containers they belong to. Union with {@link BatteryRecordQuery.containerId},
+   * never a replacement for it.
+   */
+  readonly containerIds?: readonly Uuid[];
   readonly catalogEntryId?: Uuid;
+  /** `catalog_entry_id is not null` — the catalog-matched filter on `/batteries`. */
+  readonly isCatalogMatched?: boolean;
   readonly intakeSessionId?: Uuid;
   readonly chemistry?: Chemistry;
   /** A small mobility pack and a vehicle pack sit in the same list; this narrows it. */
   readonly applicationClass?: ApplicationClass;
+  /**
+   * T-49 governs `battery_record.assessed_condition` (D-38). **Stays `string`
+   * to match the column**, which is `string` pending the fixture migration
+   * `BUILD_NOTES_b1a-doc-defects.md` §2.2 asks for — narrowing the filter ahead
+   * of the field would make the filter unable to select the fixtures.
+   */
+  readonly assessedCondition?: string;
   readonly serialNumber?: string;
   /** Any non-empty `ddr_flags`. */
   readonly hasDdrFlag?: boolean;
@@ -71,6 +101,9 @@ export interface BatteryRecordQuery extends BaseQuery {
   readonly isAirTransportProhibited?: boolean;
   /** Excludes `voided` records, which are retained but sit outside every operational count. */
   readonly excludeVoided?: boolean;
+  /** The `/batteries` date range, over `created_at`. Half-open, both bounds optional. */
+  readonly loggedAfter?: IsoTimestamp;
+  readonly loggedBefore?: IsoTimestamp;
 }
 
 export type BatteryRecordRepository = Repository<
@@ -95,11 +128,22 @@ export type UpdateCatalogEntry = UpdateInput<
   "partNumberNormalized" | "organizationId"
 >;
 
-export interface CatalogQuery extends BaseQuery {
+export type CatalogEntrySortField =
+  "manufacturerName" | "modelName" | "partNumber" | "updatedAt";
+
+export interface CatalogQuery
+  extends BaseQuery, SortRequest<CatalogEntrySortField> {
   readonly status?: CatalogEntryStatus;
   readonly manufacturerName?: string;
   readonly applicationClass?: ApplicationClass;
   readonly chemistry?: Chemistry;
+  /**
+   * T-04, the physical cell shape — the `/catalog` form-factor filter.
+   *
+   * **T-04 is not T-06.** `format_category` is a jurisdiction-dependent band on
+   * `format_classification` and is not filterable here, or anywhere in B1a.
+   */
+  readonly cellFormFactor?: CellFormFactor;
   /** `organization_id is null` — the shared platform catalog. */
   readonly isGlobal?: boolean;
 }

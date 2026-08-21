@@ -36,6 +36,7 @@ import type {
 } from "@/types/tenancy";
 import type { AppliedRuleVersion } from "@/domain/rules/outcome";
 import * as ID from "./ids";
+import { INVITE_TOKEN_HASHES } from "./invite-tokens";
 
 /**
  * The mock data set.
@@ -55,6 +56,21 @@ import * as ID from "./ids";
  * Two more, because a screen built against one tenant is a screen that has never
  * been asked the isolation question: **a second organization** (`ORG.rainier`)
  * with its own records, and **a membership invited but not accepted**.
+ *
+ * The identity set is unfriendly in the same way, and for the same reason — the
+ * guard, the gate and the switcher all have branches no happy-path fixture ever
+ * reaches:
+ *
+ * | Case | Where |
+ * | --- | --- |
+ * | A user for each of the six roles | `USER.*`, one membership each |
+ * | A user in exactly one organization, and one in two | every user but `USER.martaManager`; `MEMBERSHIP.martaCascade` + `martaOlympic` |
+ * | An organization with **no acceptance in force** | `ORG.olympic`, `TOS.olympicNotAccepted` |
+ * | A grant in force and a grant expired | `MEMBERSHIP.samCascade` / `leeCascadeExpired` |
+ * | A platform-admin grant in force and one expired | `MEMBERSHIP.platformAdminCascadeGrant` / `platformAdminRainierExpired` |
+ * | An invitation in each of its four states | `MEMBERSHIP.pendingInvite`, `expiredInvite`, `revokedInvite`, `danaCascade` |
+ * | A membership holding binding authority | `MEMBERSHIP.martaCascade`, `rosaOlympic` |
+ * | An emergency number whose verification has lapsed | `ORG.cascade` |
  *
  * **Timestamps are fixed, not relative.** The overdue container is overdue
  * because its clock's `dueAt` sits in the B1a build window's past, not because a
@@ -80,7 +96,21 @@ const T = {
   spreadIntake: "2026-08-19T08:12:35.000Z",
   julyShipped: "2026-07-30T15:10:00.000Z",
   julyDelivered: "2026-08-03T11:22:00.000Z",
+  olympicCreated: "2026-08-10T08:00:00.000Z",
 } as const;
+
+/**
+ * The expiry a fixture carries when it must **stay** in force.
+ *
+ * §8.2 fixes fixture timestamps rather than computing them from `now`, so a
+ * grant or an invitation that has to remain live cannot use a plausible
+ * near-future date: it would lapse quietly and turn the suite red on a Tuesday
+ * in 2027, in a test that has nothing to do with grants. Pointing far forward is
+ * stable in the direction that matters. An expired fixture points backwards,
+ * which is stable in the other direction, and **Rule 1.28's mid-session
+ * behaviour is proven by passing `at` forward in a unit test, never by waiting.**
+ */
+const STAYS_IN_FORCE = "2099-12-31T23:59:59.000Z";
 
 /** The Washington accumulation-period rule as it applied to the running clocks. */
 const WA_ACCUMULATION_APPLIED: AppliedRuleVersion = {
@@ -140,6 +170,18 @@ export const organizations: readonly Organization[] = [
     jurisdictionProfile: null,
     emergencyResponsePhone: "+1-800-555-0142",
     emergencyResponseContractRef: "ERI-CASCADE-2026-0117",
+    // D-32. Verified once, by a person, and the verification has since lapsed.
+    // **A lapsed verification is treated exactly as an absent one** — one state,
+    // not two — so this row and Rainier's reach the same screen state from
+    // opposite directions, which is the pair worth having. It points backwards,
+    // so it stays lapsed rather than drifting (§8.2).
+    emergencyVerifiedAt: "2025-03-14T17:40:00.000Z",
+    emergencyVerifiedBy: ID.USER.martaManager,
+    // Organization configuration, not a rule and not a threshold: the tenant
+    // chose this interval. Null on the other two means the platform default
+    // applies, and nothing in `src/` holds that default yet — see the
+    // build-notes.
+    emergencyReverificationIntervalMonths: 12,
     defaultTransportMode: "ground",
     status: "active",
     batteryRecordSeq: 5,
@@ -174,6 +216,11 @@ export const organizations: readonly Organization[] = [
     // this tenant until P2 or P6 supplies one — a real state, seeded.
     emergencyResponsePhone: null,
     emergencyResponseContractRef: null,
+    // Never verified, because there is nothing to verify. D-32's other entry
+    // point into the single unverified state.
+    emergencyVerifiedAt: null,
+    emergencyVerifiedBy: null,
+    emergencyReverificationIntervalMonths: null,
     defaultTransportMode: "ground",
     status: "active",
     batteryRecordSeq: 1,
@@ -182,6 +229,52 @@ export const organizations: readonly Organization[] = [
     shipmentSeq: 0,
     createdAt: T.orgCreated,
     updatedAt: T.orgCreated,
+    createdBy: null,
+    updatedBy: null,
+  },
+  {
+    // The third tenant, and it exists for one reason: **no Terms of Service
+    // acceptance in force** (E-12, Rules 7.1, 7.2). Intake is blocked
+    // organization-wide here and every read-only route stays reachable, which is
+    // the behaviour that cannot be demonstrated against the other two.
+    //
+    // It also holds no battery record, no container and no catalog proposal, so
+    // E-1's five role variants render against a genuinely empty tenant rather
+    // than against a table a test emptied.
+    id: ID.ORG.olympic,
+    name: "Olympic Mobility Supply",
+    legalName: "Olympic Mobility Supply LLC",
+    slug: "olympic-mobility-supply",
+    handlerIdentifier: null,
+    handlerSizeClass: "undetermined",
+    primaryAddress: {
+      line1: "312 Marine Drive",
+      line2: null,
+      city: "Port Angeles",
+      region: "WA",
+      postalCode: "98362",
+      country: "US",
+    },
+    mailingAddress: null,
+    timeZone: "America/Los_Angeles",
+    primaryJurisdictionId: ID.JURISDICTION.washington,
+    jurisdictionProfile: null,
+    // A number on file that nobody has verified — the third shape of D-32's one
+    // unverified state, and the one a screen is most likely to render as
+    // "verified" by mistake.
+    emergencyResponsePhone: "+1-800-555-0197",
+    emergencyResponseContractRef: null,
+    emergencyVerifiedAt: null,
+    emergencyVerifiedBy: null,
+    emergencyReverificationIntervalMonths: null,
+    defaultTransportMode: "ground",
+    status: "active",
+    batteryRecordSeq: 0,
+    containerSeq: 0,
+    lotSeq: 0,
+    shipmentSeq: 0,
+    createdAt: T.olympicCreated,
+    updatedAt: T.olympicCreated,
     createdBy: null,
     updatedBy: null,
   },
@@ -253,6 +346,76 @@ export const users: readonly User[] = [
     createdAt: T.orgCreated,
     updatedAt: T.orgCreated,
   },
+  // The four roles that had no fixture identity, so that a developer and a
+  // Playwright setup project can sign in as **each of the six** through the real
+  // form (D-39). Without them the guard's matrix is asserted rather than walked.
+  {
+    id: ID.USER.priyaProducer,
+    email: "priya.narang@cascade-recyclers.example",
+    fullName: "Priya Narang",
+    phone: "+1-360-555-0164",
+    avatarUrl: null,
+    isPlatformAdmin: false,
+    locale: "en-US",
+    status: "active",
+    lastSeenAt: T.scuffedIntake,
+    createdAt: T.orgCreated,
+    updatedAt: T.orgCreated,
+  },
+  {
+    id: ID.USER.omarTechnician,
+    email: "omar.haddad@cascade-recyclers.example",
+    fullName: "Omar Haddad",
+    phone: "+1-360-555-0171",
+    avatarUrl: null,
+    isPlatformAdmin: false,
+    locale: "en-US",
+    status: "active",
+    lastSeenAt: T.mobilityIntake,
+    createdAt: T.orgCreated,
+    updatedAt: T.orgCreated,
+  },
+  {
+    // A second external auditor whose grant has run out. The user row is
+    // untouched by that — **access ends, the person does not** (Rule 1.13).
+    id: ID.USER.leeAuditorExpired,
+    email: "l.novak@northbeam-underwriting.example",
+    fullName: "Lee Novak",
+    phone: null,
+    avatarUrl: null,
+    isPlatformAdmin: false,
+    locale: "en-US",
+    status: "active",
+    lastSeenAt: "2026-07-30T09:05:00.000Z",
+    createdAt: "2026-07-01T10:00:00.000Z",
+    updatedAt: "2026-07-01T10:00:00.000Z",
+  },
+  {
+    id: ID.USER.rosaOlympicManager,
+    email: "rosa.delgado@olympic-mobility.example",
+    fullName: "Rosa Delgado",
+    phone: "+1-360-555-0188",
+    avatarUrl: null,
+    isPlatformAdmin: false,
+    locale: "en-US",
+    status: "active",
+    lastSeenAt: null,
+    createdAt: T.olympicCreated,
+    updatedAt: T.olympicCreated,
+  },
+  {
+    id: ID.USER.tomOlympicHandler,
+    email: "tom.ashby@olympic-mobility.example",
+    fullName: "Tom Ashby",
+    phone: null,
+    avatarUrl: null,
+    isPlatformAdmin: false,
+    locale: "en-US",
+    status: "active",
+    lastSeenAt: null,
+    createdAt: T.olympicCreated,
+    updatedAt: T.olympicCreated,
+  },
 ];
 
 export const memberships: readonly Membership[] = [
@@ -262,13 +425,19 @@ export const memberships: readonly Membership[] = [
     userId: ID.USER.danaHandler,
     invitedEmail: null,
     role: "compliance_handler",
+    holdsBindingAuthority: false,
     invitedBy: ID.USER.martaManager,
     invitedAt: T.orgCreated,
-    inviteTokenHash: null,
+    // Retained after acceptance so `/invite/[token]` has a subject for the
+    // `used` state. The token is spent; the hash is what proves it was this one.
+    inviteTokenHash: INVITE_TOKEN_HASHES.usedHandler,
     inviteExpiresAt: null,
     acceptedAt: T.orgCreated,
     revokedAt: null,
     revokedBy: null,
+    grantReason: null,
+    grantScope: null,
+    grantExpiresAt: null,
     createdAt: T.orgCreated,
     updatedAt: T.orgCreated,
   },
@@ -278,6 +447,10 @@ export const memberships: readonly Membership[] = [
     userId: ID.USER.martaManager,
     invitedEmail: null,
     role: "facility_manager",
+    // D-35. Cascade's **only** holder, which is what makes Rule 1.12's "an
+    // organization always retains at least one" a state a screen can be tested
+    // against rather than a sentence in a document.
+    holdsBindingAuthority: true,
     invitedBy: null,
     invitedAt: null,
     inviteTokenHash: null,
@@ -285,6 +458,9 @@ export const memberships: readonly Membership[] = [
     acceptedAt: T.orgCreated,
     revokedAt: null,
     revokedBy: null,
+    grantReason: null,
+    grantScope: null,
+    grantExpiresAt: null,
     createdAt: T.orgCreated,
     updatedAt: T.orgCreated,
   },
@@ -294,6 +470,7 @@ export const memberships: readonly Membership[] = [
     userId: ID.USER.samAuditor,
     invitedEmail: null,
     role: "auditor",
+    holdsBindingAuthority: false,
     invitedBy: ID.USER.martaManager,
     invitedAt: "2026-08-01T12:00:00.000Z",
     inviteTokenHash: null,
@@ -301,6 +478,11 @@ export const memberships: readonly Membership[] = [
     acceptedAt: "2026-08-02T08:14:00.000Z",
     revokedAt: null,
     revokedBy: null,
+    // Rules 1.15, 1.18 — a grant carries a stated reason, a stated scope and an
+    // expiry, and it cannot be created without one. See `STAYS_IN_FORCE`.
+    grantReason: "Annual insurance underwriting review",
+    grantScope: "Full audit scope — Cascade Auto Recyclers",
+    grantExpiresAt: STAYS_IN_FORCE,
     createdAt: "2026-08-01T12:00:00.000Z",
     updatedAt: "2026-08-02T08:14:00.000Z",
   },
@@ -310,6 +492,13 @@ export const memberships: readonly Membership[] = [
     userId: ID.USER.joRainierHandler,
     invitedEmail: null,
     role: "compliance_handler",
+    // **False, and this is a judgment call recorded in the build-notes.** D-35
+    // makes binding authority an attribute of a *facility manager* membership,
+    // and Jo is a compliance handler — so `true` here would produce a row whose
+    // flag every consumer of Rule 7.3 must then ignore, and a
+    // "Binding authority: yes" cell beside a role that cannot sign. Rainier
+    // therefore holds none, which is itself a state D-35 names a remedy for.
+    holdsBindingAuthority: false,
     invitedBy: null,
     invitedAt: null,
     inviteTokenHash: null,
@@ -317,6 +506,9 @@ export const memberships: readonly Membership[] = [
     acceptedAt: T.orgCreated,
     revokedAt: null,
     revokedBy: null,
+    grantReason: null,
+    grantScope: null,
+    grantExpiresAt: null,
     createdAt: T.orgCreated,
     updatedAt: T.orgCreated,
   },
@@ -328,16 +520,252 @@ export const memberships: readonly Membership[] = [
     userId: null,
     invitedEmail: "new.handler@cascade-recyclers.example",
     role: "compliance_handler",
+    holdsBindingAuthority: false,
     invitedBy: ID.USER.martaManager,
     invitedAt: "2026-08-17T14:30:00.000Z",
-    inviteTokenHash:
-      "9f2c3a1de4b57806c9a2f5310d8e47bb62c1a09f4d7e83b25c6a1f0d9e83b471",
-    inviteExpiresAt: "2026-08-24T14:30:00.000Z",
+    inviteTokenHash: INVITE_TOKEN_HASHES.pendingHandler,
+    // Was 2026-08-24, which had already passed before this unit merged — the
+    // one live invitation in the set was expired, so the `valid` branch of
+    // `/invite/[token]` was unreachable. See `STAYS_IN_FORCE`.
+    inviteExpiresAt: STAYS_IN_FORCE,
     acceptedAt: null,
     revokedAt: null,
     revokedBy: null,
+    grantReason: null,
+    grantScope: null,
+    grantExpiresAt: null,
     createdAt: "2026-08-17T14:30:00.000Z",
     updatedAt: "2026-08-17T14:30:00.000Z",
+  },
+  {
+    id: ID.MEMBERSHIP.priyaCascade,
+    organizationId: ID.ORG.cascade,
+    userId: ID.USER.priyaProducer,
+    invitedEmail: null,
+    role: "producer_compliance_officer",
+    holdsBindingAuthority: false,
+    invitedBy: ID.USER.martaManager,
+    invitedAt: "2026-06-02T09:00:00.000Z",
+    inviteTokenHash: null,
+    inviteExpiresAt: null,
+    acceptedAt: "2026-06-02T15:41:00.000Z",
+    revokedAt: null,
+    revokedBy: null,
+    grantReason: null,
+    grantScope: null,
+    grantExpiresAt: null,
+    createdAt: "2026-06-02T09:00:00.000Z",
+    updatedAt: "2026-06-02T15:41:00.000Z",
+  },
+  {
+    id: ID.MEMBERSHIP.omarCascade,
+    organizationId: ID.ORG.cascade,
+    userId: ID.USER.omarTechnician,
+    invitedEmail: null,
+    role: "mobility_supplier_technician",
+    holdsBindingAuthority: false,
+    invitedBy: ID.USER.martaManager,
+    invitedAt: "2026-06-02T09:00:00.000Z",
+    inviteTokenHash: null,
+    inviteExpiresAt: null,
+    acceptedAt: "2026-06-03T07:22:00.000Z",
+    revokedAt: null,
+    revokedBy: null,
+    grantReason: null,
+    grantScope: null,
+    grantExpiresAt: null,
+    createdAt: "2026-06-02T09:00:00.000Z",
+    updatedAt: "2026-06-03T07:22:00.000Z",
+  },
+  {
+    // P6 acting **inside** a tenant. Rule 1.17 — platform scope alone confers no
+    // tenant data access; this row is the access, and it is the row that makes
+    // `actorType: "platform_admin"` true of everything done under it (Rules
+    // 1.18, 12.7). Without a grant row, P6 resolves no context here at all.
+    id: ID.MEMBERSHIP.platformAdminCascadeGrant,
+    organizationId: ID.ORG.cascade,
+    userId: ID.USER.platformAdmin,
+    invitedEmail: null,
+    role: "platform_admin",
+    // Rules 1.19, 7.4 — never, under any grant. A platform admin accepting a
+    // customer's terms is not consent.
+    holdsBindingAuthority: false,
+    invitedBy: ID.USER.martaManager,
+    invitedAt: "2026-08-14T11:00:00.000Z",
+    inviteTokenHash: null,
+    inviteExpiresAt: null,
+    acceptedAt: "2026-08-14T11:02:00.000Z",
+    revokedAt: null,
+    revokedBy: null,
+    grantReason: "Support request 4471 — intake photos not attaching",
+    grantScope: "Cascade Auto Recyclers — intake and battery records",
+    grantExpiresAt: STAYS_IN_FORCE,
+    createdAt: "2026-08-14T11:00:00.000Z",
+    updatedAt: "2026-08-14T11:02:00.000Z",
+  },
+  {
+    // The same platform admin, at Rainier, **expired**. Rule 1.17 is not a claim
+    // in a document while this row exists: the identical user resolves a context
+    // at Cascade and none here, and the only difference is the grant.
+    id: ID.MEMBERSHIP.platformAdminRainierExpired,
+    organizationId: ID.ORG.rainier,
+    userId: ID.USER.platformAdmin,
+    invitedEmail: null,
+    role: "platform_admin",
+    holdsBindingAuthority: false,
+    invitedBy: null,
+    invitedAt: "2026-06-01T09:00:00.000Z",
+    inviteTokenHash: null,
+    inviteExpiresAt: null,
+    acceptedAt: "2026-06-01T09:05:00.000Z",
+    revokedAt: null,
+    revokedBy: null,
+    grantReason: "Migration assistance during onboarding",
+    grantScope: "Rainier Mobility Services — battery records",
+    grantExpiresAt: "2026-06-30T23:59:59.000Z",
+    createdAt: "2026-06-01T09:00:00.000Z",
+    updatedAt: "2026-06-01T09:05:00.000Z",
+  },
+  {
+    // Rule 1.28 — an expired grant ends access **inside an already-open
+    // session**, not at the next sign-in. The row is accepted and unrevoked, so
+    // the expiry is the only thing standing between Lee and the records: exactly
+    // the case a `revokedAt`-only check would get wrong.
+    id: ID.MEMBERSHIP.leeCascadeExpired,
+    organizationId: ID.ORG.cascade,
+    userId: ID.USER.leeAuditorExpired,
+    invitedEmail: null,
+    role: "auditor",
+    holdsBindingAuthority: false,
+    invitedBy: ID.USER.martaManager,
+    invitedAt: "2026-07-01T10:00:00.000Z",
+    inviteTokenHash: null,
+    inviteExpiresAt: null,
+    acceptedAt: "2026-07-01T12:30:00.000Z",
+    revokedAt: null,
+    revokedBy: null,
+    grantReason: "Quarterly coverage review",
+    grantScope: "Cascade Auto Recyclers — July shipment records",
+    grantExpiresAt: "2026-07-31T17:00:00.000Z",
+    createdAt: "2026-07-01T10:00:00.000Z",
+    updatedAt: "2026-07-01T12:30:00.000Z",
+  },
+  {
+    id: ID.MEMBERSHIP.rosaOlympic,
+    organizationId: ID.ORG.olympic,
+    userId: ID.USER.rosaOlympicManager,
+    invitedEmail: null,
+    role: "facility_manager",
+    // Olympic's acceptor. E-12's block names **a person**, and this is who it
+    // names — a block that can only refuse is the failure D-35 forbids.
+    holdsBindingAuthority: true,
+    invitedBy: null,
+    invitedAt: null,
+    inviteTokenHash: null,
+    inviteExpiresAt: null,
+    acceptedAt: T.olympicCreated,
+    revokedAt: null,
+    revokedBy: null,
+    grantReason: null,
+    grantScope: null,
+    grantExpiresAt: null,
+    createdAt: T.olympicCreated,
+    updatedAt: T.olympicCreated,
+  },
+  {
+    id: ID.MEMBERSHIP.tomOlympic,
+    organizationId: ID.ORG.olympic,
+    userId: ID.USER.tomOlympicHandler,
+    invitedEmail: null,
+    role: "compliance_handler",
+    holdsBindingAuthority: false,
+    invitedBy: ID.USER.rosaOlympicManager,
+    invitedAt: T.olympicCreated,
+    inviteTokenHash: null,
+    inviteExpiresAt: null,
+    acceptedAt: "2026-08-10T09:15:00.000Z",
+    revokedAt: null,
+    revokedBy: null,
+    grantReason: null,
+    grantScope: null,
+    grantExpiresAt: null,
+    createdAt: T.olympicCreated,
+    updatedAt: "2026-08-10T09:15:00.000Z",
+  },
+  {
+    // The **second** membership for a user who already has one, and the only
+    // reason the organization switcher is reachable at all: E-16 says the
+    // control is absent on one membership, so proving the absence needs someone
+    // who has two. Rules 1.4, 1.5 — one role per organization, and the roles do
+    // not combine: Marta signs Cascade's terms and cannot sign Olympic's.
+    id: ID.MEMBERSHIP.martaOlympic,
+    organizationId: ID.ORG.olympic,
+    userId: ID.USER.martaManager,
+    invitedEmail: null,
+    role: "facility_manager",
+    holdsBindingAuthority: false,
+    invitedBy: ID.USER.rosaOlympicManager,
+    invitedAt: T.olympicCreated,
+    inviteTokenHash: null,
+    inviteExpiresAt: null,
+    acceptedAt: "2026-08-10T10:40:00.000Z",
+    revokedAt: null,
+    revokedBy: null,
+    grantReason: null,
+    grantScope: null,
+    grantExpiresAt: null,
+    createdAt: T.olympicCreated,
+    updatedAt: "2026-08-10T10:40:00.000Z",
+  },
+  {
+    // Token state `expired` — never accepted, never withdrawn, simply past its
+    // window. Seven days from `invitedAt`.
+    id: ID.MEMBERSHIP.expiredInvite,
+    organizationId: ID.ORG.cascade,
+    userId: null,
+    invitedEmail: "ops.lead@cascade-recyclers.example",
+    role: "facility_manager",
+    holdsBindingAuthority: false,
+    invitedBy: ID.USER.martaManager,
+    invitedAt: "2026-07-25T09:00:00.000Z",
+    inviteTokenHash: INVITE_TOKEN_HASHES.expiredManager,
+    inviteExpiresAt: "2026-08-01T09:00:00.000Z",
+    acceptedAt: null,
+    revokedAt: null,
+    revokedBy: null,
+    grantReason: null,
+    grantScope: null,
+    grantExpiresAt: null,
+    createdAt: "2026-07-25T09:00:00.000Z",
+    updatedAt: "2026-07-25T09:00:00.000Z",
+  },
+  {
+    // Token state `revoked`. Its window is still open on purpose, so the state
+    // under test is the withdrawal and not an expiry that would have masked it —
+    // `revoked` outranks `expired` in the precedence, and a fixture that holds
+    // both proves nothing about which one the adapter read.
+    id: ID.MEMBERSHIP.revokedInvite,
+    organizationId: ID.ORG.cascade,
+    userId: null,
+    invitedEmail: "coverage.review@northbeam-underwriting.example",
+    role: "auditor",
+    holdsBindingAuthority: false,
+    invitedBy: ID.USER.martaManager,
+    invitedAt: "2026-08-05T13:00:00.000Z",
+    inviteTokenHash: INVITE_TOKEN_HASHES.revokedAuditor,
+    inviteExpiresAt: STAYS_IN_FORCE,
+    acceptedAt: null,
+    // **Revocation is never a delete** (Rule 1.13). The row stays, and so does
+    // the record of who withdrew it.
+    revokedAt: "2026-08-08T16:20:00.000Z",
+    revokedBy: ID.USER.martaManager,
+    // Rule 1.15 — the grant carried an expiry from the moment it was issued,
+    // because one that could be created without an expiry is the defect.
+    grantReason: "Coverage review — withdrawn before acceptance",
+    grantScope: "Cascade Auto Recyclers — shipment records",
+    grantExpiresAt: STAYS_IN_FORCE,
+    createdAt: "2026-08-05T13:00:00.000Z",
+    updatedAt: "2026-08-08T16:20:00.000Z",
   },
 ];
 
@@ -387,6 +815,36 @@ export const tosAcceptances: readonly TosAcceptance[] = [
     userAgent: "Mozilla/5.0",
     createdAt: "2026-06-04T16:41:00.000Z",
     updatedAt: "2026-06-04T16:41:00.000Z",
+  },
+  {
+    // **E-12, and T-47's whole point: `not_accepted` is a real row, not an
+    // absent one.** Intake is blocked organization-wide at Olympic (Rules 7.1,
+    // 7.2) and every read-only route stays reachable, so the organization can be
+    // set up while consent is pending. Nothing here may be read as a partial
+    // acceptance: no user, no instant, and **no training-rights grant** — D-2
+    // makes that grant the thing that has to be in force before the first
+    // battery is logged, so `false` is the only honest value.
+    id: ID.TOS.olympicNotAccepted,
+    organizationId: ID.ORG.olympic,
+    status: "not_accepted",
+    userId: null,
+    documentKey: "terms_of_service",
+    documentVersion: "2026-06",
+    documentContentHash:
+      "3b1a7e4c8d29f05b6a1c3e7d9f2b48a05c6d1e7f3a9b2c4d5e6f7089abcdef01",
+    trainingRightsGranted: false,
+    grants: {},
+    acceptedAt: null,
+    inForceOn: null,
+    reacceptanceDeadlineOn: null,
+    supersedesTosAcceptanceId: null,
+    revokedAt: null,
+    revokedBy: null,
+    revocationReason: null,
+    ipAddress: null,
+    userAgent: null,
+    createdAt: T.olympicCreated,
+    updatedAt: T.olympicCreated,
   },
 ];
 

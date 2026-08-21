@@ -35,6 +35,7 @@ import type {
 } from "./documents";
 import type { DamageAssessmentRepository } from "./condition";
 import type { AuditEventRepository } from "./audit";
+import type { IdentityRepository } from "./identity";
 
 /**
  * The contract every data adapter satisfies.
@@ -61,7 +62,11 @@ import type { AuditEventRepository } from "./audit";
  *
  * - **Every method takes a `RequestContext` first.** The mock has no row-level
  *   security, so it enforces tenant scope and role in code — or the Playwright
- *   suite passes on mock and leaks on Supabase.
+ *   suite passes on mock and leaks on Supabase. The **one** exception is the
+ *   pre-authentication half of {@link IdentityRepository}, which takes a
+ *   `PublicContext` because resolving a `RequestContext` is what those methods
+ *   are for. It is documented in place in `./identity.ts` and **it is not a
+ *   precedent for anything else.**
  * - Contracts import from `src/types` and `src/domain` and from each other. They
  *   import **nothing** from `@supabase/*`, from `next/*`, or from `src/lib`. A
  *   Supabase type in a contract is the leak.
@@ -89,6 +94,14 @@ export interface DataAdapter {
   describe(): AdapterDescription;
 
   // Tenancy and identity — ERD.md §3
+  /**
+   * Sessions, credentials and invitations — D-39, `TECHNICAL_SPEC.md` §9.1.
+   *
+   * Identity is on the contract rather than beside it so that **the mocked
+   * identity provider sits behind the same seam every other read goes through**:
+   * when Supabase Auth lands, one module changes and no screen does.
+   */
+  readonly identity: IdentityRepository;
   readonly organizations: OrganizationRepository;
   readonly users: UserRepository;
   readonly memberships: MembershipRepository;
@@ -148,6 +161,7 @@ export interface AdapterDescription {
 export * from "./context";
 export * from "./repository";
 export * from "./object-store";
+export * from "./identity";
 export * from "./tenancy";
 export * from "./rules-as-data";
 export * from "./battery";
