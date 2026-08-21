@@ -167,7 +167,10 @@ export const POLICY_MATRIX: Readonly<Record<PolicyTable, PolicyRow>> = {
   },
 
   // Read is P2, P5, P6 only — P1 cannot read the audit log (Rule 12.8).
-  // Written by trigger under security definer, never by a user statement.
+  // Written by trigger under security definer, never by a user statement, which
+  // is why `insert` is empty here and stays empty: the application-originated
+  // rows — a denial, an export, a view — go through `auditEvents.write` and
+  // `TenantTable.insertAsDefiner`, not through this matrix (Rules 12.3, 12.6).
   audit_event: { select: WRITER_SETS.R_AUDIT, insert: [], update: [] },
 };
 

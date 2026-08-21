@@ -2,6 +2,7 @@ import type { RequestContext } from "@/data/contracts/context";
 import type { Page, PageRequest } from "@/data/contracts/repository";
 import type { Uuid } from "@/types/common";
 import {
+  DataIntegrityError,
   IntegrationError,
   NotFoundError,
   TenantScopeError,
@@ -24,6 +25,35 @@ export interface MockRow {
 
 export interface TenantRow extends MockRow {
   readonly organizationId: Uuid;
+}
+
+/**
+ * The index the requested page starts at — the one place either paging mode is
+ * read, so the two table classes cannot drift.
+ *
+ * `PageRequest` carries a cursor **or** an offset. Both together is a caller
+ * defect rather than a user-facing failure, so it is generic to the user and
+ * fully detailed in the log (`TECHNICAL_SPEC.md` §10.3).
+ *
+ * The mock's cursor is a stringified offset, which is an implementation detail
+ * of this file and of nothing else: a caller that wants numbered pages sends
+ * `offset` and gets the same behaviour from `.range()` under Supabase.
+ */
+export function pageStart(query: PageRequest, correlationId?: string): number {
+  const hasCursor = query.cursor !== undefined && query.cursor !== null;
+  if (query.offset !== undefined) {
+    if (hasCursor) {
+      throw new DataIntegrityError({
+        userMessage: "That list could not be read.",
+        correlationId,
+        context: { offset: query.offset, cursor: query.cursor },
+      });
+    }
+    return query.offset < 0 ? 0 : Math.trunc(query.offset);
+  }
+  if (!hasCursor) return 0;
+  const parsed = Number.parseInt(String(query.cursor), 10);
+  return Number.isNaN(parsed) || parsed < 0 ? 0 : parsed;
 }
 
 /** A table whose rows carry `organization_id`. 27 of the 32 do. */
@@ -65,11 +95,7 @@ export class TenantTable<T extends TenantRow> {
     const filtered = this.scoped(ctx).filter(matches);
     const ordered =
       compare === undefined ? filtered : [...filtered].sort(compare);
-    const offset =
-      query.cursor === undefined || query.cursor === null
-        ? 0
-        : Number.parseInt(query.cursor, 10);
-    const start = Number.isNaN(offset) ? 0 : offset;
+    const start = pageStart(query, ctx.correlationId);
     const items = ordered.slice(start, start + query.limit);
     const nextOffset = start + items.length;
     return {
@@ -122,6 +148,40 @@ export class TenantTable<T extends TenantRow> {
     return row;
   }
 
+  /**
+   * The `security definer` insert — `TECHNICAL_SPEC.md` §10.5,
+   * `app.write_audit_event()`.
+   *
+   * **It skips the policy check and nothing else.** The tenant scope, the
+   * latency simulation and the seeded failure all still apply, and the row's
+   * attribution still comes from whatever the caller built out of `ctx` — the
+   * elevated privilege is on the write, never on who the write claims to be.
+   *
+   * It exists for `audit_event` and for nothing else. §9.5 gives that table's
+   * INSERT to no tenant role at all, because Postgres writes those rows from a
+   * trigger and never from a user statement (Rules 12.3, 12.4) — so the caller
+   * who was just denied, whose denial has to be recorded, is precisely the
+   * caller who holds no INSERT (Rules 1.16, 12.6). **A repository reaching for
+   * this to get around a `PermissionError` on some other table has misread the
+   * denial: record it and let it stand.**
+   */
+  async insertAsDefiner(ctx: RequestContext, row: T): Promise<T> {
+    await this.begin(ctx, "insert", null);
+    if (row.organizationId !== ctx.organizationId) {
+      throw new TenantScopeError({
+        userMessage: "That action is not available.",
+        correlationId: ctx.correlationId,
+        context: {
+          entity: this.entityName,
+          rowOrganizationId: row.organizationId,
+          contextOrganizationId: ctx.organizationId,
+        },
+      });
+    }
+    this.rows.push(row);
+    return row;
+  }
+
   async update(ctx: RequestContext, id: Uuid, patch: Partial<T>): Promise<T> {
     await this.begin(ctx, "update", "update");
     const index = this.rows.findIndex(
@@ -141,10 +201,11 @@ export class TenantTable<T extends TenantRow> {
     return next;
   }
 
+  /** `action: null` is the `security definer` path — see {@link TenantTable.insertAsDefiner}. */
   private async begin(
     ctx: RequestContext,
     method: string,
-    action: "select" | "insert" | "update",
+    action: "select" | "insert" | "update" | null,
   ): Promise<void> {
     const key = `${this.entityName}.${method}`;
     await simulateLatency(key);
@@ -156,7 +217,7 @@ export class TenantTable<T extends TenantRow> {
         context: { seededFailure: key },
       });
     }
-    assertPolicy(ctx, this.policyTable, action);
+    if (action !== null) assertPolicy(ctx, this.policyTable, action);
   }
 }
 
@@ -193,11 +254,7 @@ export class PlatformTable<T extends MockRow> {
     const filtered = this.rows.filter(matches);
     const ordered =
       compare === undefined ? filtered : [...filtered].sort(compare);
-    const offset =
-      query.cursor === undefined || query.cursor === null
-        ? 0
-        : Number.parseInt(query.cursor, 10);
-    const start = Number.isNaN(offset) ? 0 : offset;
+    const start = pageStart(query, ctx.correlationId);
     const items = ordered.slice(start, start + query.limit);
     const nextOffset = start + items.length;
     return {

@@ -1,9 +1,15 @@
 import type { AdapterDescription, DataAdapter } from "@/data/contracts";
 import type { RequestContext } from "@/data/contracts/context";
-import type { Page, PageRequest } from "@/data/contracts/repository";
+import type {
+  Page,
+  PageRequest,
+  SortRequest,
+} from "@/data/contracts/repository";
 import type {
   BatteryRecordQuery,
+  BatteryRecordSortField,
   CatalogCandidateFilter,
+  CatalogEntrySortField,
   CatalogQuery,
   CatalogRepository,
   CreateBatteryRecord,
@@ -88,7 +94,13 @@ import type {
   CreateDamageAssessment,
   DamageAssessmentQuery,
 } from "@/data/contracts/condition";
-import type { AuditEventQuery, CreateAuditEvent } from "@/data/contracts/audit";
+import type {
+  AuditEventQuery,
+  AuditEventRepository,
+  AuditEventSortField,
+  CreateAuditEvent,
+} from "@/data/contracts/audit";
+import type { IdentityRepository } from "@/data/contracts/identity";
 import type { ObjectStore } from "@/data/contracts/object-store";
 import type { BatteryRecord } from "@/types/battery-record";
 import type { CatalogEntry } from "@/types/catalog";
@@ -149,14 +161,27 @@ import {
 } from "./factory";
 import { byNewest, eq, matchesSearch } from "./table";
 import { formatRecordNumber, nextId, nextSequenceNumber } from "./ids";
+import { applyMockRuntimeFromEnv } from "./runtime-from-env";
+import { mockIdentity } from "./identity";
 
 export { resetMockStore, mockStore } from "./store";
+export { MOCK_DEV_PASSWORD } from "./identity";
+export { INVITE_TOKENS } from "./fixtures/invite-tokens";
 export {
   configureMockRuntime,
   mockRuntimeConfig,
   resetMockRuntime,
 } from "./runtime";
 export * as fixtureIds from "./fixtures/ids";
+
+/**
+ * Latency and seeded failures, from the environment, once at module load.
+ *
+ * Here and not in `src/data/index.ts` — that file reads `DATA_ADAPTER` and only
+ * `DATA_ADAPTER` (`TECHNICAL_SPEC.md` §5.4, CI check 2). Both switches are off
+ * unless the environment asks, so vitest and Playwright are unaffected.
+ */
+applyMockRuntimeFromEnv();
 
 /**
  * The in-memory implementation. **Fake records only.**
@@ -178,6 +203,42 @@ export * as fixtureIds from "./fixtures/ids";
 
 const store = () => mockStore();
 
+/**
+ * A comparator for an explicit, typed sort — or the entity's own order when the
+ * caller asked for none.
+ *
+ * `sortBy` reaches an adapter from a URL query parameter, so the map here is
+ * closed over the entity's declared sortable fields: a field that is not
+ * sortable is a type error rather than a row indexed by a caller's string.
+ *
+ * **A named sort with no direction is ascending, and that is not the same thing
+ * as the unsorted default** — the default is whatever the entity orders itself
+ * by, which for anything carrying a time is newest first.
+ */
+function orderBy<T, TField extends string>(
+  sort: SortRequest<TField>,
+  keys: Readonly<Record<TField, (row: T) => string | number | null>>,
+  fallback?: (a: T, b: T) => number,
+): ((a: T, b: T) => number) | undefined {
+  const field = sort.sortBy;
+  if (field === undefined) return fallback;
+  const key = keys[field];
+  const direction = sort.sortDirection === "desc" ? -1 : 1;
+  return (a, b) => {
+    const left = key(a);
+    const right = key(b);
+    if (left === right) return 0;
+    // A missing value sorts last in **either** direction: a column of blanks at
+    // the top of a table reads as a broken query rather than as an ordering.
+    if (left === null) return 1;
+    if (right === null) return -1;
+    if (typeof left === "number" && typeof right === "number") {
+      return (left - right) * direction;
+    }
+    return (String(left) < String(right) ? -1 : 1) * direction;
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Tenancy and identity
 // ---------------------------------------------------------------------------
@@ -198,6 +259,13 @@ const organizations = platformRepository<
     containerSeq: 0,
     lotSeq: 0,
     shipmentSeq: 0,
+    // D-32 — **verification is a recorded act, not a field.** Neither shape on
+    // the contract carries these, so a create or an edit can never stamp its own
+    // verification date or name its own verifier; a new organization reads as
+    // unverified, which is exactly the state D-32 defines the behaviour for
+    // (Rule 5.6).
+    emergencyVerifiedAt: null,
+    emergencyVerifiedBy: null,
     createdAt: now(),
     updatedAt: now(),
     createdBy: ctx.userId,
@@ -251,19 +319,14 @@ const memberships = tenantRepository<
   UpdateMembership,
   MembershipQuery
 >(store().memberships, {
-  matches: (
-    row,
-    query: {
-      userId?: Uuid;
-      role?: string;
-      isActive?: boolean;
-      invitedEmail?: string;
-      search?: string;
-    },
-  ) =>
+  matches: (row, query: MembershipQuery) =>
     eq(query.userId, row.userId ?? undefined) &&
     eq(query.role, row.role) &&
     eq(query.invitedEmail, row.invitedEmail ?? undefined) &&
+    // D-35, Rule 1.12 — "how many holders does this organization have left" is
+    // one query, which is what makes the last-holder block enforceable rather
+    // than advisory.
+    eq(query.holdsBindingAuthority, row.holdsBindingAuthority) &&
     (query.isActive === undefined ||
       query.isActive === (row.acceptedAt !== null && row.revokedAt === null)) &&
     matchesSearch(query.search, row.invitedEmail),
@@ -271,6 +334,11 @@ const memberships = tenantRepository<
     ...input,
     id,
     organizationId: ctx.organizationId,
+    // D-35 — **assigning binding authority is its own recorded act.** A member
+    // who can sign on the organization's behalf (Rule 7.3) does not acquire that
+    // quietly inside an invitation, so a new membership starts without it and
+    // `update` is the only path.
+    holdsBindingAuthority: false,
     acceptedAt: null,
     revokedAt: null,
     revokedBy: null,
@@ -598,36 +666,30 @@ const formatClassifications = tenantAppendOnlyRepository<
 // Battery, catalog and intake
 // ---------------------------------------------------------------------------
 
-const batteryRecords = tenantRepository<
-  BatteryRecord,
-  CreateBatteryRecord,
-  UpdateBatteryRecord,
-  BatteryRecordQuery
->(store().batteryRecords, {
-  compare: (a, b) => byNewest(a.createdAt, b.createdAt),
-  matches: (
-    row,
-    query: {
-      status?: string;
-      containerId?: Uuid;
-      catalogEntryId?: Uuid;
-      intakeSessionId?: Uuid;
-      chemistry?: string;
-      applicationClass?: string;
-      serialNumber?: string;
-      hasDdrFlag?: boolean;
-      ddrFlag?: string;
-      isAirTransportProhibited?: boolean;
-      excludeVoided?: boolean;
-      search?: string;
-    },
-  ) =>
+/**
+ * The `/batteries` filters, in one function, because **the list and the count
+ * have to agree** — two predicates is how a table comes to say "3 results" over
+ * four rows.
+ */
+function matchesBatteryRecord(
+  row: BatteryRecord,
+  query: BatteryRecordQuery,
+): boolean {
+  return (
     eq(query.status, row.status) &&
     eq(query.containerId, row.containerId ?? undefined) &&
+    // A storage-clock tier resolves to a **set** of containers, so this is a
+    // union with `containerId` rather than a replacement for it.
+    (query.containerIds === undefined ||
+      (row.containerId !== null &&
+        query.containerIds.includes(row.containerId))) &&
     eq(query.catalogEntryId, row.catalogEntryId ?? undefined) &&
+    (query.isCatalogMatched === undefined ||
+      query.isCatalogMatched === (row.catalogEntryId !== null)) &&
     eq(query.intakeSessionId, row.intakeSessionId ?? undefined) &&
     eq(query.chemistry, row.chemistry ?? undefined) &&
     eq(query.applicationClass, row.applicationClass) &&
+    eq(query.assessedCondition, row.assessedCondition ?? undefined) &&
     eq(query.serialNumber, row.serialNumber ?? undefined) &&
     eq(query.isAirTransportProhibited, row.isAirTransportProhibited) &&
     (query.hasDdrFlag === undefined ||
@@ -635,6 +697,10 @@ const batteryRecords = tenantRepository<
     (query.ddrFlag === undefined ||
       (row.ddrFlags as readonly string[]).includes(query.ddrFlag)) &&
     (query.excludeVoided !== true || row.status !== "voided") &&
+    // Half-open on both ends, over `created_at` — the date a record was logged,
+    // never a date derived from anything else.
+    (query.loggedAfter === undefined || row.createdAt >= query.loggedAfter) &&
+    (query.loggedBefore === undefined || row.createdAt <= query.loggedBefore) &&
     matchesSearch(
       query.search,
       row.recordNumber,
@@ -642,7 +708,30 @@ const batteryRecords = tenantRepository<
       row.modelName,
       row.partNumber,
       row.serialNumber,
-    ),
+    )
+  );
+}
+
+const BATTERY_RECORD_SORT_KEYS = {
+  recordNumber: (row: BatteryRecord) => row.recordNumber,
+  manufacturerName: (row: BatteryRecord) => row.manufacturerName,
+  assessedCondition: (row: BatteryRecord) => row.assessedCondition,
+  createdAt: (row: BatteryRecord) => row.createdAt,
+} as const satisfies Readonly<
+  Record<BatteryRecordSortField, (row: BatteryRecord) => string | null>
+>;
+
+const byNewestBatteryRecord = (a: BatteryRecord, b: BatteryRecord): number =>
+  byNewest(a.createdAt, b.createdAt);
+
+const batteryRecords = tenantRepository<
+  BatteryRecord,
+  CreateBatteryRecord,
+  UpdateBatteryRecord,
+  BatteryRecordQuery
+>(store().batteryRecords, {
+  compare: byNewestBatteryRecord,
+  matches: matchesBatteryRecord,
   build: (ctx, input, id) => {
     const organization = store()
       .organizations.all()
@@ -681,6 +770,14 @@ const batteryRecords = tenantRepository<
  */
 const guardedBatteryRecords: typeof batteryRecords = {
   ...batteryRecords,
+  async list(ctx, query) {
+    return store().batteryRecords.list(
+      ctx,
+      query,
+      (row) => matchesBatteryRecord(row, query),
+      orderBy(query, BATTERY_RECORD_SORT_KEYS, byNewestBatteryRecord),
+    );
+  },
   async update(ctx, id, input) {
     const permitted = { ...(input as Record<string, unknown>) };
     delete permitted.ddrFlags;
@@ -689,27 +786,15 @@ const guardedBatteryRecords: typeof batteryRecords = {
   },
 };
 
-const catalogBase = platformRepository<
-  CatalogEntry,
-  CreateCatalogEntry,
-  UpdateCatalogEntry,
-  CatalogQuery
->(store().catalogEntries, {
-  matches: (
-    row,
-    query: {
-      status?: string;
-      manufacturerName?: string;
-      applicationClass?: string;
-      chemistry?: string;
-      isGlobal?: boolean;
-      search?: string;
-    },
-  ) =>
+function matchesCatalogEntry(row: CatalogEntry, query: CatalogQuery): boolean {
+  return (
     eq(query.status, row.status) &&
     eq(query.manufacturerName, row.manufacturerName) &&
     eq(query.applicationClass, row.applicationClass) &&
     eq(query.chemistry, row.chemistry) &&
+    // T-04, the physical cell shape. **Not T-06** — `format_category` is a
+    // jurisdiction-dependent band and is filterable nowhere in B1a.
+    eq(query.cellFormFactor, row.cellFormFactor ?? undefined) &&
     (query.isGlobal === undefined ||
       query.isGlobal === (row.organizationId === null)) &&
     matchesSearch(
@@ -718,7 +803,26 @@ const catalogBase = platformRepository<
       row.brandName,
       row.modelName,
       row.partNumber,
-    ),
+    )
+  );
+}
+
+const CATALOG_SORT_KEYS = {
+  manufacturerName: (row: CatalogEntry) => row.manufacturerName,
+  modelName: (row: CatalogEntry) => row.modelName,
+  partNumber: (row: CatalogEntry) => row.partNumber,
+  updatedAt: (row: CatalogEntry) => row.updatedAt,
+} as const satisfies Readonly<
+  Record<CatalogEntrySortField, (row: CatalogEntry) => string | null>
+>;
+
+const catalogBase = platformRepository<
+  CatalogEntry,
+  CreateCatalogEntry,
+  UpdateCatalogEntry,
+  CatalogQuery
+>(store().catalogEntries, {
+  matches: matchesCatalogEntry,
   build: (ctx, input, id) => ({
     ...input,
     id,
@@ -756,7 +860,12 @@ const catalogEntries: CatalogRepository = {
     return entry;
   },
   async list(ctx, query) {
-    const page = await catalogBase.list(ctx, query);
+    const page = await store().catalogEntries.list(
+      ctx,
+      query,
+      (row) => matchesCatalogEntry(row, query),
+      orderBy(query, CATALOG_SORT_KEYS),
+    );
     const items = page.items.filter((entry) => catalogVisible(ctx, entry));
     return { ...page, items, total: items.length };
   },
@@ -1631,45 +1740,88 @@ const damageAssessments = tenantAppendOnlyRepository<
   }),
 });
 
-const auditEvents = tenantAppendOnlyRepository<
-  TenantAuditEvent,
-  CreateAuditEvent,
-  AuditEventQuery
->(store().auditEvents, {
-  compare: (a, b) => byNewest(a.occurredAt, b.occurredAt),
-  matches: (
-    row,
-    query: {
-      entityTable?: string;
-      entityId?: Uuid;
-      actorUserId?: Uuid;
-      eventType?: string;
-      correlationId?: string;
-      governingRuleVersionId?: Uuid;
-      occurredAfter?: string;
-      occurredBefore?: string;
-      search?: string;
-    },
-  ) =>
+function matchesAuditEvent(
+  row: TenantAuditEvent,
+  query: AuditEventQuery,
+): boolean {
+  return (
     eq(query.entityTable, row.entityTable) &&
     eq(query.entityId, row.entityId) &&
     eq(query.actorUserId, row.actorUserId ?? undefined) &&
     eq(query.eventType, row.eventType) &&
+    // T-60. **A support grant that is invisible in the log is not a recorded
+    // support grant** (Rules 1.18, 12.7) — this is how an auditor asks the log
+    // what the platform did inside their tenant.
+    eq(query.actorType, row.actorType) &&
     eq(query.correlationId, row.correlationId ?? undefined) &&
     eq(query.governingRuleVersionId, row.governingRuleVersionId ?? undefined) &&
     (query.occurredAfter === undefined ||
       row.occurredAt >= query.occurredAfter) &&
     (query.occurredBefore === undefined ||
       row.occurredAt <= query.occurredBefore) &&
-    matchesSearch(query.search, row.eventType, row.reason),
-  build: (ctx, input, id) => ({
-    ...input,
-    id,
-    sequenceNo: store().auditEvents.all().length + 1,
-    organizationId: ctx.organizationId,
-    createdAt: now(),
-  }),
+    matchesSearch(query.search, row.eventType, row.reason)
+  );
+}
+
+const AUDIT_EVENT_SORT_KEYS = {
+  occurredAt: (row: TenantAuditEvent) => row.occurredAt,
+  sequenceNo: (row: TenantAuditEvent) => row.sequenceNo,
+} as const satisfies Readonly<
+  Record<AuditEventSortField, (row: TenantAuditEvent) => string | number>
+>;
+
+const byNewestAuditEvent = (a: TenantAuditEvent, b: TenantAuditEvent): number =>
+  byNewest(a.occurredAt, b.occurredAt);
+
+/**
+ * The row, built once, so the policy-checked door and the `security definer`
+ * door cannot allocate a sequence number or a tenant differently.
+ */
+const buildAuditEvent = (
+  ctx: RequestContext,
+  input: CreateAuditEvent,
+  id: Uuid,
+): TenantAuditEvent => ({
+  ...input,
+  id,
+  sequenceNo: store().auditEvents.all().length + 1,
+  organizationId: ctx.organizationId,
+  createdAt: now(),
 });
+
+const auditEventsBase = tenantAppendOnlyRepository<
+  TenantAuditEvent,
+  CreateAuditEvent,
+  AuditEventQuery
+>(store().auditEvents, {
+  compare: byNewestAuditEvent,
+  matches: matchesAuditEvent,
+  build: buildAuditEvent,
+});
+
+const auditEvents: AuditEventRepository = {
+  ...auditEventsBase,
+  async list(ctx, query) {
+    return store().auditEvents.list(
+      ctx,
+      query,
+      (row) => matchesAuditEvent(row, query),
+      orderBy(query, AUDIT_EVENT_SORT_KEYS, byNewestAuditEvent),
+    );
+  },
+  async write(ctx, input) {
+    // The `security definer` door — `TECHNICAL_SPEC.md` §10.5,
+    // `app.write_audit_event()`. Same builder, same sequence allocation, same
+    // tenant scope from `ctx`; **only the policy check on the insert is
+    // bypassed**, and only because the caller who has to be recorded is the
+    // caller who was just refused (Rules 12.3, 12.6). `append` stays
+    // policy-checked, so an ordinary caller still cannot forge a row.
+    return store().auditEvents.insertAsDefiner(
+      ctx,
+      buildAuditEvent(ctx, input, nextId()),
+    );
+  },
+};
 
 // ---------------------------------------------------------------------------
 // Object store
@@ -1742,6 +1894,7 @@ const describe = (): AdapterDescription => ({ name: "mock", kind: "fake" });
 export const mockAdapter: DataAdapter = {
   describe,
 
+  identity: mockIdentity satisfies IdentityRepository,
   organizations: scopedOrganizations,
   users,
   memberships,

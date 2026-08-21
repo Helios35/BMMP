@@ -1,23 +1,11 @@
-import {
-  CircleAlert,
-  CircleCheck,
-  CircleDashed,
-  CircleHelp,
-  Clock,
-  Minus,
-  TriangleAlert,
-  type LucideIcon,
-} from "lucide-react";
+import { CircleDashed, CircleHelp } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
-import {
-  statusIntent,
-  statusLabel,
-  type StatusIntent,
-  type StatusSystem,
-} from "./status-intent";
+import { INTENT_SURFACE_CLASSES } from "./intent-classes";
+import { INTENT_BADGE_ICON } from "./intent-icons";
+import { statusIntent, statusLabel, type StatusSystem } from "./status-intent";
 
 /**
  * `StatusBadge` — `UX_SPEC.md` §2.3.
@@ -31,31 +19,6 @@ import {
  * the single `statusIntent` map, and the label through the system's own lookup
  * in `src/domain/taxonomy` — the one place a label for that system exists.
  */
-
-const INTENT_ICONS: Readonly<Record<StatusIntent, LucideIcon>> = {
-  neutral: Minus,
-  ok: CircleCheck,
-  attention: TriangleAlert,
-  critical: CircleAlert,
-  pending: Clock,
-};
-
-/**
- * Foreground, background and border per intent, from the tokens in
- * `globals.css`. No raw hex and no numbered Tailwind colour reaches a component
- * (§1.2 Rule 1).
- */
-const INTENT_CLASSES: Readonly<Record<StatusIntent, string>> = {
-  neutral:
-    "bg-intent-neutral-background text-intent-neutral-foreground border-intent-neutral-border",
-  ok: "bg-intent-ok-background text-intent-ok-foreground border-intent-ok-border",
-  attention:
-    "bg-intent-attention-background text-intent-attention-foreground border-intent-attention-border",
-  critical:
-    "bg-intent-critical-background text-intent-critical-foreground border-intent-critical-border",
-  pending:
-    "bg-intent-pending-background text-intent-pending-foreground border-intent-pending-border",
-};
 
 /** 24px and 28px per §2.3. Text never below 13px, and 14px is the product floor. */
 const SIZE_CLASSES = {
@@ -95,7 +58,7 @@ export function StatusBadge({
         className={cn(
           "rounded-md border font-medium",
           SIZE_CLASSES[size],
-          INTENT_CLASSES.neutral,
+          INTENT_SURFACE_CLASSES.neutral,
           className,
         )}
       >
@@ -120,7 +83,7 @@ export function StatusBadge({
         className={cn(
           "rounded-md border font-medium",
           SIZE_CLASSES[size],
-          INTENT_CLASSES.neutral,
+          INTENT_SURFACE_CLASSES.neutral,
           className,
         )}
       >
@@ -133,7 +96,7 @@ export function StatusBadge({
     );
   }
 
-  const Icon = INTENT_ICONS[intent];
+  const Icon = INTENT_BADGE_ICON[intent];
 
   return (
     <Badge
@@ -143,7 +106,7 @@ export function StatusBadge({
       className={cn(
         "rounded-md border font-medium",
         SIZE_CLASSES[size],
-        INTENT_CLASSES[intent],
+        INTENT_SURFACE_CLASSES[intent],
         className,
       )}
     >

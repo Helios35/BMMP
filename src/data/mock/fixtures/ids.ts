@@ -13,12 +13,19 @@ const uid = (block: string, n: number): string =>
 export const ORG = {
   cascade: uid("0a000001", 1),
   rainier: uid("0a000001", 2),
+  /**
+   * Third tenant, holding **no Terms of Service acceptance in force** — E-12's
+   * subject, and the only organization where the intake block is reachable.
+   * It also holds no battery record at all, which is what makes E-1's five role
+   * variants renderable without emptying a table in a test.
+   */
+  olympic: uid("0a000001", 3),
 } as const;
 
 export const USER = {
   /** P1 · Compliance Handler at Cascade. The daily user. */
   danaHandler: uid("0a000002", 1),
-  /** P2 · Facility Manager at Cascade. */
+  /** P2 · Facility Manager at Cascade. Holds Cascade's binding authority (D-35). */
   martaManager: uid("0a000002", 2),
   /** P5 · Auditor at Cascade. Read-only, externally, everywhere, always. */
   samAuditor: uid("0a000002", 3),
@@ -26,6 +33,16 @@ export const USER = {
   platformAdmin: uid("0a000002", 4),
   /** P1 at Rainier — the second tenant, so isolation is testable. */
   joRainierHandler: uid("0a000002", 5),
+  /** P3 · Producer Compliance Officer at Cascade. */
+  priyaProducer: uid("0a000002", 6),
+  /** P4 · Mobility Supplier Technician at Cascade. */
+  omarTechnician: uid("0a000002", 7),
+  /** P5 whose grant has **expired** — Rules 1.15, 1.28's subject. */
+  leeAuditorExpired: uid("0a000002", 8),
+  /** P2 at Olympic, holds Olympic's binding authority. */
+  rosaOlympicManager: uid("0a000002", 9),
+  /** P1 at Olympic. */
+  tomOlympicHandler: uid("0a000002", 10),
 } as const;
 
 export const MEMBERSHIP = {
@@ -33,13 +50,31 @@ export const MEMBERSHIP = {
   martaCascade: uid("0a000003", 2),
   samCascade: uid("0a000003", 3),
   joRainier: uid("0a000003", 4),
-  /** Invited, not yet accepted — `user_id` is still null. */
+  /** Invited, not yet accepted — `user_id` is still null. Token state `valid`. */
   pendingInvite: uid("0a000003", 5),
+  priyaCascade: uid("0a000003", 6),
+  omarCascade: uid("0a000003", 7),
+  /** P6's **recorded support grant** on Cascade, in force (Rules 1.17, 1.18). */
+  platformAdminCascadeGrant: uid("0a000003", 8),
+  /** P6's **expired** grant on Rainier — platform scope alone buys nothing (Rule 1.17). */
+  platformAdminRainierExpired: uid("0a000003", 9),
+  /** P5 whose `grantExpiresAt` is in the past — Rule 1.28 mid-session. */
+  leeCascadeExpired: uid("0a000003", 10),
+  rosaOlympic: uid("0a000003", 11),
+  tomOlympic: uid("0a000003", 12),
+  /** Marta's second organization — the switcher's only subject (E-16). */
+  martaOlympic: uid("0a000003", 13),
+  /** Invited, never accepted, past its window. Token state `expired`. */
+  expiredInvite: uid("0a000003", 14),
+  /** Invited, then withdrawn. Token state `revoked`. */
+  revokedInvite: uid("0a000003", 15),
 } as const;
 
 export const TOS = {
   cascadeInForce: uid("0a000004", 1),
   rainierInForce: uid("0a000004", 2),
+  /** T-47 `not_accepted` — a real row, not an absent one. E-12. */
+  olympicNotAccepted: uid("0a000004", 3),
 } as const;
 
 export const JURISDICTION = {

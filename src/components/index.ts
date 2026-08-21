@@ -9,6 +9,15 @@
  */
 
 export * from "./status/status-intent";
+export * from "./status/intent-classes";
+export * from "./status/intent-icons";
 export * from "./status/status-badge";
 export * from "./confidence/confidence-band-display";
 export * from "./alert/alert-card";
+export * from "./theme/theme-provider";
+export * from "./record-table/list-url";
+export * from "./record-table/record-table";
+export * from "./storage/storage-clock-meter";
+export * from "./access/read-only-banner";
+export * from "./access/gated-control";
+export * from "./provenance/field-source-badge";

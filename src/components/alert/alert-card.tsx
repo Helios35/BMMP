@@ -1,14 +1,5 @@
 import Link from "next/link";
-import {
-  BellOff,
-  CircleAlert,
-  CircleCheck,
-  Clock,
-  Info,
-  Pin,
-  TriangleAlert,
-  type LucideIcon,
-} from "lucide-react";
+import { BellOff, CircleCheck, Pin } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -18,6 +9,11 @@ import {
   ALERT_SEVERITY_INTENTS,
   type StatusIntent,
 } from "@/components/status/status-intent";
+import { INTENT_ICON } from "@/components/status/intent-icons";
+import {
+  INTENT_BORDER_CLASSES,
+  INTENT_TEXT_CLASSES,
+} from "@/components/status/intent-classes";
 import {
   ALERT_TYPE_LABELS,
   type AlertType,
@@ -42,30 +38,6 @@ import type { Alert } from "@/types/storage";
  * the condition and the required handling, never a chance of anything
  * (Rules 1.25, 10.3).
  */
-
-const INTENT_ICONS: Readonly<Record<StatusIntent, LucideIcon>> = {
-  neutral: Info,
-  ok: CircleCheck,
-  attention: TriangleAlert,
-  critical: CircleAlert,
-  pending: Clock,
-};
-
-const INTENT_BAR: Readonly<Record<StatusIntent, string>> = {
-  neutral: "bg-intent-neutral-border",
-  ok: "bg-intent-ok-border",
-  attention: "bg-intent-attention-border",
-  critical: "bg-intent-critical-border",
-  pending: "bg-intent-pending-border",
-};
-
-const INTENT_TEXT: Readonly<Record<StatusIntent, string>> = {
-  neutral: "text-intent-neutral-foreground",
-  ok: "text-intent-ok-foreground",
-  attention: "text-intent-attention-foreground",
-  critical: "text-intent-critical-foreground",
-  pending: "text-intent-pending-foreground",
-};
 
 /** Alert types that pin to the top and cannot be dismissed by anyone. */
 const PINNED_ALERT_TYPES: readonly AlertType[] = ["storage_clock"];
@@ -104,7 +76,7 @@ export function AlertCard({
 }: AlertCardProps) {
   const intent: StatusIntent =
     ALERT_SEVERITY_INTENTS[alert.severity] ?? "neutral";
-  const Icon = INTENT_ICONS[intent];
+  const Icon = INTENT_ICON[intent];
   const isPinned =
     PINNED_ALERT_TYPES.includes(alert.alertType) && alert.resolvedAt === null;
 
@@ -120,13 +92,16 @@ export function AlertCard({
           title carry it too (UX_SPEC.md §1.2 Rule 4). */}
       <div
         aria-hidden="true"
-        className={cn("w-1 shrink-0 self-stretch", INTENT_BAR[intent])}
+        className={cn(
+          "w-1 shrink-0 self-stretch",
+          INTENT_BORDER_CLASSES[intent],
+        )}
       />
 
       <CardContent className="flex flex-1 items-start gap-3 py-1">
         <Icon
           aria-hidden="true"
-          className={cn("mt-0.5 size-5 shrink-0", INTENT_TEXT[intent])}
+          className={cn("mt-0.5 size-5 shrink-0", INTENT_TEXT_CLASSES[intent])}
         />
 
         <div className="flex min-w-0 flex-1 flex-col gap-1">
@@ -210,7 +185,7 @@ export function AlertCardEmpty({
       <CardContent className="flex items-center gap-3 py-2">
         <CircleCheck
           aria-hidden="true"
-          className={cn("size-5 shrink-0", INTENT_TEXT.ok)}
+          className={cn("size-5 shrink-0", INTENT_TEXT_CLASSES.ok)}
         />
         <p className="text-sm">{message}</p>
       </CardContent>
@@ -246,12 +221,15 @@ export function AlertRegionError({
     >
       <div
         aria-hidden="true"
-        className={cn("w-1 shrink-0 self-stretch", INTENT_BAR.critical)}
+        className={cn(
+          "w-1 shrink-0 self-stretch",
+          INTENT_BORDER_CLASSES.critical,
+        )}
       />
       <CardContent className="flex flex-1 items-start gap-3 py-1">
         <BellOff
           aria-hidden="true"
-          className={cn("mt-0.5 size-5 shrink-0", INTENT_TEXT.critical)}
+          className={cn("mt-0.5 size-5 shrink-0", INTENT_TEXT_CLASSES.critical)}
         />
         <div className="flex flex-1 flex-col gap-1">
           <p className="text-base leading-snug font-semibold">{message}</p>
