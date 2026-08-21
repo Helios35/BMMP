@@ -48,6 +48,21 @@ export interface RouteAccessRule {
   readonly capabilities: Readonly<Record<RoleCode, Capability>>;
   /** Why this row is what it is, where §5.2 gives a reason. */
   readonly note?: string;
+  /**
+   * The rule a denial on this route must name — Rule 1.26, *every permission
+   * denial states the reason in plain language and, where a rule governs it,
+   * names the rule.* Absent where the restriction is a role posture rather than
+   * a numbered rule.
+   *
+   * Stored as the bare number (`"12.8"`); the "Rule " prefix belongs to the
+   * copy, not to the data.
+   *
+   * **It lives on this row rather than in a lookup keyed by route**, because a
+   * second structure keyed by route is the exact duplication §7.2 forbids — and
+   * a denial message that disagrees with the map about who may open a page is
+   * worse than no message.
+   */
+  readonly deniedRule?: string;
 }
 
 /**
@@ -293,6 +308,7 @@ export const ROUTE_ACCESS: Readonly<Record<AppRoute, RouteAccessRule>> = {
       auditor: "read",
       platform_admin: "read",
     },
+    deniedRule: "12.8",
     note:
       "P1 cannot read the audit log (Rule 12.8). P1, P3 and P4 see the history of " +
       "records they can already open, built from storage_event, " +
