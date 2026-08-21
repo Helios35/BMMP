@@ -52,8 +52,11 @@ export interface DamageAssessment extends TenantScoped, Created {
    * How the assessment was produced. An instrument-sourced row also carries the
    * `instrument*` fields below.
    *
-   * `ERD.md` §8.1 says the values are in `TAXONOMY.md`; no system defines them —
-   * reported in this unit's build-notes.
+   * T-59 governs this column (D-38), and its module is
+   * `src/domain/taxonomy/damage-assessment-method`. **The field stays `string`
+   * pending a fixture migration** — the fixtures store
+   * `human_visual_inspection` where T-59 authors `visual_inspection`. Reported
+   * in this unit's build-notes.
    */
   readonly assessmentMethod: string;
   /** T-46. */
@@ -65,6 +68,11 @@ export interface DamageAssessment extends TenantScoped, Created {
   /**
    * **Assessed**, never *measured* (`_ANCHORS.md` §7.5). Assessed and measured
    * are never merged into one field (Rule 11.5).
+   *
+   * T-49 governs this column (D-38), and its module is
+   * `src/domain/taxonomy/assessed-condition`. **The field stays `string`
+   * pending a fixture migration** — the fixtures store `damaged` where T-49
+   * authors `damaged_or_defective`. Reported in this unit's build-notes.
    */
   readonly assessedCondition: string;
   /** Read by the shipment trigger. */

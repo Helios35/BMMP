@@ -12,6 +12,7 @@ import type {
   Uuid,
 } from "@/types/common";
 import type { ClassificationBasisCode } from "@/domain/taxonomy/classification-basis-code";
+import type { ClassificationDecisionScope } from "@/domain/taxonomy/classification-decision-scope";
 import type { ClassificationDecisionStatus } from "@/domain/taxonomy/classification-decision-status";
 import type { DocumentRenderStatus } from "@/domain/taxonomy/document-render-status";
 import type { DocumentType } from "@/domain/taxonomy/document-type";
@@ -44,12 +45,9 @@ import type { AppliedRuleVersion } from "@/domain/rules/outcome";
 export interface ClassificationDecision extends TenantScoped, Created {
   readonly id: Uuid;
   /**
-   * Which subject was decided; matches whichever id below is non-null.
-   *
-   * `ERD.md` §7.1 says the values are in `TAXONOMY.md`; no system defines them —
-   * reported in this unit's build-notes.
+   * Which subject was decided; matches whichever id below is non-null. T-58.
    */
-  readonly decisionScope: string;
+  readonly decisionScope: ClassificationDecisionScope;
   readonly batteryRecordId: Uuid | null;
   readonly containerId: Uuid | null;
   readonly shipmentId: Uuid | null;

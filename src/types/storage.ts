@@ -222,8 +222,13 @@ export interface Alert extends TenantScoped, Timestamped {
   /**
    * **Never expresses a probability of ignition** (Rules 1.25, 10.3; T-44).
    *
-   * `ERD.md` §6.5 says the values are in `TAXONOMY.md`; no system defines them —
-   * reported in this unit's build-notes.
+   * T-48 governs this column and is written in `TAXONOMY.md` (D-30), but no
+   * module and no union has landed. T-48's display label for the stored value
+   * `attention` is "Needs attention", and `TAXONOMY.md` §4.5 forbids a label
+   * that contains its own stored value; bending the label and bending the rule
+   * are both P6's call. **The field stays `string` until that call is made** —
+   * reported in this unit's build-notes. An unrecognised severity renders as
+   * `neutral` and is never guessed upward.
    */
   readonly severity: string;
   /** Plain language, rendered from the alert's own data — never a stored regulatory phrase. */

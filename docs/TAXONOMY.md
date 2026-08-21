@@ -43,7 +43,7 @@ BMMP follows a battery through the end of its life: identify it → assess its c
 - **Never invent a value.** If a value you need is not here, it does not exist yet. Stop and raise it — additions go through P6 and get appended to the relevant system, not improvised in a branch.
 - **Never invent a mapping.** §5 (Label-to-Database Mapping) is binding. A display label is never derived from a stored value at runtime by string manipulation, and a stored value is never derived from a label.
 - **Never rename a stored value.** Renaming is a deprecation plus an addition, logged in §6. See §5.4.
-- Each system carries a stable ID (`T-01` … `T-47`). Cite systems by ID. **IDs never move and are never reused.**
+- Each system carries a stable ID (`T-01` … `T-61`). Cite systems by ID. **IDs never move and are never reused.**
 
 ### 1.2 What is taxonomy and what is data — the load-bearing distinction
 
@@ -173,6 +173,21 @@ Two citations in this document are deliberately **not** numbered, because what t
 | T-45 | Classification decision status | `classification_decision.status` | single | B1a |
 | T-46 | Damage assessment status | `damage_assessment.status` | single | B1a |
 | T-47 | Terms of Service acceptance status | `tos_acceptance.status` | single | B1a |
+| **I. Condition, severity, source, method and step** ||||
+| T-48 | Alert severity | `alert.severity` | single | B1a |
+| T-49 | Assessed condition | `battery_record.assessed_condition`, `damage_assessment.assessed_condition` | single | B1a |
+| T-50 | Intake photo type | `intake_photo.photo_type` | single | B1a |
+| T-51 | Label crop method | `intake_photo.crop_method` | single | B1a |
+| T-52 | Review reason code | `intake_session.review_reason_codes` | multi | B1a |
+| T-53 | Intake step | `intake_session.current_step` | single | B1a |
+| T-54 | Chemistry source | `battery_record.chemistry_source` | single | B1a |
+| T-55 | State-of-charge source | `battery_record.soc_source` | single | B1a |
+| T-56 | Date code precision | `date_code_decode.decoded_precision` | single | B1a |
+| T-57 | Date code decode method | `date_code_decode.decoded_by_method` | single | B1a |
+| T-58 | Classification decision scope | `classification_decision.decision_scope` | single | B1a |
+| T-59 | Damage assessment method | `damage_assessment.assessment_method` | single | B1a |
+| T-60 | Audit actor type | `audit_event.actor_type` | single | B1a |
+| T-61 | Catalog entry source type | `catalog_entry.source_type` | single | B1a |
 
 ---
 
@@ -380,7 +395,7 @@ Two citations in this document are deliberately **not** numbered, because what t
 - **Single-select.**
 - **System-assigned** as the pipeline advances. Users do not set this value directly; P1 can abandon a session, which the system records as `abandoned`.
 - **The pipeline order is fixed** and code-orchestrated: photo → label crop → vision extraction → catalog match → confidence gate → human confirmation. No agent chooses the next step, and every step writes an `audit_event` including steps that produce nothing and steps that fail (`_ANCHORS.md` §6). Governed by **Rules 2.2, 2.3 and 2.4**.
-- **`completed` and `abandoned` are terminal.** A session is never reopened — a correction is a new action on the resulting battery record, not a reopened session. **`failed` is not terminal**: it returns to `open` on retry, or to `abandoned` if the handler gives up. An idle session expires to `abandoned` on a configured interval (**OQ-8**).
+- **`completed` and `abandoned` are terminal.** A session is never reopened — a correction is a new action on the resulting battery record, not a reopened session. **`failed` is not terminal**: it returns to `open` on retry, or to `abandoned` if the handler gives up. **An idle session does not expire in B1a** — the interval is configuration and it is unset, so no session ever moves to `abandoned` on a timer (**D-33**). `abandoned` is reached only by a handler abandoning the session, which is a person acting.
 - **Triggers behaviour:** entering `awaiting_confirmation` with any gated field below band places the record in the `/review` queue (**Rules 2.13, 2.14**). See T-10.
 
 ---
@@ -1316,6 +1331,9 @@ Two citations in this document are deliberately **not** numbered, because what t
 | `shipment.status_changed` | Shipment status changed | The shipment moved between values of T-28. |
 | `document_render.issued` | Document issued | A document was rendered and issued. |
 | `document_render.superseded` | Document superseded | An issued document was replaced. |
+| `document.render_failed` | Document render failed | A render could not complete, so no `document_render` row exists. The event carries the full input snapshot, the error code and the correlation id, which is what makes a failed render as auditable as a successful one (`TECHNICAL_SPEC.md` §10.4). |
+| `document.viewed` | Document viewed | An issued document's stored bytes were streamed to a reader. |
+| `document.reprinted` | Document reprinted | An issued document's stored bytes were streamed again for print. **A reprint never re-renders** — the bytes are the ones that were issued (`TECHNICAL_SPEC.md` §8.4). |
 | `membership.role_changed` | Role changed | A member's role was changed. |
 | `jurisdiction_rule.version_activated` | Rule version activated | A rule version became active for a jurisdiction and domain. |
 | `override.recorded` | Override recorded | A P6 override was applied, with its stated reason. |
@@ -1438,6 +1456,340 @@ Two citations in this document are deliberately **not** numbered, because what t
 - **Consent is organisational, not personal** (**Rule 7.19**). A new P1 joining an organisation with an acceptance in force may log batteries immediately; their own acknowledgement is recorded on first sign-in as a record, not a second gate (**Rule 7.20**).
 - **Imports never carry eligibility forward by assertion.** Migrated records default to `training_excluded` (T-12) and an imported acceptance must arrive as its own row with version, actor and timestamp intact, audited as such (**Rule 7.23; EC-31**).
 - **`superseded` is terminal.** An acceptance row is never edited or deleted — it is the evidence of what was agreed and when.
+
+---
+
+### T-48 · Alert severity
+
+**Stored on:** `alert.severity` · **Cardinality:** single-select · **Phase:** B1a
+
+**Purpose:** States how urgently an alert must be acted on, so that every surface that renders an alert — the dashboard region, the alert bell, the container list — orders and styles it the same way without re-deriving urgency from the alert's subject.
+
+| Stored value | Display label | Definition | Visual intent | Phase |
+|---|---|---|---|---|
+| `critical` | Critical | A legal, safety or documentary obligation is **already** breached, or an action the user needs is **already** blocked. The condition exists now; it is not approaching. | `critical` | B1a |
+| `attention` | Needs attention | An obligation **will** be breached if nothing changes, or a required human action is queued and waiting. The condition is approaching or pending, not present. | `attention` | B1a |
+| `informational` | For information | A state change worth surfacing that carries no obligation and no deadline. | `neutral` | B1a |
+
+**Which severity a given alert carries**
+
+Severity is set by the code that raises the alert, from the condition that raised it. It is **not** a property of the alert type (T-44) — the same type raises at different severities as the condition changes.
+
+| Condition | Severity |
+|---|---|
+| Storage clock in the `overdue` state (**Rule 4.15**) | `critical` |
+| Storage clock in an alert band short of overdue (**Rule 4.13**) | `attention` |
+| A loaded container with no current printed label, or a printed start date that no longer matches (**Rules 4.19, 4.22**) | `critical` |
+| A damaged, defective or recalled record blocking a shipment (**Rules 6.7, 6.16**) | `critical` |
+| A record entering quarantine and needing handling (**Rule 6.17**) | `attention` |
+| Records waiting in the confidence-gated review queue (**Rule 2.14**) | `attention` |
+| A container over its fire-code quantity limit — **B1a warns and blocks nothing** (**Rule 4.26**) | `attention` |
+| A container approaching its fill limit | `attention` |
+| A published rule version that affects open records and requires action (**Rule 3.17**) | `attention` |
+| A container marked ready to ship, raised for P1 and P6 | `informational` |
+| A proposed catalog entry approved, raised for the proposer | `informational` |
+
+**Rules**
+
+- **Single-select per alert.** An alert carries exactly one severity.
+- **Severity is frozen at insert.** `docs/ERD.md` §6.5 freezes `severity` by trigger after the row is written, alongside `alert_type`, `trigger_snapshot`, `raised_at` and `governing_rule_version_id`. A condition that worsens raises a **new** alert; it does not edit the old one's severity. The alert row is evidence, and evidence that changes retroactively is not evidence.
+- **An unrecognised severity renders as `neutral` and is never guessed upward.** Guessing upward into `critical` invents an urgency, and inventing urgency in a compliance product is worse than showing none. This preserves exactly the behaviour `b1a-00` shipped.
+- **Severity is never derived from the storage clock's alert band (T-27).** T-27 is the clock's own ladder and its tier count is `jurisdiction_rule` data that varies by jurisdiction. T-48 is the display urgency of an alert record, and it is fixed at three values platform-wide. Mapping one onto the other would make the alert bell's colour a function of which state the site is in.
+- **Ordering.** Where alerts are ordered by urgency, `critical` before `attention` before `informational`, and within `critical` an overdue storage clock is pinned above everything else and is dismissible by no role, including P6 (Edge Case **E-6**).
+- **Severity is not permission.** What a role can see is governed by **Rules 1.2 and 12.8** and by T-44's audience routing. Severity says how loud, never who.
+- **No alert at any severity states or implies a probability of ignition** (**Rules 1.25, 10.3**). A `critical` alert about a damaged battery describes the condition and the required handling — never a chance of anything.
+
+---
+
+### T-49 · Assessed condition
+
+**Stored on:** `battery_record.assessed_condition`, `damage_assessment.assessed_condition` · **Cardinality:** single-select · **Phase:** B1a
+
+**Purpose:** Records a human's judgment of a battery's physical condition at inspection. This is the third of the three hard-gated intake fields, and it is the input the damaged-or-defective determination and the air-transport prohibition both read.
+
+| Stored value | Display label | Definition |
+|---|---|---|
+| `not_assessed` | Not assessed | No person has assessed this battery. A record in this state **cannot ship** (**Rule 6.1**). |
+| `sound` | Sound | Assessed by a person. No damaged-or-defective indicator present and no cosmetic finding recorded. |
+| `cosmetic_wear_only` | Cosmetic wear only | Assessed by a person. One or more findings from T-29's cosmetic set present, and none from its damaged-or-defective set. **Ships on the ordinary path** — this value exists so a handler is never forced to call a scuffed pack damaged. |
+| `damaged_or_defective` | Damaged or defective | Assessed by a person. One or more findings from T-29's damaged-or-defective set confirmed. Sets `ddr_flags` (T-30) and `is_air_transport_prohibited`, and routes the record to a segregated quarantine container. |
+
+**Rules**
+
+- **Single-select.**
+- **Hard-gated.** This is one of the three fields that never auto-commit at any confidence level (**Rule 2.15**, `TECHNICAL_SPEC.md` §11.1 step 3). A model may propose it; **a model never sets it** (**Rules 6.2, 6.6**). Only P1 and P6 may confirm it (**Rule 2.22**).
+- **"Assessed," never "measured."** BMMP integrates third-party health testers; it does not measure battery health. A measured instrument reading is stored on the `instrument_*` columns of `damage_assessment`, is labelled and exported separately, and **never merges into or silently replaces this value** (**Rules 2.27, 11.5**; `_ANCHORS.md` §7.5).
+- **This is not a grade.** T-31 is BMMP's published A/B/C/reject grading scheme and is B2. This system is what a handler observes; T-31 is what BMMP concludes. **Rule 6.22** binds them: a record with an unresolved damaged-or-defective determination can never be graded or marked reusable or resaleable.
+- **A recall association reaches the same handling class without changing this value.** An active recall sets `ddr_flags` and the air prohibition under **Rule 6.5** independently of the assessed condition, because a recalled battery may be physically sound. Never write `damaged_or_defective` because of a recall — the finding and the recall are separate facts and an auditor will look for both.
+- **Relationship to T-46.** T-46 is the *status of an assessment row*; T-49 is *what the assessment found*. `assessed_sound` (T-46) covers both `sound` and `cosmetic_wear_only` here.
+- **Changing this value re-opens the confidence gate** (`UX_SPEC.md` §3.7) and triggers a re-classification check (**Rules 3.15, 6.20**). Moving **out of** `damaged_or_defective` is held to **Rule 6.11**'s discipline: a new assessment by a person, a stated reason, and at least one supporting photograph. The superseded assessment stays visible permanently (**Rule 6.12**).
+- **Triggers behaviour:** the air-transport hard block (**Rules 6.7, 6.8**), quarantine routing (**Rule 6.17**), the DDR packet (**Rule 6.16**), and shipment eligibility (**Rule 6.1**).
+
+---
+
+### T-50 · Intake photo type
+
+**Stored on:** `intake_photo.photo_type` · **Cardinality:** single-select · **Phase:** B1a
+
+**Purpose:** Names what a captured image is, so the pipeline knows which image to read, which images are evidence, and which are the training pair.
+
+| Stored value | Display label | Definition |
+|---|---|---|
+| `label` | Label | The battery's nameplate or label. **At least one is required before extraction runs** (**Rule 2.5**). |
+| `label_crop` | Label crop | The cropped label region. **Always a child row** carrying `parent_intake_photo_id` and `crop_geometry`; the original is never modified (**Rule 2.6**). |
+| `whole_pack` | Whole pack | The whole battery, for identification context and form-factor proposal (**Rule 2.25**). |
+| `damage` | Damage evidence | Supports a damage assessment. Feeds the labelled damage set (**Rule 7.11**). |
+| `clearing_evidence` | Clearing evidence | The photograph required to clear a damaged-or-defective finding (**Rule 6.11**). `damage_assessment.clearing_photo_intake_photo_id` points at one. |
+
+**Rules**
+
+- **Single-select**, assigned at capture by the surface that captured it.
+- **`label_crop` is the only value that requires a parent.** Every other value is a top-level capture with `parent_intake_photo_id` null.
+- **The training pair is the `label_crop` plus the human-confirmed answer** (**Rule 7.10**) — not the `label`, and not the `whole_pack`. `data_use_eligibility` (T-12) is stamped once at capture on every row regardless of type and is never recomputed by any role including P6.
+- **A photo is never deleted to correct a mistake.** A wrongly-typed capture is superseded by a new one; the original is retained for audit (**Rule 12.13**).
+- **Form factor may be proposed from a `whole_pack` image and still passes the confidence gate. It never implies, suggests or contributes to a chemistry determination** (**Rules 2.9, 2.25**).
+
+---
+
+### T-51 · Label crop method
+
+**Stored on:** `intake_photo.crop_method` · **Cardinality:** single-select · **Phase:** B1a
+
+**Purpose:** Records whether the label region was found by the vision provider or drawn by a person.
+
+| Stored value | Display label | Definition |
+|---|---|---|
+| `auto_detected` | Detected automatically | Geometry came from the vision provider's region detection. |
+| `manual` | Drawn by hand | A person drew the crop box, either because detection returned nothing, because it returned a low-confidence region, or because they chose to. |
+
+**Rules**
+
+- **Single-select**, and set on `label_crop` rows only.
+- **Both are ordinary outcomes. Neither is an error state** (`docs/ERD.md` §5.4). The manual path is always available and never hidden (`TECHNICAL_SPEC.md` §11.1 step 2), and a `manual` crop carries no penalty in the confidence gate, in review, or in training eligibility.
+- **There is no third value.** A crop is drawn by a machine or by a person.
+
+---
+
+### T-52 · Review reason code
+
+**Stored on:** `intake_session.review_reason_codes` · **Cardinality:** **multi-select** (`text[]`) · **Phase:** B1a
+
+**Purpose:** States why a record is in the review queue, so the reviewer sees what to fix before opening the card, and so a backing-up queue can be read for its cause rather than its size.
+
+| Stored value | Display label | Definition |
+|---|---|---|
+| `field_confidence_below_threshold` | Low confidence on a field | At least one extracted field fell below the applicable threshold. **The whole record routes to review, not just that field** (**Rule 2.14**). |
+| `catalog_match_score_below_threshold` | Weak catalog match | The best candidate's match score fell below the applicable threshold. |
+| `catalog_match_ambiguous` | Ambiguous catalog match | The top two candidates are too close to separate. **The system never auto-selects the top one and never silently narrows the list** (**Rule 2.19**). |
+| `no_catalog_match` | No catalog match | No candidate resolved. The record continues on the manual entry path (**Rule 2.20**) and **cannot ship until shipping identifiers resolve** (**Rule 5.9**). |
+| `no_fields_extracted` | Label unreadable | Extraction returned no readable field. **A distinct state from low confidence** and it must not share its treatment (`UX_SPEC.md` **E-4**). |
+| `field_validation_failed` | Value failed validation | An extracted value failed its expected shape and was presented as unread, with the raw text retained (**Rule 2.12**). |
+| `extraction_failed` | Extraction did not complete | The provider errored, timed out or returned a malformed response. **The confidence gate is never relaxed to clear a backlog** (**D-25**; **EC-14**). |
+| `session_abandoned` | Left unfinished | The handler left the flow. The session persists with its extraction and appears on the queue. **Work is never lost and never silently committed.** |
+
+**Rules**
+
+- **Multi-select.** A record commonly carries more than one reason and every applicable reason is recorded — a record that is both weakly matched and low-confidence says so.
+- **The gate verdict lives on `intake_session`, not on `label_extraction`**, because the gate routes the record and not the field (`docs/ERD.md` §5.5, **Rule 2.14**).
+- **Reason codes are diagnostic, never permissive.** No combination of them, and no absence of them, allows a hard-gated field to commit without human confirmation (**Rules 2.13, 2.15, 2.17**).
+- **A record leaves the queue in exactly two ways: a human confirms it, or a human voids it with a stated reason** (**Rule 2.23**). It never times out into a confirmed state and it never ages out.
+
+---
+
+### T-53 · Intake step
+
+**Stored on:** `intake_session.current_step` · **Cardinality:** single-select · **Phase:** B1a
+
+**Purpose:** Records which step of the fixed intake pipeline a session is on, so an interrupted session resumes where it stopped.
+
+| Stored value | Display label | Definition |
+|---|---|---|
+| `capture` | Photo | Step 1. Capturing photos. |
+| `extraction_review` | Extraction review | Step 2. Reviewing extracted fields against the label crop, resolving the catalog match. |
+| `confirm_and_place` | Confirm and place | Step 3. Recording state of charge and assessed condition, assigning a container, seeing the classification outcome. |
+| `complete` | Complete | The session committed. Terminal. |
+
+**Rules**
+
+- **Single-select, system-assigned.** Users do not set it directly.
+- **The order is fixed and code-orchestrated.** No step may be skipped, reordered, run in parallel or chosen at runtime, and no model selects the next step (**Rules 2.2, 2.3**).
+- **The step index also lives in the URL** as `?step=` so the flow is deep-linkable and resumable (`SITE_ARCHITECTURE.md` §1.3). The URL and this column agree; the column is the durable one.
+- **A step may be revisited.** Moving back from step 3 to step 2 is ordinary and does not discard captured work.
+- **Distinct from T-08.** T-08 is the session's lifecycle status; this is its position in the flow. A session may be `awaiting_confirmation` (T-08) at `extraction_review` (T-53).
+
+---
+
+### T-54 · Chemistry source
+
+**Stored on:** `battery_record.chemistry_source` · **Cardinality:** single-select · **Phase:** B1a
+
+**Purpose:** Records how a battery's chemistry was established, so that every screen and export can state the basis rather than presenting chemistry as a bare fact.
+
+| Stored value | Display label | Definition |
+|---|---|---|
+| `catalog_match` | Matched from the catalog | Defaulted from the matched `catalog_entry` and confirmed by a person (**Rules 2.10, 2.18**; **D-23**). |
+| `human_entry` | Entered by hand | Entered directly by P1 or P6 on the manual entry path and confirmed by that person (**Rules 2.10, 2.20**). |
+
+**Rules**
+
+- **Single-select.**
+- **These are the only two sources, and there will never be a third** (**Rule 2.10**). **`docs/ERD.md` §5.1 states it as an absence:** no value in this set means "read from a photograph," because chemistry cannot be seen in an image.
+- **Rule 2.9 is in all capitals for this reason.** Chemistry is printed on the label; the label is read; the reading resolves to a catalog entry; the catalog entry carries the chemistry; a person confirms it. **Any value, screen, label, API field or document implying visual chemistry detection is wrong and must be removed** (**D-7**, `_ANCHORS.md` §7.2).
+- **The resolved lithium-ion sub-chemistry lives on the record**, defaulted from the matched catalog entry, not left on the catalog entry alone (**D-23**).
+- **Never inferred from form factor.** Form-factor detection contributes nothing to chemistry (**Rule 2.25**).
+
+---
+
+### T-55 · State-of-charge source
+
+**Stored on:** `battery_record.soc_source` · **Cardinality:** single-select · **Phase:** B1a
+
+**Purpose:** Records how the state of charge at intake was established, since it is an input to hazard ranking at B2 and a handler's estimate and a meter reading are not the same evidence.
+
+| Stored value | Display label | Definition |
+|---|---|---|
+| `device_indicator` | Read from an indicator | Read from a gauge, indicator or display on the battery or the device it came out of. |
+| `handheld_meter` | Read with a meter | Read by the handler with a handheld voltmeter or tester. |
+| `handler_estimate` | Handler's estimate | The handler's stated estimate. No reading was available. |
+| `not_observable` | Not observable | The state of charge could not be established. |
+
+**Rules**
+
+- **Single-select**, recorded alongside `state_of_charge_band` (T-21) and `state_of_charge_percent_at_intake` at step 3 (**Rule 2.26**).
+- **`not_observable` is a legitimate answer, not a failure.** It is the correct value for a pack with no indicator and no accessible terminals, and it must never be replaced with a default band or a guessed percentage.
+- **None of these is a health measurement.** State of charge is not state of health, and this column never contributes to a claim about condition (**Rule 2.27**; `_ANCHORS.md` §7.5).
+- **This value never contributes to a probability of ignition** — no such output exists anywhere in the product (**Rule 1.25**).
+
+---
+
+### T-56 · Date code precision
+
+**Stored on:** `date_code_decode.decoded_precision` · **Cardinality:** single-select · **Phase:** B1a
+
+**Purpose:** States how precisely a printed date code resolves, so a year-only code is never displayed or exported as though it named a day.
+
+| Stored value | Display label | Definition |
+|---|---|---|
+| `day` | Day | Resolves to a calendar day. |
+| `month` | Month | Resolves to a calendar month. |
+| `quarter` | Quarter | Resolves to a calendar quarter. |
+| `year` | Year | Resolves to a year only. |
+| `undecodable` | Could not be decoded | The code was read but does not resolve against any known format. |
+
+**Rules**
+
+- **Single-select.**
+- **`undecodable` is recorded as itself and never as an approximate date** (**Rule 2.24**). A code that cannot be decoded produces no manufacture date — it does not produce a fuzzy one.
+- **Precision travels with the value everywhere.** A `year`-precision decode renders as a year on screen, in exports and on any document that prints it. Rendering it as 1 January is a defect.
+- **A decoded date never overrides a date a person entered** (**Rule 2.24**).
+- **A future-dated decode is a validation failure, not a fact** (**EC-11**) — it is presented as unread with the raw code retained.
+
+---
+
+### T-57 · Date code decode method
+
+**Stored on:** `date_code_decode.decoded_by_method` · **Cardinality:** single-select · **Phase:** B1a
+
+**Purpose:** Records whether the manufacture date came from a deterministic decoder or from a person.
+
+| Stored value | Display label | Definition |
+|---|---|---|
+| `deterministic_decoder` | Decoded by rule | A versioned rules-based decoder produced the date. `decoder_version` records which. |
+| `human_entry` | Entered by hand | A person entered the manufacture date directly. |
+
+**Rules**
+
+- **Single-select.**
+- **There are two values and there will never be a third.** **Date-code decoding is deterministic and rules-based** (**Rule 2.24**); there is no machine-learning path and `TECHNICAL_SPEC.md` §11.1 step 6.3 says so explicitly. **`docs/ERD.md` §5.6 states it as an absence:** no value in this set means "inferred by a model."
+- **A decoder is versioned and its version is stored**, so a decode reproduces after the decoder changes.
+
+---
+
+### T-58 · Classification decision scope
+
+**Stored on:** `classification_decision.decision_scope` · **Cardinality:** single-select · **Phase:** B1a
+
+**Purpose:** Names which subject a classification decision was made about, since the same table records decisions at three grains.
+
+| Stored value | Display label | Definition |
+|---|---|---|
+| `battery_record` | Battery record | The decision is about one battery. `battery_record_id` is non-null. |
+| `container` | Container | The decision is about a container's aggregate contents. `container_id` is non-null. |
+| `shipment` | Shipment | The decision is about a shipment's contents as offered. `shipment_id` is non-null. |
+
+**Rules**
+
+- **Single-select, and it names whichever of the three foreign keys is non-null.** Exactly one is non-null; the scope and the key never disagree.
+- **A record carries exactly one active decision** at `battery_record` scope (**Rule 3.1**), enforced by a partial unique index on `status = 'active'`.
+- **Classification runs only after identification is confirmed** (**Rule 3.3**) and reads the rule version in force on the record's **intake date** in the **site's** jurisdiction (**Rules 3.5, 3.6**).
+- **A missing site jurisdiction profile blocks the decision and never defaults it** (**Rule 3.10**; **E-13**). There is no fallback, no "assume federal" and no placeholder citation.
+- **Re-classification supersedes; it never overwrites** (**Rule 3.14**), and a new rule version never retroactively re-classifies a departed shipment (**Rule 3.16**).
+
+---
+
+### T-59 · Damage assessment method
+
+**Stored on:** `damage_assessment.assessment_method` · **Cardinality:** single-select · **Phase:** per row
+
+| Stored value | Display label | Definition | Phase |
+|---|---|---|---|
+| `visual_inspection` | Visual inspection | A person inspected the battery and confirmed the findings. **B1a's only method.** | B1a |
+| `model_assisted_visual` | Model-assisted inspection | A model proposed indicators from a photograph and a person confirmed them. | B2 |
+| `instrument_reading` | Instrument reading | A third-party health tester supplied a reading, recorded alongside a human-confirmed assessment. Carries the `instrument_*` columns. | B3 |
+
+**Rules**
+
+- **Single-select.**
+- **No method produces an assessment without human confirmation, at any confidence** (**Rule 6.6**). **A model proposes indicators; a model never sets them** (**Rule 6.2**). `model_assisted_visual` describes how the proposal arrived, not who decided.
+- **An instrument reading is measured data.** It is stored, labelled and exported **separately** from assessed condition, and never merges into it or silently replaces it (**Rules 2.27, 11.5**; Roadmap Principle 7). The vendor is open until Gate 3.
+- **B1a writes only `visual_inspection`.** Building the other two ahead of their specification is a review rejection, not a head start.
+
+---
+
+### T-60 · Audit actor type
+
+**Stored on:** `audit_event.actor_type` · **Cardinality:** single-select · **Phase:** B1a
+
+**Purpose:** States what kind of actor caused an audited event, so a platform admin's action inside a tenant is never mistaken for a member's.
+
+| Stored value | Display label | Definition |
+|---|---|---|
+| `user` | Member | A signed-in member acting in their own organization. `actor_user_id` is non-null. |
+| `platform_admin` | Platform admin | P6 acting inside a tenant **under a recorded support grant**. `actor_user_id` is non-null. **Rendered distinctly wherever it appears** (**Rules 1.18, 12.7**). |
+| `system` | System | The application acting with no human actor — a pipeline step, a trigger, a computed state change (**Rule 12.5**). |
+| `scheduled_job` | Scheduled job | A cron-invoked job: storage-clock alerts, recall sync. |
+| `integration` | Integration | An inbound webhook from an external system. |
+
+**Rules**
+
+- **Single-select**, set by the audit trigger from the request context, never by application code choosing a value.
+- **`actor_user_id` is non-null for `user` and `platform_admin`** and may be null for the other three.
+- **`platform_admin` is visually distinct on `/audit` and in every export.** A support grant that is invisible in the log is not a recorded support grant.
+- **`system` is not a way to avoid attribution.** A state change a person caused is attributed to that person even when a trigger performed the write (**Rule 2.21** — "confirmed by the system" is not a valid value).
+- **No role edits or deletes an audit event, including P6** (**Rules 12.3, 12.4**).
+
+---
+
+### T-61 · Catalog entry source type
+
+**Stored on:** `catalog_entry.source_type` · **Cardinality:** single-select · **Phase:** B1a
+
+**Purpose:** States where a catalog entry's specification came from, so a handler confirming a match can weigh the entry they are matching against.
+
+| Stored value | Display label | Definition |
+|---|---|---|
+| `manufacturer_published` | Manufacturer specification | Taken from a manufacturer's published specification or datasheet. `source_url` carries the reference. |
+| `platform_curated` | Platform curated | Created or verified by P6 from primary sources. Platform-owned entries carry `organization_id` null. |
+| `handler_proposed` | Proposed by a handler | Proposed from a catalog miss and approved by P6 (**Rule 2.20**; Flow F). |
+| `regulatory_source` | Regulatory source | Taken from a public regulatory or standards dataset. |
+
+**Rules**
+
+- **Single-select.**
+- **`handler_proposed` is not a lesser entry once approved** — approval is P6 reviewing the proposal against the linked intake photo and label crop. The value records provenance, not quality.
+- **Approving an entry never silently re-matches a committed record.** Every record committed unmatched against the same identifying fields is **raised on `/review` for a person to confirm** (Flow F, step 4).
+- **Source type never substitutes for confirmation.** However authoritative the entry, chemistry, model and condition still require human confirmation (**Rule 2.15**).
+
 ---
 
 ## 4. Naming Conventions

@@ -1,7 +1,7 @@
 # Project Setup Reference — BMMP
 
 **Battery Material Management Platform**
-**Version:** 1.2 · **Date:** 2026-08-19
+**Version:** 1.3 · **Date:** 2026-08-21
 **Owner:** Nathan Ivy / Next Sketch LLC · **Client:** Jonathan
 **Status:** Active. This document is permanent. Bump the version in this header; never rename the file.
 
@@ -72,9 +72,8 @@ Must include at minimum:
 
 ### Branching rules
 
-- `main` — production-ready code only. **Never work directly on this branch.**
-- `staging` — integration branch. Code here gets tested before going to main.
-- Feature branches — where all active work happens.
+- `main` — production-ready code only, and the only long-lived branch. **Never work directly on this branch.**
+- Feature branches — where all active work happens. Each one opens a pull request against `main` and merges when the checks pass and a human has read the diff (D-29).
 
 **Rule: one brief, one branch.** Every unit of work handed to a build agent gets its own branch, and the branch name carries the unit ID from the sprint plan so the branch, the brief, and the build-notes are traceable to each other:
 
@@ -88,7 +87,7 @@ chore/b1a-01-ci-pipeline
 
 This is a **single-owner project** — Nate owns every merge. GitHub's required-reviewer rule cannot be satisfied by one person, so protection is enforced through status checks plus a hard human rule.
 
-On `main` and `staging`, enable:
+On `main`, enable:
 
 - Require a pull request before merging
 - Require status checks to pass: `lint`, `typecheck`, `test`, `build`
@@ -381,7 +380,7 @@ Set up automation before any feature work begins. One-time setup, runs forever.
 
 ### CD
 
-- **Staging:** Vercel deploys automatically from `staging` when CI passes
+- **Staging:** every pull request gets its own Vercel preview deployment, pointed at the staging Supabase project. The pull-request previews are the staging deployment (D-29, D-21)
 - **Production:** Vercel deploys from `main` after CI passes **and** manual promotion in Vercel
 
 ### Rule
@@ -412,7 +411,7 @@ See `.env.example`. Every key is listed there.
 pnpm test · pnpm test:e2e · pnpm lint · pnpm typecheck
 
 ## Branch Strategy
-main / staging / feature branches. One brief, one branch. Branch names carry the unit ID.
+main and feature branches. One brief, one branch. Branch names carry the unit ID.
 
 ## Data Layer
 How the mock and Supabase adapters work, and how to switch. Points to Section 3.2 of the setup reference.
@@ -442,7 +441,7 @@ Three rules that come from the roadmap and decision log rather than from general
 | This setup reference | repo root, `PROJECT_SETUP_BMMP.md` | now |
 | Canonical doc stack | `docs/` | next — one file per doc, version in header |
 | Builder briefs + build-notes | planning folder, `BMMP Planning\briefs\` — **outside the repository** | one file per unit |
-| Decision log | `docs/DECISION_LOG.md` | ongoing, append-only |
+| Decision log | project-level, `Jonathan AI Platforms\Decision Log.md` — **outside the repository** | ongoing, append-only |
 
 Every later brief points back to this document rather than restating it.
 
@@ -460,9 +459,11 @@ REPOSITORY
 [x] .gitignore created and complete
 [x] .gitattributes normalises line endings (authored on Windows, built on Linux CI)
 [x] First commit is structure only — no feature code
-[x] main and staging branches exist
-[x] Remote connected, both branches pushed                                  [owner]
-[x] Branch protection on main and staging: PR required, status checks
+[ ] main branch exists, and is the only long-lived branch — staging is still
+    to be deleted, locally and on the remote (D-29); main..staging is empty
+    in both, so main already holds everything staging carries               [owner]
+[x] Remote connected, main pushed                                           [owner]
+[x] Branch protection on main: PR required, status checks
     required, force-push and deletion blocked                               [owner]
 
 ENVIRONMENT
@@ -497,7 +498,7 @@ CI/CD
     deliberate bad import — the proof runs in CI, not once by hand
 [x] Adapter selector proven to throw on an unset and on a misspelled DATA_ADAPTER
 [ ] Two Vercel projects and two Supabase projects, hard-isolated (D-21);
-    staging auto-deploys, production requires manual promotion              [owner]
+    PR previews are the staging deployment; production manually promoted    [owner]
 [x] Required status checks selected in branch protection                    [owner]
 
 DOCUMENTATION
@@ -512,6 +513,8 @@ PROJECT-SPECIFIC
 ```
 
 ### Changelog
+
+**v1.3 — 2026-08-21.** **D-29** removes the `staging` branch: `main` is the only long-lived branch, every unit opens a pull request against `main`, and branch protection applies to `main` alone. D-17's rule that no agent merges its own work is unchanged. §6's staging deployment becomes the per-pull-request Vercel preview against the staging Supabase project, which leaves **D-21**'s isolation intact. §9's decision log is corrected to the project-level `Decision Log.md` outside the repository — it was cited as `docs/DECISION_LOG.md`, which has never existed. §10's checklist follows both, with the branch deletion left open as owner work.
 
 **v1.2 — 2026-08-19.** Stack moves from Next.js 15 to **Next.js 16** (D-27): `next@latest` is 16, and starting a 32-week build on the previous major buys a framework major upgrade in February, on top of B2. Checklist gains `.gitattributes`, the formatter exclusion for canonical documents, `format` and `e2e` as CI jobs, and an `[owner]` marker on the five items needing account access. Environment isolation resolved by **D-21**. `.env.example` gains `VISION_PROVIDER` (D-25) and error-tracking keys (D-20).
 

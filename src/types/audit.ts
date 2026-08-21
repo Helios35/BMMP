@@ -1,4 +1,5 @@
 import type { Created, IsoTimestamp, JsonObject, Uuid } from "@/types/common";
+import type { AuditActorType } from "@/domain/taxonomy/audit-actor-type";
 import type { AuditEventType } from "@/domain/taxonomy/audit-event-type";
 import type { AppliedRuleVersion } from "@/domain/rules/outcome";
 
@@ -33,28 +34,18 @@ export interface AuditEvent extends Created {
   /** **Who.** */
   readonly actorUserId: Uuid | null;
   /**
-   * Whether the actor was a person, a scheduled job or an integration.
+   * Whether the actor was a person, a scheduled job or an integration. T-60.
    *
    * **Automated pipeline steps write events exactly as human actions do**,
    * identified as the step that ran and carrying the model or rule version used
    * (Rule 12.5). **Platform actions are distinguishable from a member's**
    * (Rule 12.7).
-   *
-   * `ERD.md` §10.2 says the values are in `TAXONOMY.md`; no system defines them
-   * — reported in this unit's build-notes.
    */
-  readonly actorType: string;
+  readonly actorType: AuditActorType;
   /** For non-user actors: which job, which integration. */
   readonly actorLabel: string | null;
-  /**
-   * **What.** T-43.
-   *
-   * `ERD.md` §10.2 additionally names `document.render_failed`,
-   * `document.reprinted` and `document.viewed`, which are **not** in T-43's
-   * value set — reported in this unit's build-notes rather than invented, since
-   * adding a value is P6's call (`TAXONOMY.md` §1.1).
-   */
-  readonly eventType: AuditEventType | string;
+  /** **What.** T-43. */
+  readonly eventType: AuditEventType;
   readonly entityTable: string;
   readonly entityId: Uuid;
   /** **When.** Carries a zone (Rule 12.20). */
