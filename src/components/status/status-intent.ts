@@ -1,4 +1,5 @@
 import {
+  ASSESSED_CONDITION_LABELS,
   BATTERY_RECORD_STATUS_LABELS,
   CATALOG_ENTRY_STATUS_LABELS,
   CLASSIFICATION_DECISION_STATUS_LABELS,
@@ -13,6 +14,7 @@ import {
   INTAKE_SESSION_STATUS_LABELS,
   LOT_STATUS_LABELS,
   RECALL_MATCH_STATUS_LABELS,
+  ROLE_LABELS,
   RULE_VERSION_STATUS_LABELS,
   SHIPMENT_STATUS_LABELS,
   STATE_OF_CHARGE_BAND_LABELS,
@@ -78,7 +80,9 @@ export const STATUS_SYSTEMS = {
   classification_decision_status: CLASSIFICATION_DECISION_STATUS_LABELS,
   damage_assessment_status: DAMAGE_ASSESSMENT_STATUS_LABELS,
   tos_acceptance_status: TOS_ACCEPTANCE_STATUS_LABELS,
+  assessed_condition: ASSESSED_CONDITION_LABELS,
   format_category: FORMAT_CATEGORY_LABELS,
+  role: ROLE_LABELS,
 } as const satisfies Readonly<Record<string, Readonly<Record<string, string>>>>;
 
 export type StatusSystem = keyof typeof STATUS_SYSTEMS;
@@ -269,6 +273,28 @@ export const STATUS_INTENTS: Readonly<Record<StatusSystem, IntentMap>> = {
     lapsed: "critical",
     superseded: "neutral",
     revoked: "attention",
+  },
+  // T-49. `critical` is reserved (§1.2 Rule 5) and a damaged-or-defective
+  // finding is one of the four things that earn it: it sets the DDR flags and
+  // the air-transport prohibition (Rules 6.4, 6.5), which is a hard stop rather
+  // than a warning.
+  assessed_condition: {
+    not_assessed: "pending",
+    sound: "ok",
+    cosmetic_wear_only: "ok",
+    damaged_or_defective: "critical",
+  },
+  // T-37. **Every role reads `neutral`.** Intent carries urgency, and a role
+  // carries none — colouring one role differently from another is an editorial
+  // claim this product does not make. The badge still renders icon plus text
+  // plus colour, so the role is never carried by colour alone (§1.2 Rule 4).
+  role: {
+    compliance_handler: "neutral",
+    facility_manager: "neutral",
+    producer_compliance_officer: "neutral",
+    mobility_supplier_technician: "neutral",
+    auditor: "neutral",
+    platform_admin: "neutral",
   },
   // T-06. `not_covered` is a real, meaningful result — not an error.
   format_category: {

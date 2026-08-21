@@ -52,6 +52,13 @@ export default function GlobalError({
             </p>
           ) : null}
           <p className="pt-2">
+            {/*
+              A plain anchor, deliberately. `global-error` replaces the root
+              layout, so there is no router mounted and `next/link` has nothing
+              to push onto — this has to be a full document load. The rule fires
+              only because `/` now has a page; the reasoning predates it.
+            */}
+            {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
             <a
               href="/"
               className="inline-flex min-h-11 items-center rounded-md border border-input px-4 text-body focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none"
