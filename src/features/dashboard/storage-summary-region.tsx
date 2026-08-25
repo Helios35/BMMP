@@ -175,7 +175,13 @@ export async function StorageSummaryRegion({
       }
     >
       <SectionCard>
-        <ul data-storage-tiers="true" className="flex list-none flex-col gap-2">
+        {/* Capped rather than run to the content width: a tier and its count a
+            thousand pixels apart is a pair a reader has to track across an empty
+            page. §1.3 caps prose at a measure for the same reason. */}
+        <ul
+          data-storage-tiers="true"
+          className="flex max-w-md list-none flex-col gap-2"
+        >
           {tiers.map((tier) => (
             <li
               key={tier.band}
