@@ -435,6 +435,51 @@ test.describe("44 × 44 px minimum interactive target", () => {
       ).toEqual([]);
       expectExemptionsAreInlineLinks("/audit", result);
     });
+
+    /**
+     * The sweep above cannot re-break — **and cannot pass by finding nothing.**
+     *
+     * The general sweep measures whatever is on the page, so it stays green if
+     * the trigger stops rendering at all: the tooltip disappears, the stated
+     * reason becomes unreachable, and nothing says a word. That is precisely
+     * how two of unit 01's defects survived a whole unit — an assertion that
+     * passed vacuously.
+     *
+     * So this asserts the trigger is **there**, on every row, and measures it
+     * directly. `/containers` inherits this exact path for P3, P4 and P5 in
+     * unit 04 (`SITE_ARCHITECTURE.md` §5.4), and that unit adds its route to
+     * this test rather than writing a second one.
+     */
+    test("the not-linked row reason is present, focusable and 44px", async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: 1280, height: 800 });
+      await page.goto("/audit");
+      await expect(page.locator("#page-title")).toBeVisible();
+
+      const triggers = page.locator('[data-row-reason-trigger="true"]');
+      const count = await triggers.count();
+      expect(
+        count,
+        "/audit renders no row-reason trigger at all — every row on this route is non-navigable and each one must state why (§5.4)",
+      ).toBeGreaterThan(0);
+
+      for (let index = 0; index < count; index += 1) {
+        const trigger = triggers.nth(index);
+        const box = await trigger.boundingBox();
+        expect(
+          box,
+          `/audit row ${index}: the trigger is not rendered`,
+        ).not.toBeNull();
+        expect(
+          box?.height ?? 0,
+          `/audit row ${index}: the row-reason trigger is ${box?.height ?? 0}px tall. It is focusable and hoverable, which makes it a target, and §1.5's 44px floor applies on desktop too. The threshold is not lowered.`,
+        ).toBeGreaterThanOrEqual(MINIMUM_TARGET_PX);
+        // In the tab order on purpose: `aria-disabled` semantics aside, a reason
+        // a keyboard user cannot reach is a reason nobody stated.
+        await expect(trigger).toHaveAttribute("tabindex", "0");
+      }
+    });
   });
 });
 
