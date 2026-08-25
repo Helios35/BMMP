@@ -539,6 +539,18 @@ async function resolveHref(page, baseUrl, spec) {
   return href;
 }
 
+/**
+ * Wait for the page to be worth photographing.
+ *
+ * **Deliberately not `networkidle`.** Next prefetches every `<Link>` that enters
+ * the viewport, and a `fullPage` screenshot puts the whole page in the viewport
+ * — so a long route never reaches idle and every capture pays the full timeout.
+ * That cost twenty seconds an image on the first run of this script.
+ *
+ * What is actually needed is: the route rendered, the fonts are resolved so no
+ * text reflows after the shutter, and one animation frame has passed. All three
+ * are conditions rather than durations.
+ */
 async function settle(page, screen) {
   const landed = screen.landsOn ?? null;
   if (landed !== null) {
@@ -546,7 +558,15 @@ async function settle(page, screen) {
   }
   const marker = screen.as === null ? "text=BMMP" : "#page-title";
   await page.locator(marker).first().waitFor({ state: "visible" });
-  await page.waitForLoadState("networkidle").catch(() => {});
+  await page.waitForLoadState("load");
+  await page.evaluate(() =>
+    document.fonts.ready.then(
+      () =>
+        new Promise((resolve) => {
+          requestAnimationFrame(() => requestAnimationFrame(resolve));
+        }),
+    ),
+  );
 }
 
 async function capturePage(page, screen, url, file) {
