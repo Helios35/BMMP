@@ -8,6 +8,7 @@
  * never by editing the generated primitive (`UX_SPEC.md` §1.1).
  */
 
+export * from "./page";
 export * from "./status/status-intent";
 export * from "./status/intent-classes";
 export * from "./status/intent-icons";
