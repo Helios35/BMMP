@@ -13,6 +13,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { INTENT_TEXT_CLASSES } from "@/components/status/intent-classes";
 import type { StatusIntent } from "@/components/status/status-intent";
+import { LeadingIcon } from "@/components/page/leading-icon";
 import { cn } from "@/lib/utils";
 
 import { INTENT_ICON } from "@/components/status/intent-icons";
@@ -80,14 +81,8 @@ function AlertRow({ item }: { readonly item: AlertBellItem }) {
 
   const content = (
     <>
-      <Icon
-        aria-hidden="true"
-        className={cn(
-          "mt-0.5 size-5 shrink-0",
-          INTENT_TEXT_CLASSES[item.intent],
-        )}
-      />
-      <span className="flex min-w-0 flex-col gap-0.5">
+      <LeadingIcon icon={Icon} className={INTENT_TEXT_CLASSES[item.intent]} />
+      <span className="flex min-w-0 flex-col gap-1">
         <span className="text-body-strong text-balance">{item.title}</span>
         <span className="text-caption">{item.body}</span>
         <span className="text-caption text-muted-foreground">
@@ -181,7 +176,7 @@ export function AlertBell({ items, total, state, retryHref }: AlertBellProps) {
                 INTENT_TEXT_CLASSES.critical,
               )}
             >
-              <BellOff aria-hidden="true" className="mt-0.5 size-5 shrink-0" />
+              <LeadingIcon icon={BellOff} />
               We could not load your alerts.
             </p>
             <Button

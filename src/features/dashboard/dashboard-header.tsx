@@ -1,10 +1,5 @@
-import Link from "next/link";
-import type { ReactElement } from "react";
-
 import { canReadRoute, canWriteRoute } from "@/domain/access/route-capability";
-import { APP_ROUTE_NAMES } from "@/domain/access/routes";
 import type { RoleCode } from "@/domain/taxonomy/role";
-import { Button } from "@/components/ui/button";
 
 import {
   AUDIT_LOG,
@@ -72,30 +67,4 @@ export function dashboardPrimaryAction(
   if (canReadRoute(role, AUDIT_LOG.route)) return AUDIT_LOG;
 
   return null;
-}
-
-/**
- * The page title and its action.
- *
- * **`id="page-title"` and `tabIndex={-1}` are required**: the shell's route
- * announcer moves focus here on every navigation, and without them a route
- * change is silent to a screen reader (`UX_SPEC.md` §6.6).
- */
-export function DashboardHeader({
-  action,
-}: {
-  readonly action: DashboardLink | null;
-}): ReactElement {
-  return (
-    <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
-      <h1 id="page-title" tabIndex={-1} className="text-h1 lg:text-display">
-        {APP_ROUTE_NAMES["/"]}
-      </h1>
-      {action === null ? null : (
-        <Button asChild size="lg" className="min-h-11">
-          <Link href={action.href}>{action.label}</Link>
-        </Button>
-      )}
-    </div>
-  );
 }

@@ -88,12 +88,12 @@ export function ConfidenceBandDisplay({
   // `not_extracted`, which means a run happened and read nothing.
   if (band === null || band === undefined || band === "") {
     return (
-      <div className={cn("flex flex-col gap-0.5", className)}>
+      <div className={cn("flex flex-col gap-1", className)}>
         <Badge
           variant="outline"
           data-confidence-state="empty"
           className={cn(
-            "h-7 gap-1.5 rounded-md border px-2 text-sm font-medium",
+            "h-7 gap-2 rounded-md border px-2 text-label",
             INTENT_SURFACE_CLASSES.neutral,
           )}
         >
@@ -108,13 +108,13 @@ export function ConfidenceBandDisplay({
   // coerced (TAXONOMY.md §5.8).
   if (!isConfidenceBand(band)) {
     return (
-      <div className={cn("flex flex-col gap-0.5", className)}>
+      <div className={cn("flex flex-col gap-1", className)}>
         <Badge
           variant="outline"
           data-confidence-state="unrecognised"
           title="Retired or unrecognised confidence band"
           className={cn(
-            "h-7 gap-1.5 rounded-md border px-2 text-sm font-medium",
+            "h-7 gap-2 rounded-md border px-2 text-label",
             INTENT_SURFACE_CLASSES.neutral,
           )}
         >
@@ -129,14 +129,14 @@ export function ConfidenceBandDisplay({
   const Icon = BAND_ICONS[band];
 
   return (
-    <div className={cn("flex flex-col gap-0.5", className)}>
+    <div className={cn("flex flex-col gap-1", className)}>
       <Badge
         variant="outline"
         data-confidence-state="default"
         data-band={band}
         data-intent={intent}
         className={cn(
-          "h-7 gap-1.5 rounded-md border px-2 text-sm font-medium",
+          "h-7 gap-2 rounded-md border px-2 text-label",
           INTENT_SURFACE_CLASSES[intent],
         )}
       >
@@ -156,7 +156,7 @@ export function ConfidenceBandDisplay({
       ) : null}
 
       {isHardGated ? (
-        <span data-confidence-hard-gated className="text-caption font-medium">
+        <span data-confidence-hard-gated className="text-label">
           Always confirmed by a person
         </span>
       ) : null}
@@ -173,7 +173,7 @@ export function ConfidenceBandDisplaySkeleton({
   return (
     <div
       data-confidence-state="loading"
-      className={cn("flex flex-col gap-0.5", className)}
+      className={cn("flex flex-col gap-1", className)}
     >
       <Skeleton className="h-7 w-24 rounded-md" />
       <Skeleton className="h-[1.125rem] w-16 rounded-md" />

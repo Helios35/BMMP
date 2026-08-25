@@ -3,7 +3,7 @@ import { CircleAlert } from "lucide-react";
 import { INTENT_SURFACE_CLASSES } from "@/components/status/intent-classes";
 import { StatusBadge } from "@/components/status/status-badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { SectionCard } from "@/components/page";
 import { Separator } from "@/components/ui/separator";
 import { readTaxonomyValue } from "@/domain/taxonomy/lookup";
 import {
@@ -82,59 +82,58 @@ function SiteCard({ profile }: { readonly profile: SiteJurisdictionProfile }) {
   const { site, chain, rules, asOfDate } = profile;
 
   return (
-    <Card data-site-key={site.key}>
-      <CardHeader>
-        <CardTitle className="text-h2 break-words">
-          {formatAddressLine(site.address)}
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-4">
-        <FieldList>
-          <Field label="Time zone" value={site.timeZone} mono />
-          <Field label="Containers at this site">
-            <span className="text-body-strong">{site.containerCount}</span>
-          </Field>
-          <Field label="Jurisdiction chain" span>
-            {chain.length === 0 ? (
-              <span className="text-body text-muted-foreground">
-                None recorded.
-              </span>
-            ) : (
-              <JurisdictionChain chain={chain} />
-            )}
-          </Field>
-        </FieldList>
+    <SectionCard
+      dataAttributes={{ "data-site-key": site.key }}
+      headingLevel={3}
+      title={
+        <span className="break-words">{formatAddressLine(site.address)}</span>
+      }
+    >
+      <FieldList>
+        <Field label="Time zone" value={site.timeZone} mono />
+        <Field label="Containers at this site">
+          <span className="text-body-strong">{site.containerCount}</span>
+        </Field>
+        <Field label="Jurisdiction chain" span>
+          {chain.length === 0 ? (
+            <span className="text-body text-muted-foreground">
+              None recorded.
+            </span>
+          ) : (
+            <JurisdictionChain chain={chain} />
+          )}
+        </Field>
+      </FieldList>
 
-        {site.jurisdictionId === null ? (
-          <NoJurisdictionNotice />
-        ) : (
-          <>
-            <Separator />
-            <div className="flex flex-col gap-1">
-              <h3 className="text-body-strong">Rules in force</h3>
-              <p className="max-w-[72ch] text-caption text-muted-foreground">
-                Resolved on <CalendarDay value={asOfDate} /> in this
-                site&rsquo;s time zone. {RULE_PAYLOAD_NOTE}
-              </p>
-            </div>
+      {site.jurisdictionId === null ? (
+        <NoJurisdictionNotice />
+      ) : (
+        <>
+          <Separator />
+          <div className="flex flex-col gap-1">
+            <h3 className="text-body-strong">Rules in force</h3>
+            <p className="max-w-[72ch] text-caption text-muted-foreground">
+              Resolved on <CalendarDay value={asOfDate} /> in this site&rsquo;s
+              time zone. {RULE_PAYLOAD_NOTE}
+            </p>
+          </div>
 
-            {rules.length === 0 ? (
-              <p className="text-body text-muted-foreground">
-                {NO_RULES_FOR_JURISDICTION}
-              </p>
-            ) : (
-              <ul className="flex flex-col gap-4">
-                {rules.map((row) => (
-                  <li key={row.rule.id}>
-                    <RuleRow row={row} />
-                  </li>
-                ))}
-              </ul>
-            )}
-          </>
-        )}
-      </CardContent>
-    </Card>
+          {rules.length === 0 ? (
+            <p className="text-body text-muted-foreground">
+              {NO_RULES_FOR_JURISDICTION}
+            </p>
+          ) : (
+            <ul className="flex flex-col gap-4">
+              {rules.map((row) => (
+                <li key={row.rule.id}>
+                  <RuleRow row={row} />
+                </li>
+              ))}
+            </ul>
+          )}
+        </>
+      )}
+    </SectionCard>
   );
 }
 

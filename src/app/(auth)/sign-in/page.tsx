@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import { CARD_SPACING } from "@/components/page";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   isSessionEndReason,
@@ -84,7 +85,7 @@ export default async function SignInPage({
         />
       )}
 
-      <Card>
+      <Card className={CARD_SPACING}>
         <CardHeader>
           {/*
             A real `h1`. `CardTitle` is a generated `div` and is never hand-edited,

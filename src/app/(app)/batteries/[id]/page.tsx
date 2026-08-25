@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { ReadOnlyBanner } from "@/components/access/read-only-banner";
+import { PageShell } from "@/components/page";
 import {
   decodeListQuery,
   encodeListQuery,
@@ -138,40 +139,48 @@ export default async function BatteryRecordPage({
   );
 
   return (
-    <div className="flex flex-col gap-6 p-4 md:p-6">
-      <Breadcrumbs
-        crumbs={breadcrumbTrail(
-          "/batteries/[id]",
-          ctx.role,
-          record.recordNumber,
-        )}
-      />
-
+    <PageShell>
       <RecordHeader
         record={record}
         container={container}
         clock={clock}
         role={ctx.role}
         documentsHref={documentsHref}
-      />
+        breadcrumbs={
+          <Breadcrumbs
+            crumbs={breadcrumbTrail(
+              "/batteries/[id]",
+              ctx.role,
+              record.recordNumber,
+            )}
+          />
+        }
+        notice={
+          <>
+            {/* Pinned directly below the title, in §2.9's slot. The decision is
+                the domain's, not this page's. */}
+            {showsReadOnlyBanner({
+              role: ctx.role,
+              routeHasMutatingControls: true,
+            }) ? (
+              <ReadOnlyBanner />
+            ) : null}
 
-      {/* Pinned directly below the title, and it is the only thing that goes
-          there (§2.9). The decision is the domain's, not this page's. */}
-      {showsReadOnlyBanner({
-        role: ctx.role,
-        routeHasMutatingControls: true,
-      }) ? (
-        <ReadOnlyBanner />
-      ) : null}
+            {/* Persistent on every tab, and non-dismissible for every role
+                including P6 (Rules 6.8, 6.17). */}
+            <DdrBlockAlert record={record} assessment={currentAssessment} />
 
-      {/* Persistent on every tab, and non-dismissible for every role including
-          P6 (Rules 6.8, 6.17). */}
-      <DdrBlockAlert record={record} assessment={currentAssessment} />
-
-      <RecordActions
-        role={ctx.role}
-        capability={capability}
-        recordId={record.id}
+            {/* E-8a's disabled controls sit inside the header rather than in a
+                row of their own between the block and the tabs. Every mutating
+                affordance on this record is then in one place, which is what an
+                auditor is on this screen to find. */}
+            <RecordActions
+              role={ctx.role}
+              capability={capability}
+              recordId={record.id}
+            />
+          </>
+        }
       />
 
       <RecordTabs basePath={basePath} query={query} active={tab} />
@@ -188,6 +197,6 @@ export default async function BatteryRecordPage({
       {tab === "history" ? (
         <HistoryTab ctx={ctx} record={record} timeZone={timeZone} />
       ) : null}
-    </div>
+    </PageShell>
   );
 }

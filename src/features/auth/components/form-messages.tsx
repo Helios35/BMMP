@@ -2,6 +2,7 @@ import { CircleAlert } from "lucide-react";
 
 import { INTENT_SURFACE_CLASSES } from "@/components/status/intent-classes";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { LeadingIcon } from "@/components/page/leading-icon";
 import { cn } from "@/lib/utils";
 
 /**
@@ -45,9 +46,9 @@ export function FieldError({
     <p
       id={id}
       role="alert"
-      className="flex items-start gap-1.5 text-caption text-intent-attention-foreground"
+      className="flex items-start gap-2 text-caption text-intent-attention-foreground"
     >
-      <CircleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+      <LeadingIcon icon={CircleAlert} size="caption" glyph="sm" />
       <span>{message}</span>
     </p>
   );

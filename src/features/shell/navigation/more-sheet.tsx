@@ -125,7 +125,7 @@ export function MoreSheet({
 
         <Separator className="my-2" />
 
-        <div className="flex flex-col gap-0.5 px-4 pb-3">
+        <div className="flex flex-col gap-1 px-4 pb-3">
           <p className="truncate text-body-strong">{displayName}</p>
           {/* Metadata, which is what muted is permitted for (UX_SPEC.md §1.2 Rule 3). */}
           <p className="truncate text-caption text-muted-foreground">{email}</p>

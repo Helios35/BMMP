@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { Suspense } from "react";
 
+import { ACTION_BUTTON_CLASS, PageHeader, PageShell } from "@/components/page";
+import { Button } from "@/components/ui/button";
 import { data } from "@/data";
 import type { RequestContext } from "@/data/contracts";
 import { canReadRoute } from "@/domain/access/route-capability";
@@ -8,7 +11,6 @@ import { APP_ROUTE_NAMES } from "@/domain/access/routes";
 import {
   AlertsRegion,
   AlertsRegionSkeleton,
-  DashboardHeader,
   dashboardPrimaryAction,
   hasOpenStorageClockAlert,
   QuickActionsRegion,
@@ -101,21 +103,35 @@ export default async function DashboardPage() {
   const showsReviewQueue = reviewQueueFraming(ctx.role) !== null;
 
   return (
-    <div className="flex flex-col gap-8">
-      <DashboardHeader action={primaryAction} />
-
-      {isIntakeBlocked ? (
-        <IntakeBlockedNotice
-          gate={gate}
-          // Never a link the role will be redirected away from: P1, P3, P4 and
-          // P5 cannot reach organization settings, so they are given the names
-          // and no link (E-11 generalised, §5.3(7)).
-          canReachOrganizationSettings={canReadRoute(
-            ctx.role,
-            "/settings/organization",
-          )}
-        />
-      ) : null}
+    <PageShell>
+      <PageHeader
+        title={APP_ROUTE_NAMES["/"]}
+        action={
+          primaryAction === null ? undefined : (
+            <Button asChild size="lg" className={ACTION_BUTTON_CLASS}>
+              <Link href={primaryAction.href} data-primary-action="true">
+                {primaryAction.label}
+              </Link>
+            </Button>
+          )
+        }
+        // §2.9's slot. E-12 qualifies what this whole page can offer, so it is
+        // pinned to the header rather than floating between two regions.
+        notice={
+          isIntakeBlocked ? (
+            <IntakeBlockedNotice
+              gate={gate}
+              // Never a link the role will be redirected away from: P1, P3, P4
+              // and P5 cannot reach organization settings, so they are given the
+              // names and no link (E-11 generalised, §5.3(7)).
+              canReachOrganizationSettings={canReadRoute(
+                ctx.role,
+                "/settings/organization",
+              )}
+            />
+          ) : undefined
+        }
+      />
 
       {batteryCount === 0 ? (
         <ZeroBatteriesCard
@@ -144,7 +160,7 @@ export default async function DashboardPage() {
       </Suspense>
 
       <QuickActionsRegion role={ctx.role} isIntakeBlocked={isIntakeBlocked} />
-    </div>
+    </PageShell>
   );
 }
 

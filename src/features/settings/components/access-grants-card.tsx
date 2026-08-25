@@ -1,9 +1,9 @@
 import { CircleCheck, CircleSlash } from "lucide-react";
 
 import { StatusBadge } from "@/components/status/status-badge";
-import { Card, CardContent } from "@/components/ui/card";
 import type { GrantLapseReason } from "@/domain/access/grant";
 import type { TimeZone } from "@/types/common";
+import { SectionCard } from "@/components/page";
 import { GRANT_ALWAYS_EXPIRES_NOTE } from "../member-rules";
 import type { MemberRow } from "../read-members";
 import {
@@ -64,29 +64,23 @@ export function AccessGrantsCard({
       title="Access grants"
       description="Access held by grant rather than by employment — an external auditor, or a platform administrator working inside this organization under a recorded support request."
     >
-      <Card>
-        <CardContent className="flex flex-col gap-4">
-          {rows.length === 0 ? (
-            <p className="text-body text-muted-foreground">
-              No access grants are recorded for this organization.
-            </p>
-          ) : (
-            <ul className="flex flex-col gap-4">
-              {rows.map((row) => (
-                <GrantRow
-                  key={row.membership.id}
-                  row={row}
-                  timeZone={timeZone}
-                />
-              ))}
-            </ul>
-          )}
-
-          <p className="max-w-[72ch] text-body text-muted-foreground">
-            {GRANT_ALWAYS_EXPIRES_NOTE}
+      <SectionCard>
+        {rows.length === 0 ? (
+          <p className="text-body text-muted-foreground">
+            No access grants are recorded for this organization.
           </p>
-        </CardContent>
-      </Card>
+        ) : (
+          <ul className="flex flex-col gap-4">
+            {rows.map((row) => (
+              <GrantRow key={row.membership.id} row={row} timeZone={timeZone} />
+            ))}
+          </ul>
+        )}
+
+        <p className="max-w-[72ch] text-body text-muted-foreground">
+          {GRANT_ALWAYS_EXPIRES_NOTE}
+        </p>
+      </SectionCard>
     </SettingsSection>
   );
 }

@@ -9,11 +9,14 @@ import {
   type RecordTableErrorState,
 } from "@/components/record-table/record-table";
 import { ReadOnlyBanner } from "@/components/access/read-only-banner";
+import { PageHeader, PageShell } from "@/components/page";
+import { showsReadOnlyBanner } from "@/domain/access/control-treatment";
 import { data } from "@/data";
 import type { Page } from "@/data/contracts";
 import { APP_ROUTE_NAMES } from "@/domain/access/routes";
 import type { AuditEvent } from "@/types/audit";
 import { readAuditActorDirectory } from "@/features/audit/audit-actors";
+import { AUDIT_PAGE_DESCRIPTION } from "@/features/audit/audit-copy";
 import { auditFilters } from "@/features/audit/audit-filters";
 import {
   AUDIT_LIST_SPEC,
@@ -120,25 +123,31 @@ export default async function AuditPage({
     toAuditRowView(event, directory, ctx.role, timeZone),
   );
 
-  // UX_SPEC.md §3.20 fixes the banner on this route explicitly, and it is the
-  // one route where it is not a function of mutating controls: nobody may change
-  // an audit event, so `showsReadOnlyBanner` cannot decide it. See the build
-  // notes.
-  const showsBanner = ctx.role === "auditor";
+  // §3.20 pins the banner to this route, and it is the one route where the
+  // answer is not a function of mutating controls: nobody may change an audit
+  // event, for any role including P6 (Rule 1.21), so there is nothing to
+  // disable and `routeHasMutatingControls` is honestly `false`.
+  //
+  // **The decision is still the domain's.** Unit 01 rendered the banner from a
+  // role literal on this page with a comment; `showsReadOnlyBanner` now takes
+  // the third input the case needs, so no screen re-derives an access answer.
+  const showsBanner = showsReadOnlyBanner({
+    role: ctx.role,
+    routeHasMutatingControls: false,
+    bannerIsFixedOnRoute: true,
+  });
 
   return (
-    <div className="flex flex-col gap-6">
-      <h1 id="page-title" tabIndex={-1} className="text-h1 lg:text-display">
-        {APP_ROUTE_NAMES["/audit"]}
-      </h1>
-
-      {showsBanner ? <ReadOnlyBanner /> : null}
-
-      <p className="max-w-[72ch] text-body text-muted-foreground">
-        Every action this organization and this system took, newest first. The
-        log is append-only: no one can edit or remove a row, and refused actions
-        are recorded here alongside the ones that went through.
-      </p>
+    <PageShell>
+      <PageHeader
+        title={APP_ROUTE_NAMES["/audit"]}
+        description={AUDIT_PAGE_DESCRIPTION}
+        // §2.9 pins the banner directly below the page title, and this is the
+        // only slot that puts it there. Export is not a header action: §3.20
+        // requires it to carry the screen's current filter state, which makes
+        // it a control that reads the toolbar it sits in.
+        notice={showsBanner ? <ReadOnlyBanner /> : undefined}
+      />
 
       <RecordTable
         caption="Audit log, newest first"
@@ -161,22 +170,25 @@ export default async function AuditPage({
           searchSuggestion: "Try an event type or an actor.",
         }}
         error={tableError}
+        // The date range narrows the list, so it sits in the filter row with
+        // the other filters. The export acts on the narrowing, so it sits with
+        // the search (§2.7, §3.20).
+        filterControls={
+          <AuditRangeFilter
+            basePath="/audit"
+            query={query}
+            spec={AUDIT_LIST_SPEC}
+            zoneLabel={formatAuditTimestamp(nowIso(), timeZone).zone}
+          />
+        }
         toolbar={
-          <>
-            <AuditRangeFilter
-              basePath="/audit"
-              query={query}
-              spec={AUDIT_LIST_SPEC}
-              zoneLabel={formatAuditTimestamp(nowIso(), timeZone).zone}
-            />
-            <AuditExportControl
-              href={auditExportHref(query)}
-              role={ctx.role}
-              capability={capability}
-            />
-          </>
+          <AuditExportControl
+            href={auditExportHref(query)}
+            role={ctx.role}
+            capability={capability}
+          />
         }
       />
-    </div>
+    </PageShell>
   );
 }

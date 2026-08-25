@@ -3,12 +3,12 @@ import type { ReactElement } from "react";
 
 import { INTENT_ICON, INTENT_TEXT_CLASSES } from "@/components";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { SectionCard } from "@/components/page";
 import { data } from "@/data";
 import type { RequestContext } from "@/data/contracts";
 import { canReadRoute, canWriteRoute } from "@/domain/access/route-capability";
 import type { RoleCode } from "@/domain/taxonomy/role";
-import { cn } from "@/lib/utils";
+import { LeadingIcon } from "@/components/page/leading-icon";
 
 import { REVIEW_QUEUE } from "./cross-route-links";
 import {
@@ -123,32 +123,24 @@ export async function ReviewQueueRegion({
       title={REGION_TITLE}
       state={isClear ? "empty" : "default"}
     >
-      <Card data-intent={intent} className="gap-0">
-        <CardContent className="flex flex-col gap-3 py-1">
-          <div className="flex items-start gap-3">
-            <Icon
-              aria-hidden="true"
-              className={cn(
-                "mt-0.5 size-5 shrink-0",
-                INTENT_TEXT_CLASSES[intent],
-              )}
-            />
-            <p
-              data-review-count={count}
-              className="max-w-[72ch] text-body-strong text-balance"
-            >
-              {reviewQueueMessage(framing, count)}
-            </p>
+      <SectionCard dataAttributes={{ "data-intent": intent }}>
+        <div className="flex items-start gap-3">
+          <LeadingIcon icon={Icon} className={INTENT_TEXT_CLASSES[intent]} />
+          <p
+            data-review-count={count}
+            className="max-w-[72ch] text-body-strong text-balance"
+          >
+            {reviewQueueMessage(framing, count)}
+          </p>
+        </div>
+        {isClear ? null : (
+          <div className="pl-8">
+            <Button asChild variant="outline" size="lg" className="min-h-11">
+              <Link href={REVIEW_QUEUE.href}>{REVIEW_QUEUE.label}</Link>
+            </Button>
           </div>
-          {isClear ? null : (
-            <div className="pl-8">
-              <Button asChild variant="outline" size="lg" className="min-h-11">
-                <Link href={REVIEW_QUEUE.href}>{REVIEW_QUEUE.label}</Link>
-              </Button>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+        )}
+      </SectionCard>
     </DashboardRegion>
   );
 }

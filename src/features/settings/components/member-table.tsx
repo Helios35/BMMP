@@ -166,7 +166,7 @@ function CardField({
   readonly children: React.ReactNode;
 }) {
   return (
-    <div className="flex flex-col gap-0.5">
+    <div className="flex flex-col gap-1">
       <dt className="text-caption text-muted-foreground">{label}</dt>
       <dd className="text-body">{children}</dd>
     </div>

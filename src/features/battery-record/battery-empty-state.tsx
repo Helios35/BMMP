@@ -1,8 +1,7 @@
-import Link from "next/link";
 import type { ReactElement } from "react";
 import { BatteryCharging } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/page/empty-state";
 import { canReadRoute, canWriteRoute } from "@/domain/access/route-capability";
 import type { AppRoute } from "@/domain/access/routes";
 import type { RoleCode } from "@/domain/taxonomy/role";
@@ -110,22 +109,18 @@ export function BatteryEmptyState({
       : canReadRoute(role, action.route));
 
   return (
-    <div
-      role="status"
-      data-empty-role={role}
-      className="flex flex-col items-start gap-3 rounded-lg border border-border p-6"
-    >
-      <div className="flex items-center gap-2">
-        <BatteryCharging aria-hidden="true" className="size-5" />
-        <p className="max-w-[72ch] text-body-strong">{variant.message}</p>
-      </div>
-      {isOffered ? (
-        <Button asChild size="lg" className="min-h-11 rounded-md">
-          <Link href={action.route} data-empty-action={action.route}>
-            {action.label}
-          </Link>
-        </Button>
-      ) : null}
-    </div>
+    <EmptyState
+      icon={BatteryCharging}
+      // §5 E-1's sentence, whole. It is never split across a headline and a
+      // body: three e2e specs read it back as one rendered paragraph, and the
+      // words are the specification's rather than this build's.
+      title={variant.message}
+      action={
+        isOffered
+          ? { label: action.label, href: action.route, testId: action.route }
+          : null
+      }
+      dataAttributes={{ "data-empty-role": role }}
+    />
   );
 }

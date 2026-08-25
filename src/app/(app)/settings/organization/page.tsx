@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 
+import { PageColumns, PageHeader, PageShell } from "@/components/page";
 import { APP_ROUTE_NAMES } from "@/domain/access/routes";
 import { requireRoute } from "@/lib/auth/guard";
 import {
@@ -24,6 +25,7 @@ import {
   TermsOfServiceCard,
   TERMS_SECTION_ID,
 } from "@/features/settings/components/terms-of-service-card";
+import { ORGANIZATION_PAGE_DESCRIPTION } from "@/features/settings/copy";
 import { readOrganizationSettings } from "@/features/settings/read-organization-settings";
 
 /**
@@ -68,46 +70,45 @@ export default async function OrganizationSettingsPage() {
   const view = await readOrganizationSettings(ctx);
 
   return (
-    <div className="flex flex-col gap-6 p-4 md:p-6">
-      <header className="flex flex-col gap-2">
-        {/* The shell's route announcer moves focus here on every navigation. */}
-        <h1 id="page-title" tabIndex={-1} className="text-h1 lg:text-display">
-          {APP_ROUTE_NAMES["/settings/organization"]}
-        </h1>
-        <p className="max-w-[72ch] text-body text-muted-foreground">
-          {view.organization.name}. Everything on this page is read-only in this
-          release.
-        </p>
-      </header>
+    <PageShell>
+      <PageHeader
+        title={APP_ROUTE_NAMES["/settings/organization"]}
+        // The organization's name is a **value**, so it sits in the subtitle at
+        // full contrast rather than inside a muted helper sentence (§1.2 Rule
+        // 3). The words are unchanged; only which line each sits on has moved.
+        // It also makes the description a constant, which is what lets the
+        // loading skeleton occupy exactly its space (§6.3).
+        subtitle={view.organization.name}
+        description={ORGANIZATION_PAGE_DESCRIPTION}
+        // E-11, pinned below the title as §3.17 requires. A lapsed verification
+        // and an absent one reach this alert from opposite directions and it
+        // renders identically for both (D-32).
+        notice={
+          <EmergencyContactUnverifiedAlert contact={view.emergencyContact} />
+        }
+      />
 
-      {/* E-11, at the top of the page as §3.17 requires. A lapsed verification
-          and an absent one reach this alert from opposite directions and it
-          renders identically for both (D-32). */}
-      <EmergencyContactUnverifiedAlert contact={view.emergencyContact} />
-
-      <div className="flex flex-col gap-6 lg:flex-row lg:gap-10">
-        <SettingsSectionNav
-          sections={SECTIONS}
-          label="Organization settings sections"
+      <PageColumns
+        aside={
+          <SettingsSectionNav
+            sections={SECTIONS}
+            label="Organization settings sections"
+          />
+        }
+      >
+        <OrganizationProfileCard organization={view.organization} />
+        <EmergencyContactCard
+          contact={view.emergencyContact}
+          timeZone={view.organization.timeZone}
         />
-
-        <div className="flex min-w-0 flex-1 flex-col gap-10">
-          <OrganizationProfileCard organization={view.organization} />
-          <EmergencyContactCard
-            contact={view.emergencyContact}
-            timeZone={view.organization.timeZone}
-          />
-          <ClockMethodCard
-            sites={view.profiles.map((profile) => profile.site)}
-          />
-          <SiteJurisdictionSection profiles={view.profiles} />
-          <TermsOfServiceCard
-            consent={view.consent}
-            gate={view.gate}
-            timeZone={view.organization.timeZone}
-          />
-        </div>
-      </div>
-    </div>
+        <ClockMethodCard sites={view.profiles.map((profile) => profile.site)} />
+        <SiteJurisdictionSection profiles={view.profiles} />
+        <TermsOfServiceCard
+          consent={view.consent}
+          gate={view.gate}
+          timeZone={view.organization.timeZone}
+        />
+      </PageColumns>
+    </PageShell>
   );
 }

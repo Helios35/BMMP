@@ -2,7 +2,6 @@ import { CircleAlert, Info } from "lucide-react";
 
 import { INTENT_SURFACE_CLASSES } from "@/components/status/intent-classes";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Card, CardContent } from "@/components/ui/card";
 import { NO_BINDING_AUTHORITY_REMEDY } from "@/domain/consent/binding-authority";
 import { ROLE_LABELS } from "@/domain/taxonomy/role";
 import { cn } from "@/lib/utils";
@@ -11,6 +10,7 @@ import {
   LAST_BINDING_AUTHORITY_REMEDY,
 } from "../member-rules";
 import type { MemberRow } from "../read-members";
+import { SectionCard } from "@/components/page";
 import { SettingsSection } from "./settings-primitives";
 
 /**
@@ -44,66 +44,61 @@ export function BindingAuthorityCard({
       title="Binding authority"
       description={`Who can accept the Terms of Service on this organization's behalf. It is held by a ${ROLE_LABELS.facility_manager} membership, assigned as its own recorded act.`}
     >
-      <Card>
-        <CardContent className="flex flex-col gap-4">
-          {holders.length === 0 ? (
-            <Alert
-              role="status"
-              data-binding-authority-state="none"
-              className={cn(
-                INTENT_SURFACE_CLASSES.attention,
-                "gap-2 px-4 py-4",
-              )}
-            >
-              <CircleAlert aria-hidden="true" className="size-5" />
-              <AlertTitle className="text-body-strong">
-                No one currently holds binding authority.
-              </AlertTitle>
-              <AlertDescription className="max-w-[72ch] text-body text-current">
-                {NO_BINDING_AUTHORITY_REMEDY}
-              </AlertDescription>
-            </Alert>
-          ) : (
-            <ul
-              className="flex flex-col gap-2"
-              data-holder-count={holders.length}
-            >
-              {holders.map((holder) => (
-                <li
-                  key={holder.membership.id}
-                  className="flex flex-wrap items-baseline gap-x-2 gap-y-1"
-                >
-                  <span className="text-body-strong break-words">
-                    {holder.displayName}
-                  </span>
-                  <span className="text-caption text-muted-foreground">
-                    {ROLE_LABELS[holder.membership.role]}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
+      <SectionCard>
+        {holders.length === 0 ? (
+          <Alert
+            role="status"
+            data-binding-authority-state="none"
+            className={cn(INTENT_SURFACE_CLASSES.attention, "gap-2 px-4 py-4")}
+          >
+            <CircleAlert aria-hidden="true" className="size-5" />
+            <AlertTitle className="text-body-strong">
+              No one currently holds binding authority.
+            </AlertTitle>
+            <AlertDescription className="max-w-[72ch] text-body text-current">
+              {NO_BINDING_AUTHORITY_REMEDY}
+            </AlertDescription>
+          </Alert>
+        ) : (
+          <ul
+            className="flex flex-col gap-2"
+            data-holder-count={holders.length}
+          >
+            {holders.map((holder) => (
+              <li
+                key={holder.membership.id}
+                className="flex flex-wrap items-baseline gap-x-2 gap-y-1"
+              >
+                <span className="text-body-strong break-words">
+                  {holder.displayName}
+                </span>
+                <span className="text-caption text-muted-foreground">
+                  {ROLE_LABELS[holder.membership.role]}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
 
-          {holders.length === 1 ? (
-            <Alert
-              role="status"
-              data-binding-authority-state="last-holder"
-              className={cn(
-                "gap-2 border px-4 py-4",
-                INTENT_SURFACE_CLASSES.neutral,
-              )}
-            >
-              <Info aria-hidden="true" className="size-5" />
-              <AlertTitle className="text-body-strong">
-                {LAST_BINDING_AUTHORITY_HEADLINE}
-              </AlertTitle>
-              <AlertDescription className="max-w-[72ch] text-body text-current">
-                {LAST_BINDING_AUTHORITY_REMEDY}
-              </AlertDescription>
-            </Alert>
-          ) : null}
-        </CardContent>
-      </Card>
+        {holders.length === 1 ? (
+          <Alert
+            role="status"
+            data-binding-authority-state="last-holder"
+            className={cn(
+              "gap-2 border px-4 py-4",
+              INTENT_SURFACE_CLASSES.neutral,
+            )}
+          >
+            <Info aria-hidden="true" className="size-5" />
+            <AlertTitle className="text-body-strong">
+              {LAST_BINDING_AUTHORITY_HEADLINE}
+            </AlertTitle>
+            <AlertDescription className="max-w-[72ch] text-body text-current">
+              {LAST_BINDING_AUTHORITY_REMEDY}
+            </AlertDescription>
+          </Alert>
+        ) : null}
+      </SectionCard>
     </SettingsSection>
   );
 }

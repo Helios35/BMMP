@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { ReactElement } from "react";
 
 import { StatusBadge } from "@/components";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { SectionCard } from "@/components/page";
 import {
   Table,
   TableBody,
@@ -47,68 +47,60 @@ export function MatchedRecords({
   canOpenRecord,
 }: MatchedRecordsProps): ReactElement {
   return (
-    <Card className="gap-4">
-      <CardHeader>
-        <CardTitle className="text-h2">Matched records</CardTitle>
-      </CardHeader>
-      <CardContent>
-        {records.length === 0 ? (
-          <p data-matched-state="empty" className="text-body">
-            {NO_MATCHED_RECORDS}
-          </p>
-        ) : (
-          <Table data-matched-state="default">
-            <TableCaption className="sr-only">
-              Battery records matched to this catalog entry
-            </TableCaption>
-            <TableHeader>
-              <TableRow className="hover:bg-transparent">
-                <TableHead scope="col" className="h-11 px-3 text-label">
-                  Record
-                </TableHead>
-                <TableHead scope="col" className="h-11 px-3 text-label">
-                  Assessed condition
-                </TableHead>
-                <TableHead scope="col" className="h-11 px-3 text-label">
-                  Logged
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {records.map((record) => (
-                <TableRow
-                  key={record.id}
-                  className="h-14 border-border lg:h-12"
-                >
-                  <TableCell className="px-3 py-2 text-mono">
-                    {canOpenRecord ? (
-                      <Link
-                        href={`/batteries/${record.id}`}
-                        className="inline-flex min-h-11 items-center rounded-md underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none"
-                      >
-                        {record.recordNumber}
-                      </Link>
-                    ) : (
-                      record.recordNumber
-                    )}
-                  </TableCell>
-                  <TableCell className="px-3 py-2">
-                    {/* T-49, through the one intent map. The component never
+    <SectionCard title="Matched records">
+      {records.length === 0 ? (
+        <p data-matched-state="empty" className="text-body">
+          {NO_MATCHED_RECORDS}
+        </p>
+      ) : (
+        <Table data-matched-state="default">
+          <TableCaption className="sr-only">
+            Battery records matched to this catalog entry
+          </TableCaption>
+          <TableHeader>
+            <TableRow className="hover:bg-transparent">
+              <TableHead scope="col" className="h-11 px-3 text-label">
+                Record
+              </TableHead>
+              <TableHead scope="col" className="h-11 px-3 text-label">
+                Assessed condition
+              </TableHead>
+              <TableHead scope="col" className="h-11 px-3 text-label">
+                Logged
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {records.map((record) => (
+              <TableRow key={record.id} className="h-14 border-border lg:h-12">
+                <TableCell className="px-3 py-2 text-mono">
+                  {canOpenRecord ? (
+                    <Link
+                      href={`/batteries/${record.id}`}
+                      className="inline-flex min-h-11 items-center rounded-md underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none"
+                    >
+                      {record.recordNumber}
+                    </Link>
+                  ) : (
+                    record.recordNumber
+                  )}
+                </TableCell>
+                <TableCell className="px-3 py-2">
+                  {/* T-49, through the one intent map. The component never
                         picks a colour and this file never writes a label. */}
-                    <StatusBadge
-                      system="assessed_condition"
-                      value={record.assessedCondition}
-                    />
-                  </TableCell>
-                  <TableCell className="px-3 py-2 text-body">
-                    {catalogDateLabel(record.createdAt)}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        )}
-      </CardContent>
-    </Card>
+                  <StatusBadge
+                    system="assessed_condition"
+                    value={record.assessedCondition}
+                  />
+                </TableCell>
+                <TableCell className="px-3 py-2 text-body">
+                  {catalogDateLabel(record.createdAt)}
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      )}
+    </SectionCard>
   );
 }

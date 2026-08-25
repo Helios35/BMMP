@@ -90,7 +90,7 @@ export function FieldSourceBadge({
       // Always visible text, never a bare icon: a badge with no text is a
       // decoration and is not permitted (§1.2 Rule 4).
       className={cn(
-        "h-6 gap-1.5 rounded-md border px-2 font-medium",
+        "h-6 gap-2 rounded-md border px-2",
         INTENT_SURFACE_CLASSES.neutral,
         className,
       )}

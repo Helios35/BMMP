@@ -1,6 +1,11 @@
 import type { Metadata } from "next";
 
-import { Card, CardContent } from "@/components/ui/card";
+import {
+  PageColumns,
+  PageHeader,
+  PageShell,
+  SectionCard,
+} from "@/components/page";
 import { APP_ROUTE_NAMES } from "@/domain/access/routes";
 import { requireRoute } from "@/lib/auth/guard";
 import { data } from "@/data";
@@ -15,6 +20,7 @@ import {
 import { MemberTable } from "@/features/settings/components/member-table";
 import { SettingsSection } from "@/features/settings/components/settings-primitives";
 import { SettingsSectionNav } from "@/features/settings/components/settings-section-nav";
+import { MEMBERS_PAGE_DESCRIPTION } from "@/features/settings/copy";
 import { DEACTIVATE_CONFIRMATION_BODY } from "@/features/settings/member-rules";
 import { readMembers } from "@/features/settings/read-members";
 
@@ -75,48 +81,41 @@ export default async function MembersAndRolesPage() {
   const timeZone = organization.timeZone;
 
   return (
-    <div className="flex flex-col gap-6 p-4 md:p-6">
-      <header className="flex flex-col gap-2">
-        <h1 id="page-title" tabIndex={-1} className="text-h1 lg:text-display">
-          {APP_ROUTE_NAMES["/settings/users"]}
-        </h1>
-        <p className="max-w-[72ch] text-body text-muted-foreground">
-          Who is in this organization and what each of them can do. Everything
-          on this page is read-only in this release.
-        </p>
-      </header>
+    <PageShell>
+      <PageHeader
+        title={APP_ROUTE_NAMES["/settings/users"]}
+        description={MEMBERS_PAGE_DESCRIPTION}
+      />
 
-      <div className="flex flex-col gap-6 lg:flex-row lg:gap-10">
-        <SettingsSectionNav
-          sections={SECTIONS}
-          label="Members and roles sections"
-        />
+      <PageColumns
+        aside={
+          <SettingsSectionNav
+            sections={SECTIONS}
+            label="Members and roles sections"
+          />
+        }
+      >
+        <SettingsSection
+          id={MEMBERS_SECTION_ID}
+          title="Members"
+          description="Each role's description is computed from the same access map the guard enforces, so it cannot drift from what a person can actually open."
+        >
+          <SectionCard>
+            <MemberTable rows={members.rows} timeZone={timeZone} />
+            {/* Rule 1.13 — members are deactivated, never deleted. Stated here
+                because a reader looking for a way to remove someone should
+                learn now that removal is not what happens. */}
+            <p className="max-w-[72ch] text-body text-muted-foreground">
+              Members are deactivated, never deleted.{" "}
+              {DEACTIVATE_CONFIRMATION_BODY}
+            </p>
+          </SectionCard>
+        </SettingsSection>
 
-        <div className="flex min-w-0 flex-1 flex-col gap-10">
-          <SettingsSection
-            id={MEMBERS_SECTION_ID}
-            title="Members"
-            description="Each role's description is computed from the same access map the guard enforces, so it cannot drift from what a person can actually open."
-          >
-            <Card>
-              <CardContent className="flex flex-col gap-4">
-                <MemberTable rows={members.rows} timeZone={timeZone} />
-                {/* Rule 1.13 — members are deactivated, never deleted. Stated
-                    here because a reader looking for a way to remove someone
-                    should learn now that removal is not what happens. */}
-                <p className="max-w-[72ch] text-body text-muted-foreground">
-                  Members are deactivated, never deleted.{" "}
-                  {DEACTIVATE_CONFIRMATION_BODY}
-                </p>
-              </CardContent>
-            </Card>
-          </SettingsSection>
+        <BindingAuthorityCard holders={members.bindingAuthorityHolders} />
 
-          <BindingAuthorityCard holders={members.bindingAuthorityHolders} />
-
-          <AccessGrantsCard rows={members.grantedRows} timeZone={timeZone} />
-        </div>
-      </div>
-    </div>
+        <AccessGrantsCard rows={members.grantedRows} timeZone={timeZone} />
+      </PageColumns>
+    </PageShell>
   );
 }

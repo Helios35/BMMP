@@ -109,3 +109,17 @@ export const NO_RULES_FOR_JURISDICTION =
  */
 export const TOS_PRIOR_VERSION_NOTE =
   "Each accepted version stays on file permanently, because it governs the records captured under it.";
+
+/**
+ * The two settings pages' descriptions.
+ *
+ * Constants because **each page's loading skeleton renders the same sentence
+ * invisibly**, so it occupies exactly the space the real one will at every width
+ * (`UX_SPEC.md` §6.3). Inline strings would drift the first time a word changed,
+ * and the drift would be a silent jump under the reader rather than a failure.
+ */
+export const ORGANIZATION_PAGE_DESCRIPTION =
+  "Everything on this page is read-only in this release.";
+
+export const MEMBERS_PAGE_DESCRIPTION =
+  "Who is in this organization and what each of them can do. Everything on this page is read-only in this release.";

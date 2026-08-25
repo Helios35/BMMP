@@ -19,6 +19,7 @@ import {
   type AlertType,
 } from "@/domain/taxonomy/alert-type";
 import type { Alert } from "@/types/storage";
+import { LeadingIcon } from "@/components/page/leading-icon";
 
 /**
  * `AlertCard` — `UX_SPEC.md` §2.11.
@@ -99,20 +100,15 @@ export function AlertCard({
       />
 
       <CardContent className="flex flex-1 items-start gap-3 py-1">
-        <Icon
-          aria-hidden="true"
-          className={cn("mt-0.5 size-5 shrink-0", INTENT_TEXT_CLASSES[intent])}
-        />
+        <LeadingIcon icon={Icon} className={INTENT_TEXT_CLASSES[intent]} />
 
         <div className="flex min-w-0 flex-1 flex-col gap-1">
           <div className="flex items-center gap-2">
-            <p className="text-base leading-snug font-semibold text-balance">
-              {alert.title}
-            </p>
+            <p className="text-body-strong text-balance">{alert.title}</p>
             {isPinned ? (
               <span
                 data-alert-pinned
-                className="inline-flex items-center gap-1 text-[0.8125rem] text-muted-foreground"
+                className="inline-flex items-center gap-1 text-caption text-muted-foreground"
               >
                 <Pin aria-hidden="true" className="size-3.5" />
                 Pinned
@@ -120,9 +116,9 @@ export function AlertCard({
             ) : null}
           </div>
 
-          <p className="text-sm leading-relaxed">{alert.body}</p>
+          <p className="text-body">{alert.body}</p>
 
-          <p className="text-[0.8125rem] text-muted-foreground">
+          <p className="text-caption text-muted-foreground">
             {ALERT_TYPE_LABELS[alert.alertType]}
           </p>
 
@@ -135,7 +131,7 @@ export function AlertCard({
           ) : null}
 
           {action === undefined && deniedNote !== undefined ? (
-            <p data-alert-denied className="pt-1 text-sm font-medium">
+            <p data-alert-denied className="pt-1 text-label">
               {deniedNote}
             </p>
           ) : null}
@@ -187,7 +183,7 @@ export function AlertCardEmpty({
           aria-hidden="true"
           className={cn("size-5 shrink-0", INTENT_TEXT_CLASSES.ok)}
         />
-        <p className="text-sm">{message}</p>
+        <p className="text-body">{message}</p>
       </CardContent>
     </Card>
   );
@@ -227,14 +223,11 @@ export function AlertRegionError({
         )}
       />
       <CardContent className="flex flex-1 items-start gap-3 py-1">
-        <BellOff
-          aria-hidden="true"
-          className={cn("mt-0.5 size-5 shrink-0", INTENT_TEXT_CLASSES.critical)}
-        />
+        <LeadingIcon icon={BellOff} className={INTENT_TEXT_CLASSES.critical} />
         <div className="flex flex-1 flex-col gap-1">
-          <p className="text-base leading-snug font-semibold">{message}</p>
+          <p className="text-body-strong">{message}</p>
           {correlationId !== undefined ? (
-            <p className="font-mono text-[0.8125rem] text-muted-foreground">
+            <p className="font-mono text-caption text-muted-foreground">
               {correlationId}
             </p>
           ) : null}

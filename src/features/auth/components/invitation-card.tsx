@@ -5,6 +5,7 @@ import { INTENT_SURFACE_CLASSES } from "@/components/status/intent-classes";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { CARD_SPACING } from "@/components/page";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { readableRoutesFor } from "@/domain/access/route-capability";
 import {
@@ -147,7 +148,7 @@ export function InvitationCard({
       : `${invitation.invitedByName} invited you to join ${invitation.organizationName}.`;
 
   return (
-    <Card>
+    <Card className={CARD_SPACING}>
       <CardHeader>
         <CardTitle className="text-h2">
           <h1 id="page-title" tabIndex={-1}>
@@ -209,8 +210,8 @@ function UnusableInvitationCard({
   const copy = UNUSABLE_COPY[state];
 
   return (
-    <Card>
-      <CardContent className="grid gap-4 pt-6">
+    <Card className={CARD_SPACING}>
+      <CardContent className="grid gap-4">
         <Alert
           className={cn(INTENT_SURFACE_CLASSES.attention, "gap-2 px-4 py-4")}
           role="status"

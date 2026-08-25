@@ -2,9 +2,12 @@ import Link from "next/link";
 import type { ReactElement, ReactNode } from "react";
 
 import {
+  ACTION_BUTTON_CLASS,
+  EmptyState,
   INTENT_ICON,
   INTENT_SURFACE_CLASSES,
-  INTENT_TEXT_CLASSES,
+  LeadingIcon,
+  PageSection,
 } from "@/components";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -48,21 +51,21 @@ export function DashboardRegion({
 }: DashboardRegionProps): ReactElement {
   const headingId = `dashboard-region-${id}`;
 
+  // The dashboard's regions are `PageSection`s with two extra hooks: every
+  // region on `/` owns its own loading, error and empty state, and a spec reads
+  // `data-region-state` rather than guessing at classes.
   return (
-    <section
-      aria-labelledby={headingId}
-      data-dashboard-region={id}
-      data-region-state={state}
-      className="flex flex-col gap-3"
+    <PageSection
+      id={headingId}
+      title={title}
+      action={headingAction}
+      dataAttributes={{
+        "data-dashboard-region": id,
+        "data-region-state": state,
+      }}
     >
-      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-        <h2 id={headingId} className="text-h2">
-          {title}
-        </h2>
-        {headingAction}
-      </div>
       {children}
-    </section>
+    </PageSection>
   );
 }
 
@@ -90,17 +93,24 @@ export function DashboardRegionError({
       data-region-state="error"
       className={cn("gap-0 border", INTENT_SURFACE_CLASSES.critical)}
     >
-      <CardContent className="flex flex-col items-start gap-2 py-1">
+      <CardContent className="flex flex-col items-start gap-4">
         <div className="flex items-start gap-3">
-          <Icon aria-hidden="true" className="mt-0.5 size-5 shrink-0" />
-          <p className="max-w-[72ch] text-body-strong">{message}</p>
+          <LeadingIcon icon={Icon} />
+          <div className="flex min-w-0 flex-col gap-2">
+            <p className="max-w-[72ch] text-body-strong">{message}</p>
+            {correlationId === undefined ? null : (
+              <span data-correlation-id="true" className="text-mono">
+                {correlationId}
+              </span>
+            )}
+          </div>
         </div>
-        {correlationId === undefined ? null : (
-          <span data-correlation-id="true" className="text-mono">
-            {correlationId}
-          </span>
-        )}
-        <Button asChild variant="outline" size="lg" className="min-h-11">
+        <Button
+          asChild
+          variant="outline"
+          size="lg"
+          className={ACTION_BUTTON_CLASS}
+        >
           <Link href={retryHref}>Retry</Link>
         </Button>
       </CardContent>
@@ -130,40 +140,22 @@ export function DashboardRegionEmpty({
   readonly whoCanAct?: string;
   readonly intent?: "neutral" | "ok";
 }): ReactElement {
-  const Icon = INTENT_ICON[intent];
-
+  // The same box every other empty state in the product renders (§5), with the
+  // region's own `data-region-state` hook kept so its specs still select on it.
   return (
-    <Card data-region-state="empty" data-intent={intent} className="gap-0">
-      <CardContent className="flex flex-col gap-2 py-1">
-        <div className="flex items-start gap-3">
-          <Icon
-            aria-hidden="true"
-            className={cn(
-              "mt-0.5 size-5 shrink-0",
-              INTENT_TEXT_CLASSES[intent],
-            )}
-          />
-          <div className="flex min-w-0 flex-col gap-1">
-            <p className="max-w-[72ch] text-body-strong">{title}</p>
-            {description === undefined ? null : (
-              <p className="max-w-[72ch] text-body">{description}</p>
-            )}
-            {whoCanAct === undefined ? null : (
-              <p className="max-w-[72ch] text-caption text-muted-foreground">
-                {whoCanAct}
-              </p>
-            )}
-          </div>
-        </div>
-        {action === undefined ? null : (
-          <div className="pt-1 pl-8">
-            <Button asChild variant="outline" size="lg" className="min-h-11">
-              <Link href={action.href}>{action.label}</Link>
-            </Button>
-          </div>
-        )}
-      </CardContent>
-    </Card>
+    <EmptyState
+      icon={INTENT_ICON[intent]}
+      intent={intent}
+      title={title}
+      description={description}
+      whoCanAct={whoCanAct}
+      action={
+        action === undefined
+          ? null
+          : { label: action.label, href: action.href, testId: action.href }
+      }
+      dataAttributes={{ "data-region-state": "empty", "data-intent": intent }}
+    />
   );
 }
 

@@ -2,6 +2,7 @@ import type { ReactElement, ReactNode } from "react";
 import { ImageOff } from "lucide-react";
 
 import { ConfidenceBandDisplay } from "@/components/confidence/confidence-band-display";
+import { Field, FieldList } from "@/components/page";
 import { StatusBadge } from "@/components/status/status-badge";
 import {
   Table,
@@ -172,7 +173,7 @@ function PhotoCard({
   return (
     <li
       data-intake-photo={photo.id}
-      className="flex flex-col gap-3 rounded-lg border border-border p-4"
+      className="flex flex-col gap-3 rounded-md border border-border p-4"
     >
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-body-strong">
@@ -205,7 +206,7 @@ function PhotoCard({
         </p>
       </div>
 
-      <dl className="grid gap-1 text-body sm:grid-cols-[minmax(9rem,auto)_1fr]">
+      <FieldList>
         <PhotoFact label="Dimensions">
           <span className="tabular">
             {photo.widthPx} &times; {photo.heightPx}
@@ -247,11 +248,19 @@ function PhotoCard({
             </span>
           )}
         </PhotoFact>
-      </dl>
+      </FieldList>
     </li>
   );
 }
 
+/**
+ * One fact about a photo.
+ *
+ * It was a fourth field grammar — a `display: contents` two-column grid, label
+ * left, value right — for the same information the record, the catalog entry and
+ * both settings screens all render. It is `Field` now, so a field reads the same
+ * way wherever a reader meets one.
+ */
 function PhotoFact({
   label,
   children,
@@ -259,12 +268,7 @@ function PhotoFact({
   readonly label: string;
   readonly children: ReactNode;
 }) {
-  return (
-    <div className="contents">
-      <dt className="text-label">{label}</dt>
-      <dd className="min-w-0 break-words">{children}</dd>
-    </div>
-  );
+  return <Field label={label}>{children}</Field>;
 }
 
 /**

@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { INTENT_TEXT_CLASSES } from "@/components/status/intent-classes";
 import type { ActionResult } from "@/lib/action-result";
+import { LeadingIcon } from "@/components/page/leading-icon";
 import { cn } from "@/lib/utils";
 
 /**
@@ -112,7 +113,11 @@ export function OrganizationSwitcher({
     return (
       <span
         data-organization-switcher="absent"
-        className="flex min-h-11 items-center gap-2 px-2 text-body-strong"
+        // `min-w-0` is what makes the `truncate` below actually truncate: a
+        // flex item will not shrink past its content without it, so a long
+        // organisation name ran under the search, the bell and the user menu at
+        // 375px. The contact sheet is what found it.
+        className="flex min-h-11 min-w-0 items-center gap-2 px-2 text-body-strong"
       >
         <Building2 aria-hidden="true" className="size-5 shrink-0" />
         <span className="truncate">{activeName}</span>
@@ -163,7 +168,7 @@ export function OrganizationSwitcher({
           INTENT_TEXT_CLASSES.critical,
         )}
       >
-        <CircleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+        <LeadingIcon icon={CircleAlert} size="caption" glyph="sm" />
         {result.error.message}
       </p>
     ) : null;
@@ -186,7 +191,7 @@ export function OrganizationSwitcher({
           variant="ghost"
           size="lg"
           data-organization-switcher="menu"
-          className="min-h-11 max-w-[16rem] justify-start gap-2 px-2 text-body-strong"
+          className="min-h-11 max-w-[16rem] min-w-0 justify-start gap-2 px-2 text-body-strong"
         >
           <Building2 aria-hidden="true" className="size-5 shrink-0" />
           <span className="truncate">{activeName}</span>

@@ -1,28 +1,26 @@
+import { PageHeaderSkeleton, PageShell } from "@/components/page";
 import { Skeleton } from "@/components/ui/skeleton";
 
 /**
  * `/batteries/[id]` while it loads — `UX_SPEC.md` §6.3.
  *
- * The skeleton matches the layout it becomes: a crumb, a heading, the header
- * facts, the tab row and two cards. **Layout must not shift when the content
- * arrives**, and there is never a spinner in the middle of an empty page.
+ * The skeleton matches the layout it becomes: a crumb, the record number beside
+ * its 44px copy button, the print action, the identifying subtitle, the
+ * four-badge meta strip, the tab row and two cards. **Layout must not shift when
+ * the content arrives**, and there is never a spinner in the middle of an empty
+ * page.
+ *
+ * `titleAdornment` is what makes the title line 44px rather than the type
+ * token's 36 — the copy button is a touch target and it is the taller of the
+ * two. Without it this header was eight pixels short on every load.
  */
 export default function BatteryRecordLoading() {
   return (
-    <div className="flex flex-col gap-6 p-4 md:p-6">
-      <Skeleton className="h-5 w-40 rounded-md" />
-      <div className="flex flex-col gap-2">
-        <Skeleton className="h-9 w-56 rounded-md" />
-        <Skeleton className="h-6 w-72 rounded-md" />
-        <div className="flex flex-wrap gap-2">
-          <Skeleton className="h-6 w-28 rounded-md" />
-          <Skeleton className="h-6 w-28 rounded-md" />
-          <Skeleton className="h-6 w-28 rounded-md" />
-        </div>
-      </div>
+    <PageShell>
+      <PageHeaderSkeleton breadcrumb titleAdornment subtitle action meta={4} />
       <Skeleton className="h-11 w-full max-w-md rounded-md" />
       <Skeleton className="h-64 w-full rounded-lg" />
       <Skeleton className="h-64 w-full rounded-lg" />
-    </div>
+    </PageShell>
   );
 }

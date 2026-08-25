@@ -1,5 +1,7 @@
 import { FileClock } from "lucide-react";
 
+import { EmptyState } from "@/components/page/empty-state";
+
 /**
  * `/audit` with nothing in it — **E-15, "zero audit events"**.
  *
@@ -19,24 +21,11 @@ import { FileClock } from "lucide-react";
  */
 export function AuditEmptyState() {
   return (
-    <div
-      role="status"
-      data-audit-empty="zero-records"
-      className="flex flex-col items-start gap-2 rounded-lg border border-border p-6"
-    >
-      <div className="flex items-center gap-2">
-        <FileClock
-          aria-hidden="true"
-          className="size-5 text-muted-foreground"
-        />
-        <p className="text-body-strong">No activity in this range.</p>
-      </div>
-      <p className="max-w-[72ch] text-body text-muted-foreground">
-        Nothing has been recorded for this organization yet. Rows appear here on
-        their own as people work — every sign-in, every battery logged, every
-        document issued and every refused action is written to this log by the
-        system, and no one can add to it or remove from it by hand.
-      </p>
-    </div>
+    <EmptyState
+      icon={FileClock}
+      title="No activity in this range."
+      description="Nothing has been recorded for this organization yet. Rows appear here on their own as people work — every sign-in, every battery logged, every document issued and every refused action is written to this log by the system, and no one can add to it or remove from it by hand."
+      dataAttributes={{ "data-audit-empty": "zero-records" }}
+    />
   );
 }

@@ -16,6 +16,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { INTENT_TEXT_CLASSES } from "@/components/status/intent-classes";
 import type { ActionResult } from "@/lib/action-result";
+import { LeadingIcon } from "@/components/page/leading-icon";
 import { cn } from "@/lib/utils";
 
 import { useCommandPalette } from "./command-palette-provider";
@@ -202,10 +203,7 @@ export function CommandPalette({ pages, search }: CommandPaletteProps) {
                   INTENT_TEXT_CLASSES.critical,
                 )}
               >
-                <CircleAlert
-                  aria-hidden="true"
-                  className="mt-0.5 size-5 shrink-0"
-                />
+                <LeadingIcon icon={CircleAlert} />
                 Search unavailable
               </p>
               <p className="text-caption text-muted-foreground">

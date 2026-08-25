@@ -1,10 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import type { ReactNode } from "react";
 
 import {
   decodeListQuery,
   toPageRequest,
 } from "@/components/record-table/list-url";
+import { ACTION_BUTTON_CLASS, PageHeader, PageShell } from "@/components/page";
 import { RecordTable } from "@/components/record-table/record-table";
 import { Button } from "@/components/ui/button";
 import { data } from "@/data";
@@ -123,10 +125,14 @@ export default async function BatteriesPage({
   });
 
   return (
-    <div className="flex flex-col gap-6 p-4 md:p-6">
-      <h1 id="page-title" tabIndex={-1} className="text-h1 lg:text-display">
-        {APP_ROUTE_NAMES["/batteries"]}
-      </h1>
+    <PageShell>
+      {/* No action in the header. §2.7's anatomy puts *"the route's primary
+          action"* in the table's own header row, beside the search and the
+          filters, and that is also what keeps this route's skeleton honest: the
+          row's height is set by the search box, so a role without the action
+          leaves no gap where P1 and P6 have a button. In the page header it
+          would be 60px of layout shift on a phone for four of the six roles. */}
+      <PageHeader title={APP_ROUTE_NAMES["/batteries"]} />
 
       <RecordTable
         caption="Battery records"
@@ -160,14 +166,9 @@ export default async function BatteriesPage({
           searchSuggestion: "Try a record ID, a serial number or a model.",
         }}
         error={result.error}
-        toolbar={
-          <LogABatteryAction
-            role={ctx.role}
-            isIntakeBlocked={isIntakeBlocked}
-          />
-        }
+        toolbar={logABatteryAction(ctx.role, isIntakeBlocked)}
       />
-    </div>
+    </PageShell>
   );
 }
 
@@ -243,18 +244,17 @@ async function readBatteryRecords(
  * P4 gains this capability at B3 as a value change in the map, and this control
  * follows without being touched.
  */
-function LogABatteryAction({
-  role,
-  isIntakeBlocked,
-}: {
-  readonly role: Parameters<typeof canWriteRoute>[0];
+function logABatteryAction(
+  role: Parameters<typeof canWriteRoute>[0],
   /** E-12 — blocked organisation-wide means the action is absent, not disabled. */
-  readonly isIntakeBlocked: boolean;
-}) {
-  if (isIntakeBlocked) return null;
-  if (!canWriteRoute(role, "/batteries/new")) return null;
+  isIntakeBlocked: boolean,
+): ReactNode {
+  // `undefined` rather than a component rendering `null`, so `PageToolbar` omits
+  // its action group entirely rather than leaving an empty flex box in it.
+  if (isIntakeBlocked) return undefined;
+  if (!canWriteRoute(role, "/batteries/new")) return undefined;
   return (
-    <Button asChild size="lg" className="min-h-11 rounded-md">
+    <Button asChild size="lg" className={ACTION_BUTTON_CLASS}>
       <Link href="/batteries/new" data-primary-action="true">
         {APP_ROUTE_NAMES["/batteries/new"]}
       </Link>
