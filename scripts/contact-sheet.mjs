@@ -470,6 +470,17 @@ async function startOwnServer(port) {
     PORT: String(port),
   };
 
+  // **A clean build, every time.**
+  //
+  // Turbopack's cache survives a failed build, and a build that reuses it can
+  // emit HTML referencing a CSS chunk that is not on disk. The whole `before`
+  // set was captured that way once — a hundred and forty-four screenshots of
+  // completely unstyled HTML, produced by a run that reported success in a
+  // second. It is the same failure as reusing someone else's server: **the
+  // images were not of the build this script made.**
+  console.log("→ clearing .next");
+  await rm(".next", { recursive: true, force: true });
+
   console.log("→ building");
   await run("pnpm", ["build"], { env });
 
