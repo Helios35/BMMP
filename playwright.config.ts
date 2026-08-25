@@ -64,12 +64,22 @@ export default defineConfig({
     command: "pnpm build && pnpm start",
     url: baseURL,
     /**
-     * Local only — `CI` is set in CI, so CI always starts its own server and the
-     * pinned environment below is the environment the run gets. Locally a server
-     * that is already listening is reused as it was started, which is the one
-     * way a developer's `.env.local` can still reach a run.
+     * **Never.** The suite builds and starts its own server, everywhere,
+     * including locally.
+     *
+     * This read `!process.env.CI` through unit 01, which meant a stray process
+     * on the port was silently adopted instead of the suite building its own —
+     * and it happened during that unit. A suite that quietly tests someone
+     * else's server proves nothing about the commit under test, and **every
+     * visual artifact produced from such a run is worthless**: the screenshots
+     * are of whatever that process was serving.
+     *
+     * With this `false`, a port already in use is a loud Playwright failure
+     * naming the port rather than a green run against the wrong build. Pass
+     * `PORT` to move out of the way of a dev server rather than reaching for
+     * reuse.
      */
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: false,
     timeout: 180_000,
     /**
      * **Every switch the server reads is stated here, not inherited.**
