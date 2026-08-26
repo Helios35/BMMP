@@ -11,6 +11,7 @@ import { safeNextPath } from "@/domain/access/next-path";
 import { APP_ROUTE_NAMES } from "@/domain/access/routes";
 import { data } from "@/data";
 import { FormNotice } from "@/features/auth/components/form-messages";
+import { DevSignInPanel } from "@/features/auth/components/dev-sign-in-panel";
 import { SignInForm } from "@/features/auth/components/sign-in-form";
 import { publicContext } from "@/lib/auth/session";
 
@@ -122,6 +123,11 @@ export default async function SignInPage({
               {APP_ROUTE_NAMES["/sign-up"]}
             </Link>
           </p>
+
+          {/* A development shortcut past the sign-up screen. It renders only
+              while the mock adapter is live, and it is not part of the product
+              — see `dev-sign-in.ts`. */}
+          <DevSignInPanel />
         </CardContent>
       </Card>
     </div>
