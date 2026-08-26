@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { ReactElement } from "react";
 import { CircleAlert, TriangleAlert } from "lucide-react";
 
+import { FieldList } from "@/components/page";
 import { FieldSourceBadge } from "@/components/provenance/field-source-badge";
 import { INTENT_SURFACE_CLASSES } from "@/components/status/intent-classes";
 import { StatusBadge } from "@/components/status/status-badge";
@@ -134,199 +135,206 @@ export async function OverviewTab({
   return (
     <div className="flex flex-col gap-6">
       <DetailCard title="Identity">
-        <FieldRow
-          label="Manufacturer"
-          source={
-            <FieldSourceBadge
-              source={fieldSourceFor("manufacturerName", sourceInput)}
-            />
-          }
-        >
-          {record.manufacturerName ?? <NotRecorded />}
-        </FieldRow>
+        <FieldList>
+          <FieldRow
+            label="Manufacturer"
+            source={
+              <FieldSourceBadge
+                source={fieldSourceFor("manufacturerName", sourceInput)}
+              />
+            }
+          >
+            {record.manufacturerName ?? <NotRecorded />}
+          </FieldRow>
 
-        <FieldRow
-          label="Model"
-          source={
-            <FieldSourceBadge
-              source={fieldSourceFor("modelName", sourceInput)}
-            />
-          }
-        >
-          {record.modelName ?? <NotRecorded />}
-        </FieldRow>
+          <FieldRow
+            label="Model"
+            source={
+              <FieldSourceBadge
+                source={fieldSourceFor("modelName", sourceInput)}
+              />
+            }
+          >
+            {record.modelName ?? <NotRecorded />}
+          </FieldRow>
 
-        <FieldRow
-          label="Part number"
-          source={
-            <FieldSourceBadge
-              source={fieldSourceFor("partNumber", sourceInput)}
-            />
-          }
-        >
-          {record.partNumber === null ? (
-            <NotRecorded />
-          ) : (
-            <span className="text-mono">{record.partNumber}</span>
-          )}
-        </FieldRow>
-
-        <FieldRow
-          label="Serial number"
-          source={
-            <FieldSourceBadge
-              source={fieldSourceFor("serialNumber", sourceInput)}
-            />
-          }
-        >
-          {record.serialNumber === null ? (
-            <NotRecorded />
-          ) : (
-            <span className="text-mono break-all">{record.serialNumber}</span>
-          )}
-        </FieldRow>
-
-        <ChemistryRow record={record} />
-
-        <FieldRow
-          label="Form factor"
-          source={<FieldSourceBadge source={FORM_FACTOR_SOURCE} />}
-        >
-          <TaxonomyText
-            system="cell_form_factor"
-            read={readTaxonomyValue(
-              CELL_FORM_FACTORS,
-              CELL_FORM_FACTOR_LABELS,
-              record.cellFormFactor,
+          <FieldRow
+            label="Part number"
+            source={
+              <FieldSourceBadge
+                source={fieldSourceFor("partNumber", sourceInput)}
+              />
+            }
+          >
+            {record.partNumber === null ? (
+              <NotRecorded />
+            ) : (
+              <span className="text-mono">{record.partNumber}</span>
             )}
-          />
-        </FieldRow>
+          </FieldRow>
 
-        <ManufactureDateRow record={record} decode={decode} />
+          <FieldRow
+            label="Serial number"
+            source={
+              <FieldSourceBadge
+                source={fieldSourceFor("serialNumber", sourceInput)}
+              />
+            }
+          >
+            {record.serialNumber === null ? (
+              <NotRecorded />
+            ) : (
+              <span className="text-mono break-all">{record.serialNumber}</span>
+            )}
+          </FieldRow>
 
-        <FieldRow
-          label="Assessed condition"
-          source={
-            <FieldSourceBadge
-              source="entered_by"
-              enteredByName={
-                record.conditionConfirmedBy === null
-                  ? undefined
-                  : names.get(record.conditionConfirmedBy)
-              }
+          <ChemistryRow record={record} />
+
+          <FieldRow
+            label="Form factor"
+            source={<FieldSourceBadge source={FORM_FACTOR_SOURCE} />}
+          >
+            <TaxonomyText
+              system="cell_form_factor"
+              read={readTaxonomyValue(
+                CELL_FORM_FACTORS,
+                CELL_FORM_FACTOR_LABELS,
+                record.cellFormFactor,
+              )}
             />
-          }
-          note={
-            record.conditionConfirmedAt === null || container === null
-              ? undefined
-              : absoluteInstant(
-                  record.conditionConfirmedAt,
-                  container.siteTimeZone,
-                )
-          }
-        >
-          <StatusBadge
-            system="assessed_condition"
-            value={record.assessedCondition}
-          />
-        </FieldRow>
+          </FieldRow>
+
+          <ManufactureDateRow record={record} decode={decode} />
+
+          <FieldRow
+            label="Assessed condition"
+            source={
+              <FieldSourceBadge
+                source="entered_by"
+                enteredByName={
+                  record.conditionConfirmedBy === null
+                    ? undefined
+                    : names.get(record.conditionConfirmedBy)
+                }
+              />
+            }
+            note={
+              record.conditionConfirmedAt === null || container === null
+                ? undefined
+                : absoluteInstant(
+                    record.conditionConfirmedAt,
+                    container.siteTimeZone,
+                  )
+            }
+          >
+            <StatusBadge
+              system="assessed_condition"
+              value={record.assessedCondition}
+            />
+          </FieldRow>
+        </FieldList>
       </DetailCard>
 
       <DetailCard
         title="Specification"
         description="Units are the field's own. Nothing here is inferred from a number."
       >
-        <FieldRow
-          label="Nominal voltage"
-          source={
-            <FieldSourceBadge
-              source={fieldSourceFor("nominalVoltageV", sourceInput)}
-            />
-          }
-        >
-          <Measure value={record.nominalVoltageV} unit="V" />
-        </FieldRow>
-        <FieldRow
-          label="Rated capacity"
-          source={
-            <FieldSourceBadge
-              source={fieldSourceFor("ratedCapacityAh", sourceInput)}
-            />
-          }
-        >
-          <Measure value={record.ratedCapacityAh} unit="Ah" />
-        </FieldRow>
-        <FieldRow
-          label="Rated energy"
-          source={
-            <FieldSourceBadge
-              source={fieldSourceFor("ratedEnergyWh", sourceInput)}
-            />
-          }
-        >
-          <Measure value={record.ratedEnergyWh} unit="Wh" />
-        </FieldRow>
-        <FieldRow label="Mass">
-          <Measure value={record.batteryMassKg} unit="kg" />
-        </FieldRow>
-        <FieldRow label="Application class">
-          {labelFor(APPLICATION_CLASS_LABELS, record.applicationClass)}
-        </FieldRow>
-        <FieldRow label="Assembly level">
-          {labelFor(ASSEMBLY_LEVEL_LABELS, record.assemblyLevel)}
-        </FieldRow>
-        <FieldRow label="Cell count">
-          <Count value={record.cellCount} />
-        </FieldRow>
-        <FieldRow label="Module count">
-          <Count value={record.moduleCount} />
-        </FieldRow>
-        <FieldRow label="Certification marks">
-          {record.certificationMarks === null ? (
-            <NotRecorded />
-          ) : (
-            jsonText(record.certificationMarks)
-          )}
-        </FieldRow>
-        <FieldRow label="UN 38.3 test summary">
-          <Un383 record={record} />
-        </FieldRow>
+        <FieldList>
+          <FieldRow
+            label="Nominal voltage"
+            source={
+              <FieldSourceBadge
+                source={fieldSourceFor("nominalVoltageV", sourceInput)}
+              />
+            }
+          >
+            <Measure value={record.nominalVoltageV} unit="V" />
+          </FieldRow>
+          <FieldRow
+            label="Rated capacity"
+            source={
+              <FieldSourceBadge
+                source={fieldSourceFor("ratedCapacityAh", sourceInput)}
+              />
+            }
+          >
+            <Measure value={record.ratedCapacityAh} unit="Ah" />
+          </FieldRow>
+          <FieldRow
+            label="Rated energy"
+            source={
+              <FieldSourceBadge
+                source={fieldSourceFor("ratedEnergyWh", sourceInput)}
+              />
+            }
+          >
+            <Measure value={record.ratedEnergyWh} unit="Wh" />
+          </FieldRow>
+          <FieldRow label="Mass">
+            <Measure value={record.batteryMassKg} unit="kg" />
+          </FieldRow>
+          <FieldRow label="Application class">
+            {labelFor(APPLICATION_CLASS_LABELS, record.applicationClass)}
+          </FieldRow>
+          <FieldRow label="Assembly level">
+            {labelFor(ASSEMBLY_LEVEL_LABELS, record.assemblyLevel)}
+          </FieldRow>
+          <FieldRow label="Cell count">
+            <Count value={record.cellCount} />
+          </FieldRow>
+          <FieldRow label="Module count">
+            <Count value={record.moduleCount} />
+          </FieldRow>
+          <FieldRow label="Certification marks">
+            {record.certificationMarks === null ? (
+              <NotRecorded />
+            ) : (
+              jsonText(record.certificationMarks)
+            )}
+          </FieldRow>
+          <FieldRow label="UN 38.3 test summary">
+            <Un383 record={record} />
+          </FieldRow>
+        </FieldList>
       </DetailCard>
 
       <ClassificationCard decisions={decisions.items} />
 
       <DetailCard title="Placement and clock">
-        <FieldRow label="Container">
-          {container === null ? (
-            <NotRecorded />
-          ) : canReadRoute(ctx.role, "/containers/[id]") ? (
-            <Link
-              href={`/containers/${container.id}`}
-              data-inline-target="true"
-              className="rounded-md underline underline-offset-4 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none"
-            >
-              {container.containerCode}
-            </Link>
-          ) : (
-            container.containerCode
-          )}
-        </FieldRow>
-        <FieldRow label="Storage location">
-          {container?.storageLocation ?? <NotRecorded />}
-        </FieldRow>
-        {clock !== undefined && container !== null ? (
-          <div className="pt-2">
-            <StorageClockMeter
-              clock={clock}
-              asOf={asOf}
-              label={`Storage clock for container ${container.containerCode}`}
-            />
-          </div>
-        ) : (
-          <FieldRow label="Storage clock">
-            <NotRecorded />
+        <FieldList>
+          <FieldRow label="Container">
+            {container === null ? (
+              <NotRecorded />
+            ) : canReadRoute(ctx.role, "/containers/[id]") ? (
+              <Link
+                href={`/containers/${container.id}`}
+                data-inline-target="true"
+                className="rounded-md underline underline-offset-4 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none"
+              >
+                {container.containerCode}
+              </Link>
+            ) : (
+              container.containerCode
+            )}
           </FieldRow>
-        )}
+          <FieldRow label="Storage location">
+            {container?.storageLocation ?? <NotRecorded />}
+          </FieldRow>
+          {clock !== undefined && container !== null ? null : (
+            <FieldRow label="Storage clock">
+              <NotRecorded />
+            </FieldRow>
+          )}
+        </FieldList>
+        {/* Outside the field list rather than inside it: a `<dl>` holds
+            label-and-value pairs, and the meter is neither. */}
+        {clock !== undefined && container !== null ? (
+          <StorageClockMeter
+            clock={clock}
+            asOf={asOf}
+            label={`Storage clock for container ${container.containerCode}`}
+          />
+        ) : null}
       </DetailCard>
 
       {/* [B2] hazard_ranking — the slot, reserved. When it arrives it is a

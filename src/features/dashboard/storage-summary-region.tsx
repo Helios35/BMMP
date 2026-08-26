@@ -6,7 +6,7 @@ import {
   StorageClockMeter,
   StorageClockMeterSkeleton,
 } from "@/components";
-import { Card, CardContent } from "@/components/ui/card";
+import { SectionCard } from "@/components/page";
 import { data } from "@/data";
 import type { RequestContext } from "@/data/contracts";
 import { canReadRoute } from "@/domain/access/route-capability";
@@ -174,29 +174,30 @@ export async function StorageSummaryRegion({
         ) : undefined
       }
     >
-      <Card className="gap-0">
-        <CardContent className="py-1">
-          <ul
-            data-storage-tiers="true"
-            className="flex list-none flex-col gap-2"
-          >
-            {tiers.map((tier) => (
-              <li
-                key={tier.band}
-                data-storage-tier={tier.band}
-                className="flex min-h-11 flex-wrap items-center justify-between gap-x-4 gap-y-1"
-              >
-                <StatusBadge
-                  system="storage_clock_alert_band"
-                  value={tier.band}
-                  size="sm"
-                />
-                <span className="tabular text-body-strong">{tier.count}</span>
-              </li>
-            ))}
-          </ul>
-        </CardContent>
-      </Card>
+      <SectionCard>
+        {/* Capped rather than run to the content width: a tier and its count a
+            thousand pixels apart is a pair a reader has to track across an empty
+            page. §1.3 caps prose at a measure for the same reason. */}
+        <ul
+          data-storage-tiers="true"
+          className="flex max-w-md list-none flex-col gap-2"
+        >
+          {tiers.map((tier) => (
+            <li
+              key={tier.band}
+              data-storage-tier={tier.band}
+              className="flex min-h-11 flex-wrap items-center justify-between gap-x-4 gap-y-1"
+            >
+              <StatusBadge
+                system="storage_clock_alert_band"
+                value={tier.band}
+                size="sm"
+              />
+              <span className="tabular text-body-strong">{tier.count}</span>
+            </li>
+          ))}
+        </ul>
+      </SectionCard>
 
       {metered.map((clock) => {
         const containerCode =
@@ -209,36 +210,34 @@ export async function StorageSummaryRegion({
             : null;
 
         return (
-          <Card key={clock.id} className="gap-0">
-            <CardContent className="flex flex-col gap-3 py-1">
-              {containerCode === null ? null : (
-                <p className="text-label">
-                  {link === null ? (
-                    // P3, P4 and P5 do not hold `/containers/[id]`, so the code
-                    // renders as text: no link, no hover, no pointer
-                    // (`SITE_ARCHITECTURE.md` §5.4).
-                    <span className="text-mono">{containerCode}</span>
-                  ) : (
-                    <Link
-                      href={link.href}
-                      className="inline-flex min-h-11 min-w-11 items-center rounded-md text-mono underline underline-offset-4 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none"
-                    >
-                      {containerCode}
-                    </Link>
-                  )}
-                </p>
-              )}
-              <StorageClockMeter
-                clock={clock}
-                asOf={asOf}
-                label={
-                  containerCode === null
-                    ? "Storage clock"
-                    : `Storage clock for container ${containerCode}`
-                }
-              />
-            </CardContent>
-          </Card>
+          <SectionCard key={clock.id}>
+            {containerCode === null ? null : (
+              <p className="text-label">
+                {link === null ? (
+                  // P3, P4 and P5 do not hold `/containers/[id]`, so the code
+                  // renders as text: no link, no hover, no pointer
+                  // (`SITE_ARCHITECTURE.md` §5.4).
+                  <span className="text-mono">{containerCode}</span>
+                ) : (
+                  <Link
+                    href={link.href}
+                    className="inline-flex min-h-11 min-w-11 items-center rounded-md text-mono underline underline-offset-4 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none"
+                  >
+                    {containerCode}
+                  </Link>
+                )}
+              </p>
+            )}
+            <StorageClockMeter
+              clock={clock}
+              asOf={asOf}
+              label={
+                containerCode === null
+                  ? "Storage clock"
+                  : `Storage clock for container ${containerCode}`
+              }
+            />
+          </SectionCard>
         );
       })}
     </DashboardRegion>
@@ -249,11 +248,9 @@ export function StorageSummaryRegionSkeleton(): ReactElement {
   return (
     <DashboardRegion id={REGION_ID} title={REGION_TITLE} state="loading">
       <DashboardRegionSkeleton rows={1} rowClassName="h-56" />
-      <Card className="gap-0">
-        <CardContent className="py-1">
-          <StorageClockMeterSkeleton />
-        </CardContent>
-      </Card>
+      <SectionCard>
+        <StorageClockMeterSkeleton />
+      </SectionCard>
     </DashboardRegion>
   );
 }

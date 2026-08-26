@@ -38,9 +38,15 @@ import { fixtureIds, INVITE_TOKENS, storageStateFor } from "./support/roles";
  * 2. **A control that is visually hidden until it is focused.** The skip link
  *    is `sr-only` at 1 × 1 px and becomes a padded control on focus. It is not
  *    a target until then, so the sweep focuses it and measures it there.
+ * 3. **An element that is `aria-hidden` and out of the tab order.** Radix's
+ *    `Select` renders a native `<select>` per control to mirror its value for
+ *    form autofill; it is not in the accessibility tree, cannot be focused and
+ *    cannot be clicked. It measures 0 × 0 or 1 × 1 depending on when the sweep
+ *    catches it, and the 1 × 1 case made this file fail on `/batteries` at
+ *    random. **Both conditions are required together.**
  *
- * Neither relaxes the rule; a control that is small *when it can be used* still
- * fails.
+ * None of the three relaxes the rule; a control that is small *when it can be
+ * used* still fails.
  */
 
 const TARGET_SELECTOR =
@@ -94,6 +100,21 @@ function sweepInPage({ selector, minimum }: SweepInput): SweepResult {
   for (const element of Array.from(document.querySelectorAll(selector))) {
     const style = window.getComputedStyle(element);
     if (style.visibility === "hidden" || style.display === "none") continue;
+
+    // Out of the accessibility tree **and** out of the tab order: not a target
+    // anyone can reach, by pointer or by keyboard. Radix's `Select` renders one
+    // of these per control — a native `<select>` that mirrors the value for form
+    // autofill, `aria-hidden`, `tabindex="-1"`, absolutely positioned, and
+    // measuring 0×0 or 1×1 depending on when the sweep catches it. The 0 case
+    // was already skipped below and the 1 case was not, so this sweep failed on
+    // `/batteries` at random. **Both conditions are required**, so a real
+    // control cannot slip out from under the rule by carrying one attribute.
+    if (
+      element.getAttribute("aria-hidden") === "true" &&
+      element.getAttribute("tabindex") === "-1"
+    ) {
+      continue;
+    }
 
     let rect = element.getBoundingClientRect();
     let measuredAs: "self" | "stretched" | "focused" = "self";
@@ -434,6 +455,51 @@ test.describe("44 × 44 px minimum interactive target", () => {
         report("/audit", violationsOf(result)),
       ).toEqual([]);
       expectExemptionsAreInlineLinks("/audit", result);
+    });
+
+    /**
+     * The sweep above cannot re-break — **and cannot pass by finding nothing.**
+     *
+     * The general sweep measures whatever is on the page, so it stays green if
+     * the trigger stops rendering at all: the tooltip disappears, the stated
+     * reason becomes unreachable, and nothing says a word. That is precisely
+     * how two of unit 01's defects survived a whole unit — an assertion that
+     * passed vacuously.
+     *
+     * So this asserts the trigger is **there**, on every row, and measures it
+     * directly. `/containers` inherits this exact path for P3, P4 and P5 in
+     * unit 04 (`SITE_ARCHITECTURE.md` §5.4), and that unit adds its route to
+     * this test rather than writing a second one.
+     */
+    test("the not-linked row reason is present, focusable and 44px", async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: 1280, height: 800 });
+      await page.goto("/audit");
+      await expect(page.locator("#page-title")).toBeVisible();
+
+      const triggers = page.locator('[data-row-reason-trigger="true"]');
+      const count = await triggers.count();
+      expect(
+        count,
+        "/audit renders no row-reason trigger at all — every row on this route is non-navigable and each one must state why (§5.4)",
+      ).toBeGreaterThan(0);
+
+      for (let index = 0; index < count; index += 1) {
+        const trigger = triggers.nth(index);
+        const box = await trigger.boundingBox();
+        expect(
+          box,
+          `/audit row ${index}: the trigger is not rendered`,
+        ).not.toBeNull();
+        expect(
+          box?.height ?? 0,
+          `/audit row ${index}: the row-reason trigger is ${box?.height ?? 0}px tall. It is focusable and hoverable, which makes it a target, and §1.5's 44px floor applies on desktop too. The threshold is not lowered.`,
+        ).toBeGreaterThanOrEqual(MINIMUM_TARGET_PX);
+        // In the tab order on purpose: `aria-disabled` semantics aside, a reason
+        // a keyboard user cannot reach is a reason nobody stated.
+        await expect(trigger).toHaveAttribute("tabindex", "0");
+      }
     });
   });
 });

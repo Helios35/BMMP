@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { ACTION_BUTTON_CLASS, PageHeader, PageShell } from "@/components/page";
 import { Button } from "@/components/ui/button";
 
 /**
@@ -18,27 +19,36 @@ import { Button } from "@/components/ui/button";
  * nothing here mentions organisations, permissions, or anything existing
  * elsewhere — not in the copy, not in a `data-` attribute, not in the status.
  *
+ * **It is a page, and it is shaped like one.** Unit 01 gave the two not-found
+ * surfaces two different shapes — one a centred column, one a bordered box —
+ * and neither matched the routes they replace. Both are `PageHeader` now.
+ *
  * **No `<main>` element.** The shell's layout already renders
  * `<main id="main-content">` around this, and a second one is a second landmark
  * for anyone navigating by landmark.
  */
 export default function AppNotFound() {
   return (
-    <section className="mx-auto flex w-full max-w-[72ch] flex-col gap-4 py-12">
-      <h1 id="page-title" tabIndex={-1} className="text-h1 lg:text-display">
-        We couldn&rsquo;t find that record.
-      </h1>
-      <p className="text-body">
-        It may have been removed, or the link may be wrong.
-      </p>
-      <div className="flex flex-wrap gap-3 pt-2">
-        <Button asChild>
-          <Link href="/batteries">Back to batteries</Link>
-        </Button>
-        <Button asChild variant="outline">
-          <Link href="/">Go to the dashboard</Link>
-        </Button>
-      </div>
-    </section>
+    <PageShell>
+      <PageHeader
+        title="We couldn’t find that record."
+        description="It may have been removed, or the link may be wrong."
+        action={
+          <>
+            <Button asChild size="lg" className={ACTION_BUTTON_CLASS}>
+              <Link href="/batteries">Back to batteries</Link>
+            </Button>
+            <Button
+              asChild
+              variant="outline"
+              size="lg"
+              className={ACTION_BUTTON_CLASS}
+            >
+              <Link href="/">Go to the dashboard</Link>
+            </Button>
+          </>
+        }
+      />
+    </PageShell>
   );
 }

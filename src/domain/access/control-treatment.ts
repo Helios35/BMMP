@@ -81,10 +81,38 @@ export function controlTreatmentReason(
  * `UX_SPEC.md` §2.9 — P5's, and **explicitly not P2's on `/review`.** It renders
  * where the role is the auditor and the route carries at least one mutating
  * control for someone; a banner on a page nobody can change says nothing.
+ *
+ * ## The third input, and why the function needed one
+ *
+ * Two inputs could not express `/audit`. §3.20 fixes the banner on that route
+ * for P5 — *"For P5 this is the primary destination and the `ReadOnlyBanner` is
+ * present"* — while the route carries **no mutating control for any role,
+ * including P6**: Rule 1.21 forbids editing or deleting an audit event, so the
+ * absence is the enforcement and there is nothing to disable. Passing
+ * `routeHasMutatingControls: true` would have been a lie to the domain, so unit
+ * 01 rendered the banner on the page with a comment instead — which put an
+ * access decision in `src/app`.
+ *
+ * `bannerIsFixedOnRoute` is that specification, named. It is **not** a second
+ * route map: it carries no route, it is passed by the one route that has the
+ * property, and it says what §3.20 says rather than restating who may reach what
+ * (`SITE_ARCHITECTURE.md` §7.2).
+ *
+ * The alternative — documenting `/audit` as §2.9's named exception — was not
+ * taken. An exception written in prose is one a later unit re-derives from
+ * scratch; unit 04's `/containers` and unit 05's `/shipments/[id]` both ask this
+ * question again, and they should ask the function.
  */
 export function showsReadOnlyBanner(input: {
   readonly role: RoleCode;
+  /** True where at least one role can change something on this route. */
   readonly routeHasMutatingControls: boolean;
+  /**
+   * True where a screen spec pins the banner to the route regardless — `/audit`
+   * and nothing else in B1a (§3.20).
+   */
+  readonly bannerIsFixedOnRoute?: boolean;
 }): boolean {
-  return input.role === "auditor" && input.routeHasMutatingControls;
+  if (input.role !== "auditor") return false;
+  return input.routeHasMutatingControls || input.bannerIsFixedOnRoute === true;
 }

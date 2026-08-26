@@ -20,10 +20,25 @@ import { statusIntent, statusLabel, type StatusSystem } from "./status-intent";
  * in `src/domain/taxonomy` — the one place a label for that system exists.
  */
 
-/** 24px and 28px per §2.3. Text never below 13px, and 14px is the product floor. */
+/**
+ * 24px and 28px per §2.3, and **both sizes carry `label`** — 15/20 at weight
+ * 500, which is one of §1.3's eight tokens.
+ *
+ * They were `text-[0.8125rem]` (13px) and `text-sm` (14px), neither of which is
+ * a token. §2.3 asks for a 13px minimum and §1.3 says *"14px is the floor
+ * anywhere in the product. Nothing renders smaller — not a badge"*; the two
+ * disagree and that contradiction is reported rather than resolved here. What
+ * both readings admit is `label`: it clears §1.3's floor, exceeds §2.3's
+ * minimum, and is the token whose weight these badges were already reaching for
+ * with `font-medium`.
+ *
+ * A status chip is the one piece of text a handler reads across a warehouse, so
+ * where the two sections disagree the larger size is the one that serves the
+ * reader.
+ */
 const SIZE_CLASSES = {
-  sm: "h-6 gap-1.5 px-2 text-[0.8125rem]",
-  md: "h-7 gap-1.5 px-2 text-sm",
+  sm: "h-6 gap-2 px-2 text-label",
+  md: "h-7 gap-2 px-2 text-label",
 } as const;
 
 export type StatusBadgeSize = keyof typeof SIZE_CLASSES;
@@ -56,7 +71,7 @@ export function StatusBadge({
         variant="outline"
         data-status-state="empty"
         className={cn(
-          "rounded-md border font-medium",
+          "rounded-md border",
           SIZE_CLASSES[size],
           INTENT_SURFACE_CLASSES.neutral,
           className,
@@ -81,7 +96,7 @@ export function StatusBadge({
         data-status-state="unrecognised"
         title={`Retired or unrecognised value in ${system}`}
         className={cn(
-          "rounded-md border font-medium",
+          "rounded-md border",
           SIZE_CLASSES[size],
           INTENT_SURFACE_CLASSES.neutral,
           className,
@@ -104,7 +119,7 @@ export function StatusBadge({
       data-status-state="default"
       data-intent={intent}
       className={cn(
-        "rounded-md border font-medium",
+        "rounded-md border",
         SIZE_CLASSES[size],
         INTENT_SURFACE_CLASSES[intent],
         className,

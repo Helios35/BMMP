@@ -98,7 +98,7 @@ export function AuditChangeDetail({ row }: { readonly row: AuditRowView }) {
           id={panelId}
           role="region"
           aria-label={`Change detail, ${row.timestamp.full}`}
-          className="flex w-full max-w-[72ch] flex-col gap-3 rounded-lg border border-border p-3"
+          className="flex w-full max-w-[72ch] flex-col gap-3 rounded-md border border-border p-3"
         >
           {row.beforeState === null ? (
             <p className="text-body text-muted-foreground">
@@ -147,7 +147,7 @@ export function AuditChangeDetail({ row }: { readonly row: AuditRowView }) {
                 {row.ruleVersions.map((version) => (
                   <li
                     key={`${version.ruleKey}:${version.versionLabel}`}
-                    className="flex flex-col gap-0.5"
+                    className="flex flex-col gap-1"
                   >
                     <span className="text-body-strong">{version.ruleKey}</span>
                     <span className="text-mono">{version.versionLabel}</span>

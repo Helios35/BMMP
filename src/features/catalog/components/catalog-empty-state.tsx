@@ -1,8 +1,7 @@
-import Link from "next/link";
 import type { ReactElement } from "react";
 import { BookOpen } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/page/empty-state";
 
 /**
  * `/catalog` with no entries at all — **E-15**, `UX_SPEC.md` §5.
@@ -36,28 +35,23 @@ export function CatalogEmptyState({
   canAddEntry,
 }: CatalogEmptyStateProps): ReactElement {
   return (
-    <div
-      role="status"
-      data-empty-state="catalog"
-      className="flex flex-col items-start gap-2 rounded-lg border border-border p-6"
-    >
-      <div className="flex items-center gap-2">
-        <BookOpen aria-hidden="true" className="size-5 text-muted-foreground" />
-        <p className="text-body-strong">{CATALOG_EMPTY_TITLE}</p>
-      </div>
-
-      {canAddEntry ? (
-        <div className="pt-2">
-          {/* `/settings/catalog` is unit 03's page. The link is correct against
-              the capability map today and the page arrives with its unit; a
-              substitute affordance here would have to be unpicked later. */}
-          <Button asChild size="lg" className="min-h-11 rounded-md">
-            <Link href="/settings/catalog">Add an entry</Link>
-          </Button>
-        </div>
-      ) : (
-        <p className="max-w-[72ch] text-body">{CATALOG_EMPTY_WITHOUT_ACTION}</p>
-      )}
-    </div>
+    <EmptyState
+      icon={BookOpen}
+      title={CATALOG_EMPTY_TITLE}
+      // `/settings/catalog` is unit 03's page. The link is correct against the
+      // capability map today and the page arrives with its unit; a substitute
+      // affordance here would have to be unpicked later.
+      action={
+        canAddEntry
+          ? {
+              label: "Add an entry",
+              href: "/settings/catalog",
+              testId: "/settings/catalog",
+            }
+          : null
+      }
+      whoCanAct={canAddEntry ? undefined : CATALOG_EMPTY_WITHOUT_ACTION}
+      dataAttributes={{ "data-empty-state-of": "catalog" }}
+    />
   );
 }

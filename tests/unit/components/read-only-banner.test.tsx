@@ -119,7 +119,37 @@ describe("§2.9's decision table — the rule unit 03 depends on", () => {
       expect(
         showsReadOnlyBanner({ role, routeHasMutatingControls: true }),
       ).toBe(false);
+      // Including where a screen spec pins the banner to the route: `/audit` is
+      // reachable by P2 and P6 and neither of them sees it (§3.20).
+      expect(
+        showsReadOnlyBanner({
+          role,
+          routeHasMutatingControls: false,
+          bannerIsFixedOnRoute: true,
+        }),
+      ).toBe(false);
     }
+  });
+
+  it("renders where a screen spec pins it to the route — /audit (§3.20)", () => {
+    // The case two inputs could not express. Nobody may change an audit event,
+    // for any role including P6 (Rule 1.21), so `routeHasMutatingControls` is
+    // honestly false — and §3.20 still fixes the banner on the route for P5.
+    // Unit 01 rendered it from a role literal on the page with a comment; the
+    // decision belongs here.
+    expect(
+      showsReadOnlyBanner({
+        role: "auditor",
+        routeHasMutatingControls: false,
+        bannerIsFixedOnRoute: true,
+      }),
+    ).toBe(true);
+  });
+
+  it("defaults the third input to false, so no route gains a banner silently", () => {
+    expect(
+      showsReadOnlyBanner({ role: "auditor", routeHasMutatingControls: false }),
+    ).toBe(false);
   });
 
   it("pairs with disabled-not-absent for the auditor's mutating controls", () => {

@@ -137,7 +137,7 @@ export function MobileTabBar({
             data-mobile-tab-route={centre.route}
             // 64px raised primary. `size-16` is the specified figure, not a
             // rounded one (§2.2, UX_SPEC.md §4.3).
-            className="flex size-16 shrink-0 -translate-y-3 flex-col items-center justify-center gap-0.5 self-center rounded-full bg-primary text-primary-foreground shadow-lg focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none"
+            className="flex size-16 shrink-0 -translate-y-3 flex-col items-center justify-center gap-1 self-center rounded-full bg-primary text-primary-foreground shadow-lg focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none"
           >
             <CentreIcon aria-hidden="true" className="size-6" />
             <span className="text-caption">{centre.label}</span>

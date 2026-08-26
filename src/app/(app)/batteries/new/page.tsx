@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { PageHeader, PageShell, SectionCard } from "@/components/page";
 import { canReadRoute } from "@/domain/access/route-capability";
 import { APP_ROUTE_NAMES } from "@/domain/access/routes";
 import {
@@ -34,29 +34,33 @@ export default async function LogBatteryPage() {
 
   if (gate.status === "blocked") {
     return (
-      <div className="flex flex-col gap-6 p-4 md:p-6">
-        <h1 id="page-title" tabIndex={-1} className="text-h1 lg:text-display">
-          {APP_ROUTE_NAMES["/batteries/new"]}
-        </h1>
-        <IntakeBlockedNotice
-          gate={gate}
-          canReachOrganizationSettings={canReadRoute(
-            ctx.role,
-            "/settings/organization",
-          )}
+      <PageShell>
+        <PageHeader
+          title={APP_ROUTE_NAMES["/batteries/new"]}
+          // The block is pinned below the title, in the slot §2.9 fixes for
+          // every notice that qualifies what the page can do.
+          notice={
+            <IntakeBlockedNotice
+              gate={gate}
+              canReachOrganizationSettings={canReadRoute(
+                ctx.role,
+                "/settings/organization",
+              )}
+            />
+          }
         />
-      </div>
+      </PageShell>
     );
   }
 
   return (
-    <div className="flex flex-col gap-6 p-4 md:p-6">
-      <h1 id="page-title" tabIndex={-1} className="text-h1 lg:text-display">
-        {APP_ROUTE_NAMES["/batteries/new"]}
-      </h1>
-      <IntakeGraceNotice gate={gate} />
+    <PageShell>
+      <PageHeader
+        title={APP_ROUTE_NAMES["/batteries/new"]}
+        notice={<IntakeGraceNotice gate={gate} />}
+      />
       <IntakeNotYetBuilt />
-    </div>
+    </PageShell>
   );
 }
 
@@ -71,16 +75,14 @@ export default async function LogBatteryPage() {
  */
 function IntakeNotYetBuilt() {
   return (
-    <Card className="max-w-[72ch]">
-      <CardHeader>
-        <CardTitle className="text-h2">
-          {APP_ROUTE_NAMES["/batteries/new"]}
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="text-body text-muted-foreground">
+    <SectionCard
+      title={APP_ROUTE_NAMES["/batteries/new"]}
+      className="max-w-[72ch]"
+    >
+      <p className="text-body text-muted-foreground">
         Your organization&rsquo;s Terms of Service acceptance is in force, so
         intake is open. The capture flow itself arrives in the next unit.
-      </CardContent>
-    </Card>
+      </p>
+    </SectionCard>
   );
 }

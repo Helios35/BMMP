@@ -20,7 +20,7 @@ import { readTaxonomyValue } from "@/domain/taxonomy/lookup";
 import type { RoleCode } from "@/domain/taxonomy/role";
 import { relativeTimeLabel } from "@/features/shell/chrome/relative-time";
 import { cn } from "@/lib/utils";
-import { Card, CardContent } from "@/components/ui/card";
+import { SectionCard } from "@/components/page";
 import type { AuditEvent } from "@/types/audit";
 import type { IsoTimestamp, Uuid } from "@/types/common";
 import type { StorageEvent } from "@/types/storage";
@@ -293,61 +293,59 @@ export async function RecentActivityRegion({
         ) : undefined
       }
     >
-      <Card className="gap-0">
-        <CardContent className="py-1">
-          <ul
-            data-activity-source={source}
-            className="flex list-none flex-col divide-y divide-border"
-          >
-            {rows.map((row) => (
-              <li
-                key={row.id}
-                data-actor-type={row.actorType}
-                className="flex min-h-11 flex-wrap items-center justify-between gap-x-4 gap-y-1"
+      <SectionCard>
+        <ul
+          data-activity-source={source}
+          className="flex list-none flex-col divide-y divide-border"
+        >
+          {rows.map((row) => (
+            <li
+              key={row.id}
+              data-actor-type={row.actorType}
+              className="flex min-h-11 flex-wrap items-center justify-between gap-x-4 gap-y-1"
+            >
+              <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+                {row.href === null ? (
+                  <span
+                    className={cn(
+                      "inline-flex min-h-11 items-center",
+                      // An unrecognised stored value renders exactly as
+                      // stored, in mono (`TAXONOMY.md` §5.8).
+                      row.isRecognised ? "text-body-strong" : "text-mono",
+                    )}
+                  >
+                    {row.label}
+                  </span>
+                ) : (
+                  // The row's own 44px target rather than a claimed inline
+                  // exemption: this link is the row, not a phrase inside a
+                  // sentence (§1.5, WCAG 2.5.8).
+                  <Link
+                    href={row.href}
+                    className={cn(
+                      "inline-flex min-h-11 min-w-11 items-center rounded-md underline underline-offset-4 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none",
+                      row.isRecognised ? "text-body-strong" : "text-mono",
+                    )}
+                  >
+                    {row.label}
+                  </Link>
+                )}
+                {row.actorLabel === null ? null : (
+                  <span className="text-caption text-muted-foreground">
+                    {row.actorLabel}
+                  </span>
+                )}
+              </span>
+              <time
+                dateTime={row.at}
+                className="tabular text-caption text-muted-foreground"
               >
-                <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-                  {row.href === null ? (
-                    <span
-                      className={cn(
-                        "inline-flex min-h-11 items-center",
-                        // An unrecognised stored value renders exactly as
-                        // stored, in mono (`TAXONOMY.md` §5.8).
-                        row.isRecognised ? "text-body-strong" : "text-mono",
-                      )}
-                    >
-                      {row.label}
-                    </span>
-                  ) : (
-                    // The row's own 44px target rather than a claimed inline
-                    // exemption: this link is the row, not a phrase inside a
-                    // sentence (§1.5, WCAG 2.5.8).
-                    <Link
-                      href={row.href}
-                      className={cn(
-                        "inline-flex min-h-11 min-w-11 items-center rounded-md underline underline-offset-4 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none",
-                        row.isRecognised ? "text-body-strong" : "text-mono",
-                      )}
-                    >
-                      {row.label}
-                    </Link>
-                  )}
-                  {row.actorLabel === null ? null : (
-                    <span className="text-caption text-muted-foreground">
-                      {row.actorLabel}
-                    </span>
-                  )}
-                </span>
-                <time
-                  dateTime={row.at}
-                  className="tabular text-caption text-muted-foreground"
-                >
-                  {relativeTimeLabel(row.at, asOf)}
-                </time>
-              </li>
-            ))}
-          </ul>
-        </CardContent>
-      </Card>
+                {relativeTimeLabel(row.at, asOf)}
+              </time>
+            </li>
+          ))}
+        </ul>
+      </SectionCard>
     </DashboardRegion>
   );
 }

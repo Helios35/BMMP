@@ -1,10 +1,10 @@
-import { Card, CardContent } from "@/components/ui/card";
 import {
   CLOCK_METHOD_NOT_INFERRED,
   CLOCK_METHOD_NOT_RECORDED,
   CLOCK_METHOD_REMEDY,
 } from "../copy";
 import { formatAddressLine, type OrganizationSite } from "../sites";
+import { SectionCard } from "@/components/page";
 import { Field, FieldList, SettingsSection } from "./settings-primitives";
 
 /**
@@ -38,36 +38,34 @@ export function ClockMethodCard({
       title="Clock demonstration method"
       description="How each site demonstrates when its accumulation clock started, recorded with the date it took effect and included in every audit and evidence export."
     >
-      <Card>
-        <CardContent className="flex flex-col gap-4">
-          <ul className="flex flex-col gap-4">
-            {sites.map((site) => (
-              <li key={site.key} data-site-key={site.key}>
-                <FieldList>
-                  <Field
-                    label="Site"
-                    value={formatAddressLine(site.address)}
-                    span
-                  />
-                  <Field label="Method">
-                    <span
-                      className="text-body text-muted-foreground"
-                      data-clock-method="not-recorded"
-                    >
-                      {CLOCK_METHOD_NOT_RECORDED}
-                    </span>
-                  </Field>
-                  <Field label="Effective from" value={null} />
-                </FieldList>
-              </li>
-            ))}
-          </ul>
+      <SectionCard>
+        <ul className="flex flex-col gap-4">
+          {sites.map((site) => (
+            <li key={site.key} data-site-key={site.key}>
+              <FieldList>
+                <Field
+                  label="Site"
+                  value={formatAddressLine(site.address)}
+                  span
+                />
+                <Field label="Method">
+                  <span
+                    className="text-body text-muted-foreground"
+                    data-clock-method="not-recorded"
+                  >
+                    {CLOCK_METHOD_NOT_RECORDED}
+                  </span>
+                </Field>
+                <Field label="Effective from" value={null} />
+              </FieldList>
+            </li>
+          ))}
+        </ul>
 
-          <p className="max-w-[72ch] text-body text-muted-foreground">
-            {CLOCK_METHOD_REMEDY} {CLOCK_METHOD_NOT_INFERRED}
-          </p>
-        </CardContent>
-      </Card>
+        <p className="max-w-[72ch] text-body text-muted-foreground">
+          {CLOCK_METHOD_REMEDY} {CLOCK_METHOD_NOT_INFERRED}
+        </p>
+      </SectionCard>
     </SettingsSection>
   );
 }

@@ -1,7 +1,6 @@
 import type { ReactElement, ReactNode } from "react";
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { cn } from "@/lib/utils";
+import { Field, FieldList, SectionCard } from "@/components/page";
 import { NOT_SET } from "@/features/catalog/catalog-entry-display";
 
 /**
@@ -34,16 +33,9 @@ export function DetailSection({
   className,
 }: DetailSectionProps): ReactElement {
   return (
-    <Card className={cn("gap-4", className)}>
-      <CardHeader>
-        <CardTitle className="text-h2">{title}</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <dl className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
-          {children}
-        </dl>
-      </CardContent>
-    </Card>
+    <SectionCard title={title} className={className}>
+      <FieldList>{children}</FieldList>
+    </SectionCard>
   );
 }
 
@@ -66,23 +58,13 @@ export function DetailField({
   mono = false,
   wide = false,
 }: DetailFieldProps): ReactElement {
-  const isEmpty = value === null || value === undefined || value === "";
-
+  // `NOT_SET` rather than the shared default: it is this route's copy and
+  // changing it would be a copy rewrite, which this unit does not make. The
+  // divergence between *"Not set"* here and *"Not recorded"* on the record and
+  // settings screens is reported in the build-notes for the owner.
   return (
-    <div className={cn("flex flex-col gap-1", wide && "sm:col-span-2")}>
-      {/* A field label is never `muted`: A25 reserves that for metadata. */}
-      <dt className="text-label text-foreground">{label}</dt>
-      <dd
-        data-field-state={isEmpty ? "empty" : "default"}
-        // `Not set` is the value, so it keeps full contrast: A25 reserves
-        // `muted` for metadata and forbids it on anything a reader acts on.
-        className={cn(
-          "break-words",
-          isEmpty ? "text-body" : mono ? "text-mono" : "text-body-strong",
-        )}
-      >
-        {isEmpty ? NOT_SET : value}
-      </dd>
-    </div>
+    <Field label={label} mono={mono} span={wide} empty={NOT_SET}>
+      {value === null ? undefined : value}
+    </Field>
   );
 }

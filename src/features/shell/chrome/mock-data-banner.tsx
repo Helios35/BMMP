@@ -35,8 +35,8 @@ export function MockDataBanner() {
     >
       <TriangleAlert aria-hidden="true" className="size-4 shrink-0" />
       <p>
-        <strong className="font-semibold">Mock data.</strong> Every record on
-        this screen is invented. Nothing here describes anything real.
+        <strong>Mock data.</strong> Every record on this screen is invented.
+        Nothing here describes anything real.
       </p>
     </div>
   );

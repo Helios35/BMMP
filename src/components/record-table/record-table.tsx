@@ -37,6 +37,9 @@ import {
   INTENT_SURFACE_CLASSES,
   INTENT_TEXT_CLASSES,
 } from "@/components/status/intent-classes";
+import { EmptyState } from "@/components/page/empty-state";
+import { LeadingIcon } from "@/components/page/leading-icon";
+import { PageToolbar } from "@/components/page/page-layout";
 import { cn } from "@/lib/utils";
 import {
   activeFilterCount,
@@ -160,8 +163,17 @@ export interface RecordTableProps<TRow> {
   readonly filteredEmpty?: RecordTableFilteredEmpty;
   /** Present only when the read failed. */
   readonly error?: RecordTableErrorState;
-  /** Primary action and export, right of the search box. The route role-gates it. */
+  /** Primary action and export, on the search box's line. The route role-gates it. */
   readonly toolbar?: ReactNode;
+  /**
+   * A filter this component's declarative `filters` cannot express — `/audit`'s
+   * date range is the case it exists for.
+   *
+   * It renders in the filter row, beside the others, rather than beside the
+   * export: a control that narrows the list belongs with the controls that
+   * narrow the list, wherever it came from.
+   */
+  readonly filterControls?: ReactNode;
   readonly className?: string;
 }
 
@@ -181,6 +193,7 @@ export function RecordTable<TRow>({
   filteredEmpty,
   error,
   toolbar,
+  filterControls,
   className,
 }: RecordTableProps<TRow>): ReactElement {
   const narrowed = isNarrowed(query);
@@ -201,27 +214,32 @@ export function RecordTable<TRow>({
       data-empty-kind={emptyKind}
       className={cn("flex w-full flex-col gap-4", className)}
     >
-      {/* Header. It survives every state — a reader who hit an error or an empty
-          result keeps their search, their filters and their bearings (§2.7). */}
-      <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-        <div className="flex flex-col gap-3 md:flex-row md:items-end">
+      {/* The toolbar survives every state — a reader who hit an error or an
+          empty result keeps their search, their filters and their bearings
+          (§2.7). It is `PageToolbar` so the arrangement is identical on every
+          list in the product, including the four units 03–05 build. */}
+      <PageToolbar
+        search={
           <RecordTableSearch
             basePath={basePath}
             query={query}
             spec={querySpec}
             placeholder={searchPlaceholder}
           />
-          <RecordTableFilters
-            basePath={basePath}
-            query={query}
-            spec={querySpec}
-            filters={filters}
-          />
-        </div>
-        {toolbar !== undefined ? (
-          <div className="flex flex-wrap items-center gap-2">{toolbar}</div>
-        ) : null}
-      </div>
+        }
+        filters={
+          <>
+            <RecordTableFilters
+              basePath={basePath}
+              query={query}
+              spec={querySpec}
+              filters={filters}
+            />
+            {filterControls}
+          </>
+        }
+        actions={toolbar}
+      />
 
       {state === "error" && error !== undefined ? (
         <RecordTableError
@@ -505,7 +523,7 @@ function NotLinkedPrimary({
           </Tooltip>
         </TooltipProvider>
       </span>
-      <span className="flex flex-col gap-0.5 md:hidden">
+      <span className="flex flex-col gap-1 md:hidden">
         <span>{children}</span>
         <span
           data-row-reason-line="true"
@@ -620,33 +638,26 @@ function FilteredEmpty({
       : `No ${noun} match these filters`);
   const Icon = kind === "search" ? SearchX : FilterX;
 
+  // The same box as the route's zero-records state, with the sentence and the
+  // action that make this a *different* state (§2.7). One box, two answers.
   return (
-    <div
-      role="status"
-      data-table-empty={kind}
-      className="flex flex-col items-start gap-2 rounded-lg border border-border p-6"
-    >
-      <div className="flex items-center gap-2">
-        <Icon aria-hidden="true" className="size-5 text-muted-foreground" />
-        <p className="text-body-strong">{title}</p>
-      </div>
-      <p className="max-w-[72ch] text-body text-muted-foreground">
-        {kind === "search"
+    <EmptyState
+      icon={Icon}
+      title={title}
+      description={
+        kind === "search"
           ? (copy?.searchSuggestion ??
             "Nothing here matched that search. Widen it, or clear it to see everything you can reach.")
-          : "Everything you can reach is still here — these filters just exclude all of it."}
-      </p>
-      <Button
-        asChild
-        variant="outline"
-        size="lg"
-        className="min-h-11 rounded-md"
-      >
-        <Link href={href} data-clear-narrowing="true">
-          {kind === "search" ? "Clear search" : "Clear filters"}
-        </Link>
-      </Button>
-    </div>
+          : "Everything you can reach is still here — these filters just exclude all of it."
+      }
+      action={{
+        label: kind === "search" ? "Clear search" : "Clear filters",
+        href,
+        testId: "clear-narrowing",
+        dataAttributes: { "data-clear-narrowing": "true" },
+      }}
+      dataAttributes={{ "data-table-empty": kind }}
+    />
   );
 }
 
@@ -811,10 +822,10 @@ export function RecordTableSkeleton({
       data-table-state="loading"
       className={cn("flex w-full flex-col gap-4", className)}
     >
-      <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-        <Skeleton className="h-11 w-full rounded-md sm:w-80" />
-        <Skeleton className="h-11 w-32 rounded-md" />
-      </div>
+      <PageToolbar
+        search={<Skeleton className="h-11 w-full rounded-md sm:w-80" />}
+        actions={<Skeleton className="h-11 w-32 rounded-md" />}
+      />
       <div className="flex flex-col">
         <div className="flex h-11 items-center gap-3 border-b border-border px-3">
           {Array.from({ length: columns }, (_, index) => (
@@ -837,7 +848,12 @@ export function RecordTableSkeleton({
         ))}
       </div>
       <div className="flex items-center gap-2">
-        <Info aria-hidden="true" className="size-4 text-muted-foreground" />
+        <LeadingIcon
+          icon={Info}
+          size="caption"
+          glyph="sm"
+          className="text-muted-foreground"
+        />
         <span className="text-caption text-muted-foreground">
           Loading records…
         </span>

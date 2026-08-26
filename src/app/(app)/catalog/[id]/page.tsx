@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
-import { ReadOnlyBanner } from "@/components";
+import { PageHeader, PageShell, ReadOnlyBanner } from "@/components";
 import { data } from "@/data";
 import type { RequestContext } from "@/data/contracts";
 import { showsReadOnlyBanner } from "@/domain/access/control-treatment";
@@ -72,28 +72,23 @@ export default async function CatalogEntryPage({
   const crumbs = breadcrumbTrail("/catalog/[id]", ctx.role, title);
 
   return (
-    <div className="flex flex-col gap-6 p-4 md:p-6">
-      <div className="flex flex-col gap-3">
-        <Breadcrumbs crumbs={crumbs} />
-
-        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-          {/* The shell's route announcer moves focus here on every navigation. */}
-          <h1 id="page-title" tabIndex={-1} className="text-h1 lg:text-display">
-            {title}
-          </h1>
-          <EditEntryControl role={ctx.role} entryId={entry.id} />
-        </div>
-
-        {/* E-8a. The route carries a mutating control for someone, so the
-            auditor gets the banner as well as the disabled control. The decision
-            is `@/domain/access`'s; this page renders the answer. */}
-        {showsReadOnlyBanner({
-          role: ctx.role,
-          routeHasMutatingControls: true,
-        }) ? (
-          <ReadOnlyBanner />
-        ) : null}
-      </div>
+    <PageShell>
+      <PageHeader
+        breadcrumbs={<Breadcrumbs crumbs={crumbs} />}
+        title={title}
+        action={<EditEntryControl role={ctx.role} entryId={entry.id} />}
+        // E-8a. The route carries a mutating control for someone, so the auditor
+        // gets the banner as well as the disabled control. The decision is
+        // `@/domain/access`'s; this page renders the answer.
+        notice={
+          showsReadOnlyBanner({
+            role: ctx.role,
+            routeHasMutatingControls: true,
+          }) ? (
+            <ReadOnlyBanner />
+          ) : undefined
+        }
+      />
 
       <CatalogEntrySections
         entry={entry}
@@ -104,7 +99,7 @@ export default async function CatalogEntryPage({
         records={matched.items}
         canOpenRecord={canReadRoute(ctx.role, "/batteries/[id]")}
       />
-    </div>
+    </PageShell>
   );
 }
 

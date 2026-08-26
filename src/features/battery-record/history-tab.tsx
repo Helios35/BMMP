@@ -326,7 +326,7 @@ function DamageAssessments({
                 ? undefined
                 : "true"
             }
-            className="grid gap-2 rounded-lg border border-border p-4"
+            className="grid gap-2 rounded-md border border-border p-4"
           >
             <div className="flex flex-wrap items-center gap-2">
               <StatusBadge

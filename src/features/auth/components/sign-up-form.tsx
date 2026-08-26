@@ -223,7 +223,7 @@ export function SignUpForm({
           />
           <Label
             htmlFor="acceptsTerms"
-            className="max-w-[72ch] flex-1 items-start text-body leading-6 font-normal"
+            className="max-w-[72ch] flex-1 items-start text-body"
           >
             <span>
               {TERMS_CHECKBOX_LEAD} {TERMS_CHECKBOX_AUTHORITY}

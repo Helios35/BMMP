@@ -96,7 +96,7 @@ export function RecordTableSearch({
           setValue(event.target.value);
         }}
         data-record-table-search="true"
-        className="min-h-11 rounded-md pl-9 text-body"
+        className="min-h-11 rounded-md pl-8 text-body"
       />
     </div>
   );

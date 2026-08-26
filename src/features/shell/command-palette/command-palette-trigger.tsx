@@ -59,7 +59,7 @@ export function CommandPaletteTrigger() {
         {shortcut === null ? null : (
           <kbd
             aria-hidden="true"
-            className="rounded-md border border-input px-1.5 py-0.5 text-caption tabular-nums"
+            className="rounded-md border border-input px-2 text-caption tabular-nums"
           >
             {shortcut}
           </kbd>

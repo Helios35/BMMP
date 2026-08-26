@@ -1,8 +1,7 @@
 import type { ReactElement, ReactNode } from "react";
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Field, SectionCard } from "@/components/page";
 import type { TaxonomyRead } from "@/domain/taxonomy/lookup";
-import { cn } from "@/lib/utils";
 
 /**
  * The small display pieces `/batteries` and `/batteries/[id]` share.
@@ -61,7 +60,14 @@ export function TaxonomyText<T extends string>({
   return <span data-taxonomy-state="recognised">{read.label}</span>;
 }
 
-/** A titled section of the record. A border, never a shadow (§1.4). */
+/**
+ * A titled section of the record — the shared `SectionCard`, under the name the
+ * four record tabs already call it by.
+ *
+ * It was a hand-rolled `Card` whose description rendered at `caption`; the
+ * shared panel renders it at `body`, because a sentence explaining a section is
+ * something a reader has to read (§1.2 Rule 3, §1.3).
+ */
 export function DetailCard({
   title,
   description,
@@ -76,20 +82,14 @@ export function DetailCard({
   readonly className?: string;
 }): ReactElement {
   return (
-    <Card className={cn("gap-4", className)}>
-      <CardHeader className="gap-1">
-        <CardTitle className="text-h2">{title}</CardTitle>
-        {description !== undefined ? (
-          // Helper text under a heading is metadata, which is the one thing the
-          // muted token is for (§1.2 Rule 3).
-          <p className="max-w-[72ch] text-caption text-muted-foreground">
-            {description}
-          </p>
-        ) : null}
-        {action}
-      </CardHeader>
-      <CardContent className="flex flex-col gap-2">{children}</CardContent>
-    </Card>
+    <SectionCard
+      title={title}
+      description={description}
+      action={action}
+      className={className}
+    >
+      {children}
+    </SectionCard>
   );
 }
 
@@ -117,19 +117,9 @@ export function FieldRow({
   readonly note?: ReactNode;
 }): ReactElement {
   return (
-    <div
-      data-field-row="true"
-      className="grid gap-1 border-b border-border py-3 last:border-b-0 md:grid-cols-[minmax(11rem,1fr)_minmax(0,2fr)_auto] md:items-baseline md:gap-4"
-    >
-      <span className="text-label">{label}</span>
-      <span className="flex min-w-0 flex-col gap-1 text-body-strong break-words">
-        {children}
-        {note !== undefined ? (
-          <span className="text-caption text-muted-foreground">{note}</span>
-        ) : null}
-      </span>
-      <span className="flex items-center md:justify-end">{source}</span>
-    </div>
+    <Field label={label} source={source} note={note}>
+      {children}
+    </Field>
   );
 }
 

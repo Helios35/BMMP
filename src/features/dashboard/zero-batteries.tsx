@@ -1,12 +1,9 @@
-import Link from "next/link";
 import type { ReactElement } from "react";
 import { PackageOpen } from "lucide-react";
 
+import { EmptyState } from "@/components/page/empty-state";
 import { canReadRoute, canWriteRoute } from "@/domain/access/route-capability";
 import type { RoleCode } from "@/domain/taxonomy/role";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { cn } from "@/lib/utils";
 
 import {
   AUDIT_LOG,
@@ -111,29 +108,26 @@ export function ZeroBatteriesCard({
   readonly className?: string;
 }): ReactElement {
   return (
-    <Card
-      data-region-state="empty"
-      data-zero-batteries-variant={state.variant}
-      className={cn("gap-0", className)}
-    >
-      <CardContent className="flex flex-col gap-3 py-1">
-        <div className="flex items-start gap-3">
-          <PackageOpen
-            aria-hidden="true"
-            className="mt-0.5 size-5 shrink-0 text-muted-foreground"
-          />
-          <p className="max-w-[72ch] text-body-strong text-balance">
-            {state.message}
-          </p>
-        </div>
-        {state.action === null ? null : (
-          <div className="pl-8">
-            <Button asChild size="lg" className="min-h-11">
-              <Link href={state.action.href}>{state.action.label}</Link>
-            </Button>
-          </div>
-        )}
-      </CardContent>
-    </Card>
+    <EmptyState
+      icon={PackageOpen}
+      // §5 E-1's sentence, whole. `edge-zero-batteries.spec.ts` reads every
+      // variant back as one rendered paragraph and asserts the other three are
+      // absent, so the copy is never split.
+      title={state.message}
+      action={
+        state.action === null
+          ? null
+          : {
+              label: state.action.label,
+              href: state.action.href,
+              testId: state.action.href,
+            }
+      }
+      className={className}
+      dataAttributes={{
+        "data-region-state": "empty",
+        "data-zero-batteries-variant": state.variant,
+      }}
+    />
   );
 }

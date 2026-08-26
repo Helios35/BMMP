@@ -1,11 +1,11 @@
 import { StatusBadge } from "@/components/status/status-badge";
-import { Card, CardContent } from "@/components/ui/card";
 import {
   IntakeBlockedNotice,
   IntakeGraceNotice,
 } from "@/features/consent/components/intake-blocked-notice";
 import type { IntakeGateView } from "@/features/consent/read-intake-gate";
 import type { TimeZone } from "@/types/common";
+import { SectionCard } from "@/components/page";
 import { TOS_PRIOR_VERSION_NOTE } from "../copy";
 import type { ConsentRow } from "../read-organization-settings";
 import {
@@ -82,95 +82,91 @@ export function TermsOfServiceCard({
       ) : null}
       <IntakeGraceNotice gate={gate} />
 
-      <Card>
-        <CardContent className="flex flex-col gap-4">
-          {rows.length === 0 ? (
-            <p className="text-body text-muted-foreground">
-              No Terms of Service record exists for this organization.
-            </p>
-          ) : (
-            <ul className="flex flex-col gap-4">
-              {rows.map(({ acceptance, acceptedByName }) => (
-                <li
-                  key={acceptance.id}
-                  data-tos-status={acceptance.status}
-                  className="rounded-md border border-border p-4"
-                >
-                  <FieldList>
-                    <Field label="Status">
-                      {/* T-47. `not_accepted` is a real value, not an absent row. */}
-                      <StatusBadge
-                        system="tos_acceptance_status"
-                        value={acceptance.status}
-                      />
-                    </Field>
-                    <Field
-                      label="Version"
-                      value={acceptance.documentVersion}
-                      mono
+      <SectionCard>
+        {rows.length === 0 ? (
+          <p className="text-body text-muted-foreground">
+            No Terms of Service record exists for this organization.
+          </p>
+        ) : (
+          <ul className="flex flex-col gap-4">
+            {rows.map(({ acceptance, acceptedByName }) => (
+              <li
+                key={acceptance.id}
+                data-tos-status={acceptance.status}
+                className="rounded-md border border-border p-4"
+              >
+                <FieldList>
+                  <Field label="Status">
+                    {/* T-47. `not_accepted` is a real value, not an absent row. */}
+                    <StatusBadge
+                      system="tos_acceptance_status"
+                      value={acceptance.status}
                     />
-                    <Field label="Accepted by" value={acceptedByName} />
-                    <Field label="Accepted on">
-                      {acceptance.acceptedAt === null ? (
-                        <span className="text-body text-muted-foreground">
-                          Not accepted.
-                        </span>
-                      ) : (
-                        <ZonedDate
-                          instant={acceptance.acceptedAt}
-                          timeZone={timeZone}
-                        />
-                      )}
-                    </Field>
-                    <Field label="In force from">
-                      {acceptance.inForceOn === null ? null : (
-                        <CalendarDay value={acceptance.inForceOn} />
-                      )}
-                    </Field>
-                    <Field label="Re-acceptance deadline">
-                      {acceptance.reacceptanceDeadlineOn === null ? (
-                        // Absent is not the same as missing here: an acceptance
-                        // with no grace window has no deadline to state
-                        // (Rule 7.13).
-                        <span className="text-body text-muted-foreground">
-                          No grace window.
-                        </span>
-                      ) : (
-                        <CalendarDay
-                          value={acceptance.reacceptanceDeadlineOn}
-                        />
-                      )}
-                    </Field>
-                    <Field label="Data training-rights grant">
-                      {/* D-2. Promoted to its own column because the intake
+                  </Field>
+                  <Field
+                    label="Version"
+                    value={acceptance.documentVersion}
+                    mono
+                  />
+                  <Field label="Accepted by" value={acceptedByName} />
+                  <Field label="Accepted on">
+                    {acceptance.acceptedAt === null ? (
+                      <span className="text-body text-muted-foreground">
+                        Not accepted.
+                      </span>
+                    ) : (
+                      <ZonedDate
+                        instant={acceptance.acceptedAt}
+                        timeZone={timeZone}
+                      />
+                    )}
+                  </Field>
+                  <Field label="In force from">
+                    {acceptance.inForceOn === null ? null : (
+                      <CalendarDay value={acceptance.inForceOn} />
+                    )}
+                  </Field>
+                  <Field label="Re-acceptance deadline">
+                    {acceptance.reacceptanceDeadlineOn === null ? (
+                      // Absent is not the same as missing here: an acceptance
+                      // with no grace window has no deadline to state
+                      // (Rule 7.13).
+                      <span className="text-body text-muted-foreground">
+                        No grace window.
+                      </span>
+                    ) : (
+                      <CalendarDay value={acceptance.reacceptanceDeadlineOn} />
+                    )}
+                  </Field>
+                  <Field label="Data training-rights grant">
+                    {/* D-2. Promoted to its own column because the intake
                           trigger reads it — an acceptance that withholds it is
                           not consent to capture (Rule 7.1). */}
-                      <span className="text-body-strong">
-                        {acceptance.trainingRightsGranted
-                          ? "Granted"
-                          : "Not granted"}
-                      </span>
-                    </Field>
-                    {/* Proves *what* was agreed to, not merely that something
+                    <span className="text-body-strong">
+                      {acceptance.trainingRightsGranted
+                        ? "Granted"
+                        : "Not granted"}
+                    </span>
+                  </Field>
+                  {/* Proves *what* was agreed to, not merely that something
                         was (Rule 7.5). Never truncated: it is read back
                         character by character in a dispute. */}
-                    <Field
-                      label="Document content hash"
-                      value={acceptance.documentContentHash}
-                      mono
-                      span
-                    />
-                  </FieldList>
-                </li>
-              ))}
-            </ul>
-          )}
+                  <Field
+                    label="Document content hash"
+                    value={acceptance.documentContentHash}
+                    mono
+                    span
+                  />
+                </FieldList>
+              </li>
+            ))}
+          </ul>
+        )}
 
-          <p className="max-w-[72ch] text-body text-muted-foreground">
-            {TOS_PRIOR_VERSION_NOTE}
-          </p>
-        </CardContent>
-      </Card>
+        <p className="max-w-[72ch] text-body text-muted-foreground">
+          {TOS_PRIOR_VERSION_NOTE}
+        </p>
+      </SectionCard>
     </SettingsSection>
   );
 }

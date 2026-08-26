@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import { CARD_SPACING } from "@/components/page";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { APP_ROUTE_NAMES } from "@/domain/access/routes";
 import { ROLE_LABELS } from "@/domain/taxonomy/role";
@@ -68,7 +69,7 @@ export default async function SignUpPage({
         />
       )}
 
-      <Card>
+      <Card className={CARD_SPACING}>
         <CardHeader>
           <CardTitle className="text-h2">
             <h1 id="page-title" tabIndex={-1}>

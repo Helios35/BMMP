@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-import { RecordTable } from "@/components";
+import { PageHeader, PageShell, RecordTable } from "@/components";
 import { canReadRoute } from "@/domain/access/route-capability";
 import { APP_ROUTE_NAMES } from "@/domain/access/routes";
 import { requireRoute } from "@/lib/auth/guard";
@@ -45,11 +45,10 @@ export default async function CatalogPage({
   const canOpenEntry = canReadRoute(ctx.role, "/catalog/[id]");
 
   return (
-    <div className="flex flex-col gap-6 p-4 md:p-6">
-      {/* The shell's route announcer moves focus here on every navigation. */}
-      <h1 id="page-title" tabIndex={-1} className="text-h1 lg:text-display">
-        {APP_ROUTE_NAMES["/catalog"]}
-      </h1>
+    <PageShell>
+      {/* No action in the header: §3.15 makes search the primary action, and it
+          lives in the table's toolbar with the filters it narrows alongside. */}
+      <PageHeader title={APP_ROUTE_NAMES["/catalog"]} />
 
       <RecordTable
         caption="Catalog entries"
@@ -86,6 +85,6 @@ export default async function CatalogPage({
         }}
         error={view.error}
       />
-    </div>
+    </PageShell>
   );
 }

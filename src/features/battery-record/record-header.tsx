@@ -1,7 +1,8 @@
 import Link from "next/link";
-import type { ReactElement } from "react";
+import type { ReactElement, ReactNode } from "react";
 import { Printer } from "lucide-react";
 
+import { ACTION_BUTTON_CLASS, PageHeader } from "@/components/page";
 import { StatusBadge } from "@/components/status/status-badge";
 import { Button } from "@/components/ui/button";
 import { canReadRoute } from "@/domain/access/route-capability";
@@ -37,82 +38,88 @@ export function RecordHeader({
   clock,
   role,
   documentsHref,
+  breadcrumbs,
+  notice,
 }: {
   readonly record: BatteryRecord;
   readonly container: Container | null;
   readonly clock: StorageClock | undefined;
   readonly role: RoleCode;
   readonly documentsHref: string;
+  readonly breadcrumbs?: ReactNode;
+  /** The read-only banner, the hard block and the gated controls (§2.9). */
+  readonly notice?: ReactNode;
 }): ReactElement {
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-        <div className="flex min-w-0 flex-col gap-2">
-          <div className="flex flex-wrap items-center gap-1">
-            <h1
-              id="page-title"
-              tabIndex={-1}
-              // `font-mono` rather than the `text-mono` token: the token carries
-              // its own size, and this heading is `h1` / `display` (§1.3).
-              className="font-mono text-h1 tabular-nums lg:text-display"
-            >
-              {record.recordNumber}
-            </h1>
-            <CopyButton value={record.recordNumber} label="record ID" />
-          </div>
-
-          <p className="text-body">
-            {record.manufacturerName ?? <NotRecorded />}
-            {record.modelName === null ? null : ` · ${record.modelName}`}
-          </p>
-
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-body">
-              <TaxonomyText
-                system="chemistry"
-                read={
-                  record.chemistry === null
-                    ? null
-                    : readTaxonomyValue(
-                        CHEMISTRIES,
-                        CHEMISTRY_LABELS,
-                        record.chemistry,
-                      )
-                }
-              />
-            </span>
-            <StatusBadge
-              system="assessed_condition"
-              value={record.assessedCondition}
-              size="sm"
-            />
-            <StatusBadge
-              system="battery_record_status"
-              value={record.status}
-              size="sm"
-            />
-            <StatusBadge
-              system="storage_clock_alert_band"
-              value={clock?.alertBand}
-              size="sm"
-            />
-            <ContainerLink container={container} role={role} />
-          </div>
-        </div>
-
+    <PageHeader
+      breadcrumbs={breadcrumbs}
+      title={
+        // `font-mono` rather than the `text-mono` token: the token carries its
+        // own size, and this heading is `h1` / `display` (§1.3).
+        <span className="font-mono tabular-nums">{record.recordNumber}</span>
+      }
+      // §1.3 — every ID sits beside a copy button at a 44px target. Outside the
+      // `h1`, so the heading's accessible name stays the record number.
+      titleAdornment={
+        <CopyButton value={record.recordNumber} label="record ID" />
+      }
+      // A value, not helper text: this is the line a handler reads to confirm
+      // they have the right battery, so it is never muted (§1.2 Rule 3).
+      subtitle={
+        <>
+          {record.manufacturerName ?? <NotRecorded />}
+          {record.modelName === null ? null : ` · ${record.modelName}`}
+        </>
+      }
+      action={
         <Button
           asChild
           variant="outline"
           size="lg"
-          className="min-h-11 rounded-md"
+          className={ACTION_BUTTON_CLASS}
         >
           <Link href={documentsHref} data-print-documents="true">
             <Printer aria-hidden="true" />
             Print documents
           </Link>
         </Button>
-      </div>
-    </div>
+      }
+      meta={
+        <>
+          <span className="text-body">
+            <TaxonomyText
+              system="chemistry"
+              read={
+                record.chemistry === null
+                  ? null
+                  : readTaxonomyValue(
+                      CHEMISTRIES,
+                      CHEMISTRY_LABELS,
+                      record.chemistry,
+                    )
+              }
+            />
+          </span>
+          <StatusBadge
+            system="assessed_condition"
+            value={record.assessedCondition}
+            size="sm"
+          />
+          <StatusBadge
+            system="battery_record_status"
+            value={record.status}
+            size="sm"
+          />
+          <StatusBadge
+            system="storage_clock_alert_band"
+            value={clock?.alertBand}
+            size="sm"
+          />
+          <ContainerLink container={container} role={role} />
+        </>
+      }
+      notice={notice}
+    />
   );
 }
 
