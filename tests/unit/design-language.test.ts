@@ -3,6 +3,8 @@ import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
+import { cn, TYPE_TOKEN_NAMES } from "@/lib/utils";
+
 /**
  * §1.3's type scale and §1.4's spacing scale, **enforced rather than agreed**.
  *
@@ -332,6 +334,75 @@ describe("§1.4 — two radii, and elevation only where a surface floats", () =>
 });
 
 /* -------------------------------------------------------------- the corpus */
+
+/* ------------------------------------------------------------------- merge */
+
+/**
+ * **A type token and a text colour have to survive each other.**
+ *
+ * The eight tokens are `@utility` rules rather than anything Tailwind ships, so
+ * `tailwind-merge` has never heard of them — and its fallback for an unknown
+ * `text-*` class is *colour*. Until `cn` was told otherwise, `text-label` and
+ * `text-primary-foreground` sat in one conflict group and the later of the two
+ * deleted the earlier.
+ *
+ * The visible result was **a primary button with no text colour at all**: it
+ * inherited `--foreground`, near-white on a near-white `--primary` in dark mode.
+ * The same collision silently dropped the *size* in the other order, so
+ * `text-caption text-muted-foreground` rendered at the inherited size.
+ *
+ * Nothing in the type sweep above could see it. Every class was on the token
+ * set; they were merged out of the DOM afterwards.
+ */
+describe("§1.3 — a type token and a text colour survive each other", () => {
+  const COLOURS = [
+    "text-foreground",
+    "text-muted-foreground",
+    "text-primary-foreground",
+    "text-popover-foreground",
+    "text-destructive",
+    "text-current",
+    "text-intent-critical-foreground",
+  ] as const;
+
+  it("keeps both, in either order, for every token and every colour", () => {
+    const dropped: string[] = [];
+    for (const token of TYPE_TOKEN_NAMES) {
+      for (const colour of COLOURS) {
+        for (const pair of [
+          [`text-${token}`, colour],
+          [colour, `text-${token}`],
+        ] as const) {
+          const merged = cn(pair[0], pair[1]);
+          if (!merged.includes(`text-${token}`) || !merged.includes(colour)) {
+            dropped.push(`${pair[0]} + ${pair[1]} -> ${merged}`);
+          }
+        }
+      }
+    }
+    expect(
+      dropped,
+      `cn() dropped one of a size/colour pair — the button-with-invisible-text bug:\n  ${dropped.join("\n  ")}`,
+    ).toEqual([]);
+  });
+
+  it("still resolves two tokens last-wins", () => {
+    expect(cn("text-body", "text-body-strong")).toBe("text-body-strong");
+    expect(cn("text-h1", "text-display")).toBe("text-display");
+  });
+
+  it("still lets a token beat the Tailwind size a generated primitive carries", () => {
+    // The whole reason `ACTION_BUTTON_CLASS` exists: `Button` is `text-sm`, and
+    // 14px is not one of §1.3's eight.
+    expect(cn("text-sm", "text-label")).toBe("text-label");
+  });
+
+  it("the eight `cn` knows are the eight globals.css defines", () => {
+    expect([...TYPE_TOKEN_NAMES].sort()).toEqual(
+      [...TYPE_TOKENS].map((token) => token.replace("text-", "")).sort(),
+    );
+  });
+});
 
 describe("the sweep looks at what it claims to", () => {
   it("scans every source file outside the generated primitives", () => {
