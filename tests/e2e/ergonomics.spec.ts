@@ -38,9 +38,15 @@ import { fixtureIds, INVITE_TOKENS, storageStateFor } from "./support/roles";
  * 2. **A control that is visually hidden until it is focused.** The skip link
  *    is `sr-only` at 1 × 1 px and becomes a padded control on focus. It is not
  *    a target until then, so the sweep focuses it and measures it there.
+ * 3. **An element that is `aria-hidden` and out of the tab order.** Radix's
+ *    `Select` renders a native `<select>` per control to mirror its value for
+ *    form autofill; it is not in the accessibility tree, cannot be focused and
+ *    cannot be clicked. It measures 0 × 0 or 1 × 1 depending on when the sweep
+ *    catches it, and the 1 × 1 case made this file fail on `/batteries` at
+ *    random. **Both conditions are required together.**
  *
- * Neither relaxes the rule; a control that is small *when it can be used* still
- * fails.
+ * None of the three relaxes the rule; a control that is small *when it can be
+ * used* still fails.
  */
 
 const TARGET_SELECTOR =
@@ -94,6 +100,21 @@ function sweepInPage({ selector, minimum }: SweepInput): SweepResult {
   for (const element of Array.from(document.querySelectorAll(selector))) {
     const style = window.getComputedStyle(element);
     if (style.visibility === "hidden" || style.display === "none") continue;
+
+    // Out of the accessibility tree **and** out of the tab order: not a target
+    // anyone can reach, by pointer or by keyboard. Radix's `Select` renders one
+    // of these per control — a native `<select>` that mirrors the value for form
+    // autofill, `aria-hidden`, `tabindex="-1"`, absolutely positioned, and
+    // measuring 0×0 or 1×1 depending on when the sweep catches it. The 0 case
+    // was already skipped below and the 1 case was not, so this sweep failed on
+    // `/batteries` at random. **Both conditions are required**, so a real
+    // control cannot slip out from under the rule by carrying one attribute.
+    if (
+      element.getAttribute("aria-hidden") === "true" &&
+      element.getAttribute("tabindex") === "-1"
+    ) {
+      continue;
+    }
 
     let rect = element.getBoundingClientRect();
     let measuredAs: "self" | "stretched" | "focused" = "self";
