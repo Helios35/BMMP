@@ -43,6 +43,7 @@ const PROVIDERS = { fixture: fixtureProvider } as const;
  */
 export interface VisionEnvironment {
   VISION_PROVIDER?: string | undefined;
+  VERCEL_ENV?: string | undefined;
   [key: string]: string | undefined;
 }
 
@@ -65,6 +66,13 @@ export function resolveVisionProvider(env: VisionEnvironment = process.env): {
     throw new Error(
       `VISION_PROVIDER must be 'fixture'; got ${JSON.stringify(env.VISION_PROVIDER)}`,
     );
+  }
+
+  // The fixture answers every label with canned fields. In production that is
+  // a real customer's record filled from a test script — the same hazard
+  // `DATA_ADAPTER=mock` is refused for, so the same refusal (D-16, D-25).
+  if (code === "fixture" && env.VERCEL_ENV === "production") {
+    throw new Error("VISION_PROVIDER=fixture is refused in production.");
   }
 
   const key = code as keyof typeof PROVIDERS;

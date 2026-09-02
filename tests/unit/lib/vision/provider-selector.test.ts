@@ -63,6 +63,24 @@ describe("resolveVisionProvider", () => {
     expect(code).toBe("fixture");
     expect(provider.code).toBe("fixture");
   });
+
+  it("refuses the fixture in production — a canned read on a real record is a wrong document", () => {
+    expect(() =>
+      resolveVisionProvider({
+        VISION_PROVIDER: "fixture",
+        VERCEL_ENV: "production",
+      }),
+    ).toThrow(/refused in production/);
+  });
+
+  it("allows the fixture everywhere that is not production", () => {
+    for (const env of ["preview", "development", undefined]) {
+      expect(
+        resolveVisionProvider({ VISION_PROVIDER: "fixture", VERCEL_ENV: env })
+          .code,
+      ).toBe("fixture");
+    }
+  });
 });
 
 describe("visionProvider (module load)", () => {
