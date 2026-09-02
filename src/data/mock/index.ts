@@ -149,6 +149,7 @@ import type {
 import { resolveRules } from "@/domain/rules/resolve";
 import { validateIntakeGateConfiguration } from "@/domain/intake/thresholds";
 import { requiredContainerType } from "@/domain/storage/placement";
+import { intakeLandingStatus } from "@/domain/intake/landing-status";
 import type { BatteryRecordStatus } from "@/domain/taxonomy/battery-record-status";
 import {
   HARD_GATED_LABEL_FIELD_CODES,
@@ -1132,6 +1133,24 @@ const intakeSessions: IntakeRepository = {
         context: { rule: "6.6" },
       });
     }
+    // The person the record names as its confirmer is the person the
+    // assessment row names — one act, two columns (Rule 6.6). A payload that
+    // disagrees would land a record whose condition column credits someone
+    // the assessment does not.
+    if (
+      input.conditionOutcome.conditionConfirmedBy.trim() === "" ||
+      input.conditionOutcome.conditionConfirmedBy !==
+        input.damageAssessment.confirmedBy
+    ) {
+      throw new DataIntegrityError({
+        userMessage: "Something went wrong and nothing was changed. Try again.",
+        correlationId: ctx.correlationId,
+        context: {
+          reason: "condition_confirmer_disagrees_with_assessment",
+          rule: "6.6",
+        },
+      });
+    }
     // The assessment row and the outcome it produced are one determination
     // seen from two sides (Rules 6.4, 6.5): the condition, the air prohibition
     // and whether any flag is set must all agree with the row's status.
@@ -1207,14 +1226,6 @@ const intakeSessions: IntakeRepository = {
             containerType: container.containerType,
             required,
           },
-        });
-      }
-      if (input.storageEvent === null) {
-        throw new ValidationError({
-          userMessage:
-            "A placement records a storage event. Nothing was changed.",
-          correlationId: ctx.correlationId,
-          context: { rule: "4.4" },
         });
       }
       if (input.joinStorageClockId !== null) {
@@ -1310,16 +1321,13 @@ const intakeSessions: IntakeRepository = {
       }
 
       // The status follows what else is in the payload, never the caller's
-      // word for it: placed → in storage (or quarantined under a DDR flag),
-      // classified when a decision exists, otherwise confirmed (T-22).
-      const status: BatteryRecordStatus =
-        container !== null
-          ? input.conditionOutcome.ddrFlags.length > 0
-            ? "quarantined"
-            : "stored"
-          : decisionId !== null
-            ? "classified"
-            : "confirmed";
+      // word for it (T-22) — the same function the builder used to audit the
+      // transition, so the trail and the column cannot disagree.
+      const status: BatteryRecordStatus = intakeLandingStatus({
+        placed: container !== null,
+        ddrFlagged: input.conditionOutcome.ddrFlags.length > 0,
+        decided: decisionId !== null,
+      });
 
       // Through the unguarded base: the DDR flags and the air prohibition
       // arrive as the domain's determination from the confirmed assessment,
@@ -1340,6 +1348,10 @@ const intakeSessions: IntakeRepository = {
           input.conditionOutcome.isAirTransportProhibited,
       } as Partial<BatteryRecord>);
 
+      // TODO(T-43) — the session's own move to `completed` (T-08) has no event
+      // type; `intake_session.started` is its only row. Proposed:
+      // `intake_session.status_changed`. Raised in the build-notes, not
+      // written under a neighbour.
       await store().intakeSessions.update(ctx, session.id, {
         status: "completed",
         currentStep: "complete",

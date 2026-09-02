@@ -737,7 +737,8 @@ export async function saveToReviewQueue(
     async (ctx, parsed, attribution) => {
       const { session, record } = await loadOpenIntake(ctx, parsed.sessionId);
       const at = now();
-      if (record.status !== "pending_review") {
+      const entersQueue = record.status !== "pending_review";
+      if (entersQueue) {
         await data.batteryRecords.update(ctx, record.id, {
           status: "pending_review",
         });
@@ -745,23 +746,32 @@ export async function saveToReviewQueue(
       await data.intakeSessions.update(ctx, session.id, {
         isReviewRequired: true,
       });
-      await data.auditEvents.write(
-        ctx,
-        userEvent(ctx, {
-          eventType: "battery_record.routed_to_review",
-          entityTable: "battery_record",
-          entityId: record.id,
-          at,
-          beforeState: { status: record.status },
-          afterState: {
-            status: "pending_review",
-            reasonCodes: [...(session.reviewReasonCodes ?? [])],
-          },
-          changedFields: record.status === "pending_review" ? null : ["status"],
-          reason: REASON_SAVED_TO_QUEUE,
-          attribution,
-        }),
-      );
+      if (entersQueue) {
+        // T-43 `battery_record.routed_to_review` — the record enters the
+        // queue; here a person routed it rather than a band, and the reason
+        // says so.
+        await data.auditEvents.write(
+          ctx,
+          userEvent(ctx, {
+            eventType: "battery_record.routed_to_review",
+            entityTable: "battery_record",
+            entityId: record.id,
+            at,
+            beforeState: { status: record.status },
+            afterState: {
+              status: "pending_review",
+              reasonCodes: [...(session.reviewReasonCodes ?? [])],
+            },
+            changedFields: ["status"],
+            reason: REASON_SAVED_TO_QUEUE,
+            attribution,
+          }),
+        );
+      }
+      // TODO(T-43) — a record already in the queue that a person saves and
+      // leaves has no state change to name and no event type for the act
+      // (proposed: `intake_session.saved_to_queue`). Nothing is written
+      // rather than a routing row that routed nothing. Raised.
       return { sessionId: session.id, batteryRecordId: record.id };
     },
   );

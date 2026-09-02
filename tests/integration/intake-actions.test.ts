@@ -520,11 +520,16 @@ describe("a whole intake, start to redirect", () => {
       limit: 5,
     });
     expect(decisions.items[0]?.wasteClassification).toBe("light_category");
+    // TODO(T-16) — no activity type describes a placement, so no storage
+    // event is written; the record's container and its status row carry it.
     const events = await data.storageEvents.list(HANDLER, {
       batteryRecordId,
       limit: 5,
     });
-    expect(events.items[0]?.storageClockId).toBe(ID.CLOCK.soundDrum);
+    expect(events.items).toHaveLength(0);
+    const landed = await data.batteryRecords.get(HANDLER, batteryRecordId);
+    expect(landed?.containerId).toBe(ID.CONTAINER.soundDrum);
+    expect(landed?.status).toBe("stored");
     const container = await data.containers.get(
       HANDLER,
       ID.CONTAINER.soundDrum,
@@ -545,7 +550,7 @@ describe("a whole intake, start to redirect", () => {
       "battery_record.confirmed",
       "damage_assessment.recorded",
       "classification_decision.recorded",
-      "storage_event.recorded",
+      "battery_record.status_changed",
     ]) {
       expect(types, expected).toContain(expected);
     }
@@ -650,14 +655,19 @@ describe("a whole intake, start to redirect", () => {
     const { sessionId, batteryRecordId } = ok(
       await actions.startIntakeSession({}),
     );
-    const labelPhotoId = await upload(sessionId, "label-low.png");
+    // A clean read routes nothing to review on its own, so the routing row
+    // below is the person's act and nothing else's.
+    const labelPhotoId = await upload(sessionId, "label-clean.png");
     ok(
       await actions.runLabelExtraction({
         sessionId,
         labelPhotoId,
-        labelFileName: "label-low.png",
+        labelFileName: "label-clean.png",
       }),
     );
+    expect(
+      (await data.batteryRecords.get(HANDLER, batteryRecordId))?.status,
+    ).not.toBe("pending_review");
 
     ok(await actions.saveToReviewQueue({ sessionId }));
     const routed = auditRows(HANDLER.correlationId).filter(
@@ -672,6 +682,17 @@ describe("a whole intake, start to redirect", () => {
     expect(
       (await data.batteryRecords.get(HANDLER, batteryRecordId))?.status,
     ).toBe("pending_review");
+
+    // Already in the queue: a second save changes nothing and writes no
+    // routing row that routed nothing (the TODO(T-43) in saveToReviewQueue).
+    ok(await actions.saveToReviewQueue({ sessionId }));
+    expect(
+      auditRows(HANDLER.correlationId).filter(
+        (row) =>
+          row.eventType === "battery_record.routed_to_review" &&
+          row.reason === "session_saved_to_queue",
+      ),
+    ).toHaveLength(1);
 
     ok(
       await actions.voidIntakeSession({

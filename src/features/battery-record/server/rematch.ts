@@ -14,7 +14,7 @@ import { ValidationError } from "@/lib/errors";
 import type { BatteryRecord } from "@/types/battery-record";
 import type { IsoTimestamp, JsonObject, Uuid } from "@/types/common";
 import type { CatalogEntry } from "@/types/catalog";
-import { userEvent, writeAuditEvent } from "./audit";
+import { systemEvent, userEvent, writeAuditEvent } from "./audit";
 import {
   assertRecordEditable,
   reclassifyRecord,
@@ -116,6 +116,7 @@ function candidateView(
 export async function findCatalogCandidatesForRecord(
   ctx: RequestContext,
   recordId: Uuid,
+  at: IsoTimestamp,
 ): Promise<readonly CatalogCandidateView[]> {
   const record = await data.batteryRecords.get(ctx, recordId);
   if (record === null) {
@@ -172,7 +173,29 @@ export async function findCatalogCandidatesForRecord(
     },
   );
 
-  return ranked.slice(0, CANDIDATE_LIMIT).flatMap((candidate) => {
+  const shortlist = ranked.slice(0, CANDIDATE_LIMIT);
+
+  // T-43 `catalog_entry.matched` — "a catalog entry was proposed for a
+  // record" — is this step, the retrieval and ranking, and it is audited even
+  // when it proposes nothing (Rule 2.4). The row is the evaluator's, not the
+  // person's: nothing was picked yet. The pick that follows is the person's
+  // own `battery_record.confirmed` row.
+  await writeAuditEvent(
+    ctx,
+    systemEvent(ctx, "rematch:candidates", {
+      eventType: "catalog_entry.matched",
+      entityTable: "battery_record",
+      entityId: record.id,
+      occurredAt: at,
+      afterState: {
+        candidateIds: shortlist.map((candidate) => candidate.catalogEntryId),
+        previousCatalogEntryId: record.catalogEntryId,
+      },
+      reason: shortlist.length === 0 ? "no_catalog_match" : null,
+    }),
+  );
+
+  return shortlist.flatMap((candidate) => {
     const entry = byId.get(candidate.catalogEntryId);
     return entry === undefined ? [] : [candidateView(candidate, entry)];
   });
@@ -263,25 +286,14 @@ export async function applyCatalogRematch(
     (key) => before[key] !== after[key],
   );
 
+  // T-43 `battery_record.confirmed` — "a human confirmed identification,
+  // including chemistry" — is exactly what the re-match dialog records under
+  // Rule 2.32: the person confirms the new values now. The status itself has
+  // not moved, so `status_changed` would be a near neighbour, never written.
   await writeAuditEvent(
     ctx,
     userEvent(ctx, {
-      eventType: "catalog_entry.matched",
-      entityTable: "catalog_entry",
-      entityId: entry.id,
-      occurredAt: at,
-      afterState: {
-        batteryRecordId: record.id,
-        selection: "human_pick",
-        previousCatalogEntryId: record.catalogEntryId,
-      },
-    }),
-  );
-
-  await writeAuditEvent(
-    ctx,
-    userEvent(ctx, {
-      eventType: "battery_record.status_changed",
+      eventType: "battery_record.confirmed",
       entityTable: "battery_record",
       entityId: record.id,
       occurredAt: at,

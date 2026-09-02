@@ -4,7 +4,6 @@ import type {
   CreateDamageAssessment,
   CreateDateCodeDecode,
   CreateStorageClock,
-  CreateStorageEvent,
   IntakeConfirmation,
   RequestContext,
   UpdateBatteryRecord,
@@ -19,6 +18,7 @@ import {
   outstandingCommitItems,
   type OutstandingItem,
 } from "@/domain/intake/commit-gate";
+import { intakeLandingStatus } from "@/domain/intake/landing-status";
 import { decodeDateCode } from "@/domain/intake/date-code";
 import {
   commitFieldStates,
@@ -139,8 +139,14 @@ export type ConfirmationBuild =
       readonly outstanding: readonly OutstandingItem[];
     };
 
-/** T-16 has no placement value; the fixtures record a placement as `repackage`. */
-const PLACEMENT_ACTIVITY = "repackage";
+// TODO(T-16) — no activity type describes a placement. The fixtures file one
+// as `repackage` ("moving material between containers or into transport
+// packaging"), which a first placement is not, and a storage_event under a
+// near-neighbour value is a wrong record in a table that is never edited.
+// Until T-16 gains a placement value the commit writes no storage_event: the
+// placement is carried by the container's accumulation start, the clock row
+// it starts or joins, and the record's own status row (T-43
+// `battery_record.status_changed`). Raised in the build-notes.
 
 /** The `storage_clock.subject_type` and `clock_start_basis` the fixtures carry — no `TAXONOMY.md` system governs either column. */
 const CLOCK_SUBJECT_CONTAINER = "container";
@@ -357,25 +363,15 @@ export function buildIntakeConfirmation(
   const conditionConfirmed =
     draft.condition !== null && draft.condition.confirmedBy !== null;
 
-  const classification = previewClassification(
-    {
-      chemistry: draft.chemistry,
-      chemistryConfirmed: fields.some(
-        (field) =>
-          field.fieldCode === "chemistry_code" && field.status === "confirmed",
-      ),
-      applicationClass:
-        input.catalogEntry?.applicationClass ?? record.applicationClass,
-      ddrFlags: [],
-    },
-    input.rules,
-    input.organization,
-  );
-
-  // An unresolved classification does not block the commit here: the record
-  // commits unplaced with no decision row and says why (Rule 3.10, E-13).
-  // The card lists the gap; the server does not refuse a battery a handler
-  // is holding because reference data is missing.
+  // One list, computed here and in read-intake.ts with the same inputs
+  // (commit-gate.ts: a drifted checklist lets a card and a server disagree).
+  // - Placement is chosen, never demanded, in B1a (build-notes b1a-02 §4);
+  //   the E-2 copy that says otherwise is raised there, not resolved here.
+  // - EC-16 / Rule 3.10: identification completes while classification
+  //   blocks. An unresolved classification (no jurisdiction profile, no rule
+  //   version in force) never refuses the commit: the record commits
+  //   unplaced, with no decision row, and the record page states the missing
+  //   input and who supplies it (E-13).
   const outstanding = outstandingCommitItems({
     fields,
     conditionConfirmed,
@@ -385,7 +381,6 @@ export function buildIntakeConfirmation(
     isOffline: false,
     classificationBlocked: false,
   });
-  void classification;
 
   if (outstanding.length > 0 || !hardGatedFieldsConfirmed(draft)) {
     return {
@@ -545,7 +540,6 @@ export function buildIntakeConfirmation(
 
   let storageClock: CreateStorageClock | null = null;
   let joinStorageClockId: Uuid | null = null;
-  let storageEvent: CreateStorageEvent | null = null;
   let containerAccumulationStartedAt: IsoTimestamp | null = null;
   let clockStart: ClockStart | null = null;
   let placementRuleVersionId: Uuid | null = null;
@@ -632,19 +626,6 @@ export function buildIntakeConfirmation(
             : null;
       }
     }
-
-    storageEvent = {
-      activityType: PLACEMENT_ACTIVITY,
-      storageClockId: null,
-      containerId: null,
-      batteryRecordId: null,
-      lotId: container.lotId,
-      occurredAt: at,
-      recordedAt: at,
-      recordedBy: ctx.userId,
-      payload: { placement: joinStorageClockId === null ? "first" : "joined" },
-      governingRuleVersionId: placementRuleVersionId,
-    };
   }
 
   // --- the audit rows ----------------------------------------------------------
@@ -756,28 +737,35 @@ export function buildIntakeConfirmation(
     );
   }
 
-  if (storageEvent !== null && container !== null) {
-    auditEvents.push(
-      systemStepEvent(ctx, {
-        step: "place",
-        provider:
-          input.rules.accumulation.kind === "resolved"
-            ? input.rules.accumulation.rule.ruleKey
-            : "unresolved",
-        eventType: "storage_event.recorded",
-        entityTable: "storage_event",
-        entityId: record.id,
-        at,
-        afterState: {
-          activityType: storageEvent.activityType,
-          containerId: container.id,
-          placement: joinStorageClockId === null ? "first" : "joined",
-          joinedStorageClockId: joinStorageClockId,
-        },
-        governingRuleVersionId: placementRuleVersionId,
-      }),
-    );
-  }
+  // T-43 `battery_record.status_changed` — the commit moves the record off
+  // `draft` / `pending_review` (T-22). The person who pressed **Confirm and
+  // log battery** caused the move, so it is their row, and it names the
+  // landing the adapter will write: the same function decides both.
+  auditEvents.push(
+    userEvent(ctx, {
+      eventType: "battery_record.status_changed",
+      entityTable: "battery_record",
+      entityId: record.id,
+      at,
+      beforeState: { status: record.status },
+      afterState: {
+        status: intakeLandingStatus({
+          placed: container !== null,
+          ddrFlagged: determination.ddrFlags.length > 0,
+          decided: classificationDecision !== null,
+        }),
+        containerId: container?.id ?? null,
+        joinedStorageClockId: joinStorageClockId,
+      },
+      changedFields:
+        container === null ? ["status"] : ["status", "containerId"],
+      governingRuleVersionId:
+        container === null
+          ? classificationRuleVersionId
+          : placementRuleVersionId,
+      attribution: input.attribution,
+    }),
+  );
 
   const confirmation: IntakeConfirmation = {
     intakeSessionId: input.session.id,
@@ -800,7 +788,8 @@ export function buildIntakeConfirmation(
     classificationDecision,
     storageClock,
     joinStorageClockId,
-    storageEvent,
+    // TODO(T-16) — see the placement note above.
+    storageEvent: null,
     containerAccumulationStartedAt,
     auditEvents,
   };

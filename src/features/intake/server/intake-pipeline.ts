@@ -749,6 +749,10 @@ export async function runIntakePipeline(
   }
 
   // 2 · extract
+  // TODO(T-43) — the session's T-08 moves (`extracting`, `awaiting_confirmation`)
+  // have no event type; the read's own row (`label_extraction.completed`)
+  // names the extraction, not the session. Proposed:
+  // `intake_session.status_changed`. Raised, never written under a neighbour.
   await data.intakeSessions.update(ctx, session.id, { status: "extracting" });
   const run: { extractionRunId: Uuid; requestedAt: IsoTimestamp } = {
     // A grouping key, not a row id: it ties the field rows of one provider

@@ -4,7 +4,6 @@ import type { CreateAuditEvent } from "@/data/contracts/audit";
 import type { RequestContext } from "@/data/contracts/context";
 import type { CreateDamageAssessment } from "@/data/contracts/condition";
 import type { CreateClassificationDecision } from "@/data/contracts/documents";
-import type { CreateStorageEvent } from "@/data/contracts/storage";
 import {
   configureMockRuntime,
   mockAdapter,
@@ -167,21 +166,6 @@ function lightCategoryDecision(): CreateClassificationDecision {
   };
 }
 
-function placementEvent(): CreateStorageEvent {
-  return {
-    activityType: "repackage",
-    storageClockId: null,
-    containerId: null,
-    batteryRecordId: null,
-    lotId: null,
-    occurredAt: AT,
-    recordedAt: AT,
-    recordedBy: ID.USER.danaHandler,
-    payload: null,
-    governingRuleVersionId: ID.RULE_VERSION.waAccumulationPeriod2026,
-  };
-}
-
 function auditEvent(
   eventType: CreateAuditEvent["eventType"],
   entityTable: string,
@@ -287,7 +271,8 @@ function placedInto(
   return confirmation({
     containerId,
     joinStorageClockId: clockId,
-    storageEvent: placementEvent(),
+    // TODO(T-16) — no activity type describes a placement; none is written.
+    storageEvent: null,
     ...overrides,
   });
 }
@@ -486,15 +471,17 @@ describe("a whole, valid commit (§11.1 step 6)", () => {
     expect(decodes.items[0]?.id).toBe(updated.dateCodeDecodeId);
     expect(decodes.items[0]?.intakeSessionId).toBe(SESSION);
 
+    // TODO(T-16) — no activity type describes a placement, so no storage
+    // event is written; the placement is the record's container.
     const events = await mockAdapter.storageEvents.list(HANDLER, {
       ...PAGE,
       batteryRecordId: RECORD,
     });
-    expect(events.items).toHaveLength(1);
-    expect(events.items[0]?.containerId).toBe(ID.CONTAINER.soundDrum);
+    expect(events.items).toHaveLength(0);
+    const placed = await mockAdapter.batteryRecords.get(HANDLER, RECORD);
+    expect(placed?.containerId).toBe(ID.CONTAINER.soundDrum);
     // Joined, not restarted: the clock is the container's running one
     // (Rule 4.4), and no new clock was created.
-    expect(events.items[0]?.storageClockId).toBe(ID.CLOCK.soundDrum);
     const clocks = await mockAdapter.storageClocks.list(HANDLER, {
       ...PAGE,
       containerId: ID.CONTAINER.soundDrum,
@@ -623,7 +610,7 @@ describe("a whole, valid commit (§11.1 step 6)", () => {
           nextAlertAt: null,
           status: "running",
         },
-        storageEvent: placementEvent(),
+        storageEvent: null,
         containerAccumulationStartedAt: AT,
       }),
     );
@@ -637,12 +624,6 @@ describe("a whole, valid commit (§11.1 step 6)", () => {
     expect(clocks.items).toHaveLength(1);
     expect(clocks.items[0]?.clockStartAt).toBe(AT);
     expect(clocks.items[0]?.stoppedAt).toBeNull();
-
-    const events = await mockAdapter.storageEvents.list(HANDLER, {
-      ...PAGE,
-      batteryRecordId: RECORD,
-    });
-    expect(events.items[0]?.storageClockId).toBe(clocks.items[0]?.id);
 
     const after = await mockAdapter.containers.get(HANDLER, fresh.id);
     expect(after?.accumulationStartedAt).toBe(AT);
@@ -729,18 +710,18 @@ describe("placement admission (Rules 4.16, 4.28; T-23)", () => {
 });
 
 describe("all or nothing — a partial commit leaves nothing written", () => {
-  it("restores every table, the session and the audit log when the storage-event append fails", async () => {
+  it("restores every table, the session and the audit log when the container update fails", async () => {
     // The seeded key is `<entityName>.<method>` where entityName is the
-    // TenantTable's second constructor argument (`store.ts`). The storage
-    // event is appended after the decode, the assessment, the decision and
-    // the clock join — a late write, so the restore has the most to undo.
+    // TenantTable's second constructor argument (`store.ts`). The container
+    // is updated after the decode, the assessment, the decision and the clock
+    // join — a late write, so the restore has the most to undo.
     const before = snapshotStore();
     const sessionBefore = await mockAdapter.intakeSessions.get(
       HANDLER,
       SESSION,
     );
 
-    configureMockRuntime({ seededFailures: ["storageEvents.insert"] });
+    configureMockRuntime({ seededFailures: ["containers.update"] });
     await expect(
       mockAdapter.intakeSessions.commitConfirmation(
         HANDLER,

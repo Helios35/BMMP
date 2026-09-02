@@ -214,6 +214,9 @@ export async function recordDamageAssessmentFor(
   const assessment = await data.damageAssessments.append(ctx, row);
 
   if (current !== null) {
+    // TODO(T-43) — a supersession has no event type of its own
+    // (`damage_assessment.superseded`); the `damage_assessment.recorded` row
+    // below names the superseded id in its before-state instead. Raised.
     await data.damageAssessments.markSuperseded(ctx, current.id, assessment.id);
   }
 

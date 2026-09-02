@@ -304,13 +304,24 @@ describe("Edit assessed condition — sound to damaged sets the flags through th
       "battery_record",
       ID.BATTERY.vehicleTraction,
     );
-    const statusRow = trail.find(
-      (event) =>
-        event.eventType === "battery_record.status_changed" &&
-        event.correlationId === HANDLER.correlationId,
-    );
-    expect(statusRow?.beforeState).toEqual({ status: "stored" });
-    expect(statusRow?.afterState).toEqual({ status: "quarantined" });
+    // Two transitions, two rows: into `reclassifying`, then to where it
+    // settled — the column moved twice and the trail shows both halves.
+    const statusMoves = trail
+      .filter(
+        (event) =>
+          event.eventType === "battery_record.status_changed" &&
+          event.correlationId === HANDLER.correlationId,
+      )
+      .map((event) => [event.beforeState, event.afterState]);
+    expect(statusMoves).toHaveLength(2);
+    expect(statusMoves).toContainEqual([
+      { status: "stored" },
+      { status: "reclassifying" },
+    ]);
+    expect(statusMoves).toContainEqual([
+      { status: "reclassifying" },
+      { status: "quarantined" },
+    ]);
 
     // Every row of the act shares the correlation id.
     const act = trail.filter(
@@ -342,6 +353,7 @@ describe("Re-run catalog matching — Rules 2.19, 3.14, 3.15", () => {
     const candidates = await findCatalogCandidatesForRecord(
       HANDLER,
       ID.BATTERY.vehicleTraction,
+      AT,
     );
     expect(candidates.length).toBeGreaterThan(0);
     expect(candidates.length).toBeLessThanOrEqual(5);
@@ -357,6 +369,13 @@ describe("Re-run catalog matching — Rules 2.19, 3.14, 3.15", () => {
       ID.CLASSIFICATION.mobilityScooter,
     );
 
+    // The proposal step is what T-43 `catalog_entry.matched` describes; the
+    // person's pick is their own `battery_record.confirmed` row.
+    await findCatalogCandidatesForRecord(
+      HANDLER,
+      ID.BATTERY.mobilityScooter,
+      AT,
+    );
     const outcome = await applyCatalogRematch(
       HANDLER,
       {
@@ -405,7 +424,7 @@ describe("Re-run catalog matching — Rules 2.19, 3.14, 3.15", () => {
     );
     const changed = trail.find(
       (event) =>
-        event.eventType === "battery_record.status_changed" &&
+        event.eventType === "battery_record.confirmed" &&
         event.reason === "catalog_rematch",
     );
     expect(changed?.actorUserId).toBe(ID.USER.danaHandler);
@@ -417,10 +436,12 @@ describe("Re-run catalog matching — Rules 2.19, 3.14, 3.15", () => {
     });
     expect(changed?.afterState).toMatchObject({ chemistry: "li_lco" });
 
-    const matched = await auditTrail("catalog_entry", ID.CATALOG.laptopCellLco);
-    expect(
-      matched.some((event) => event.eventType === "catalog_entry.matched"),
-    ).toBe(true);
+    const matched = trail.find(
+      (event) => event.eventType === "catalog_entry.matched",
+    );
+    expect(matched?.actorType).toBe("system");
+    expect(matched?.actorLabel).toBe("rematch:candidates");
+    expect(Array.isArray(matched?.afterState?.candidateIds)).toBe(true);
   });
 
   it("refuses an entry that is not available for matching", async () => {

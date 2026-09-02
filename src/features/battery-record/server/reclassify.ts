@@ -360,12 +360,33 @@ export async function reclassifyRecord(
     status: "reclassifying",
   });
 
+  // T-43 `battery_record.status_changed` — the record visibly enters
+  // `reclassifying` (T-22) before the decision is appended. A throw between
+  // the two leaves a record that says so beside a row that says why, which
+  // is the honest state; a silent transition would be a status with no trail.
+  await writeAuditEvent(
+    ctx,
+    systemEvent(ctx, actorLabel, {
+      eventType: "battery_record.status_changed",
+      entityTable: "battery_record",
+      entityId: record.id,
+      occurredAt: at,
+      beforeState: { status: statusBefore },
+      afterState: { status: "reclassifying" },
+      changedFields: ["status"],
+      reason: trigger,
+    }),
+  );
+
   const decision = await data.classificationDecisions.append(
     ctx,
     decisionRow(reclassifying, result, resolvedRule, supersedes, at),
   );
 
   for (const row of live) {
+    // TODO(T-43) — a supersession has no event type of its own
+    // (`classification_decision.superseded`); the `recorded` row below names
+    // the superseded ids in its before-state instead. Raised.
     await data.classificationDecisions.markSuperseded(ctx, row.id, decision.id);
   }
 
@@ -400,22 +421,23 @@ export async function reclassifyRecord(
   const status = settledStatus(reclassifying, result.kind);
   const settled = await data.batteryRecords.update(ctx, record.id, { status });
 
-  if (status !== statusBefore) {
-    await writeAuditEvent(
-      ctx,
-      systemEvent(ctx, actorLabel, {
-        eventType: "battery_record.status_changed",
-        entityTable: "battery_record",
-        entityId: record.id,
-        occurredAt: at,
-        beforeState: { status: statusBefore },
-        afterState: { status },
-        changedFields: ["status"],
-        governingRuleVersionId: decision.governingRuleVersionId,
-        reason: trigger,
-      }),
-    );
-  }
+  // The second move, off `reclassifying` — written even when the record
+  // settles where it started, because that too is a transition the column
+  // made and the trail must show both halves of.
+  await writeAuditEvent(
+    ctx,
+    systemEvent(ctx, actorLabel, {
+      eventType: "battery_record.status_changed",
+      entityTable: "battery_record",
+      entityId: record.id,
+      occurredAt: at,
+      beforeState: { status: "reclassifying" },
+      afterState: { status },
+      changedFields: ["status"],
+      governingRuleVersionId: decision.governingRuleVersionId,
+      reason: trigger,
+    }),
+  );
 
   return {
     kind: result.kind,

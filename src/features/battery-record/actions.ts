@@ -114,7 +114,9 @@ export async function findCatalogCandidatesForRecord(
         correlationId: ctx.correlationId,
       });
     }
-    return actionSucceeded(await findCandidatesFor(ctx, parsed.data.recordId));
+    return actionSucceeded(
+      await findCandidatesFor(ctx, parsed.data.recordId, nowIso()),
+    );
   } catch (error) {
     return actionFailedFrom(error, ctx.correlationId);
   }

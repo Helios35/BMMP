@@ -546,10 +546,16 @@ export async function readIntakeStepView(
       // both of them confirm condition (Rule 6.2).
       ownsCondition: true,
       containerChosen: draft.containerId !== null,
-      // Unplaced intake is permitted in B1a; the container is chosen, never demanded.
+      // The same inputs confirmation.ts hands the same function, so the card
+      // and the server never disagree (commit-gate.ts). Placement is chosen,
+      // never demanded, in B1a (build-notes b1a-02 §4).
       requiresContainer: false,
       isOffline: false,
-      classificationBlocked: classificationPreview.kind === "unresolved",
+      // EC-16 / Rule 3.10 — identification completes while classification
+      // blocks: an unresolved classification never stands between a person
+      // and logging the battery in their hands. The E-13 notice on this step
+      // states the missing input and who supplies it.
+      classificationBlocked: false,
     }),
     viewer: {
       userId: ctx.userId,

@@ -457,23 +457,29 @@ describe("an unplaced commit", () => {
     expect(confirmation.batteryRecord.manufacturedOn).toBe("2021-11-01");
   });
 
-  it("writes the two user rows and the system classification row, all under ctx.correlationId", () => {
+  it("writes the person's rows, the system classification row and the landing, all under ctx.correlationId", () => {
     const { confirmation } = built();
     const types = confirmation.auditEvents.map((event) => event.eventType);
     expect(types).toEqual([
       "battery_record.confirmed",
       "damage_assessment.recorded",
       "classification_decision.recorded",
+      "battery_record.status_changed",
     ]);
     for (const event of confirmation.auditEvents) {
       expect(event.correlationId).toBe(ctx.correlationId);
     }
-    const [confirmed, assessed, classified] = confirmation.auditEvents;
+    const [confirmed, assessed, classified, landed] = confirmation.auditEvents;
     expect(confirmed?.actorType).toBe("user");
     expect(confirmed?.actorUserId).toBe(ctx.userId);
     expect(assessed?.actorType).toBe("user");
     expect(classified?.actorType).toBe("system");
     expect(classified?.actorUserId).toBeNull();
+    // T-22 — unplaced with a decision lands `classified`; the person who
+    // pressed the button is the actor of the move.
+    expect(landed?.actorType).toBe("user");
+    expect(landed?.afterState).toMatchObject({ status: "classified" });
+    expect(landed?.changedFields).toEqual(["status"]);
     expect(classified?.actorLabel).toBe(
       "intake_pipeline:classify:classification.waste_stream",
     );
@@ -499,7 +505,21 @@ describe("an unplaced commit", () => {
     ).toBeNull();
     expect(
       result.confirmation.auditEvents.map((event) => event.eventType),
-    ).toEqual(["battery_record.confirmed", "damage_assessment.recorded"]);
+    ).toEqual([
+      "battery_record.confirmed",
+      "damage_assessment.recorded",
+      "battery_record.status_changed",
+    ]);
+    // EC-16 — identification completes; the record lands `confirmed`, with
+    // nothing that could be mistaken for a classification.
+    const landing = result.confirmation.auditEvents.find(
+      (event) => event.eventType === "battery_record.status_changed",
+    );
+    expect(landing?.afterState).toMatchObject({
+      status: "confirmed",
+      containerId: null,
+    });
+    expect(landing?.governingRuleVersionId).toBeNull();
   });
 });
 
@@ -588,18 +608,32 @@ describe("a placed commit", () => {
     expect(confirmation.storageClock).toBeNull();
     expect(confirmation.joinStorageClockId).toBe(soundClock.id);
     expect(confirmation.containerAccumulationStartedAt).toBeNull();
-    expect(confirmation.storageEvent?.activityType).toBe("repackage");
-    expect(confirmation.storageEvent?.payload).toEqual({ placement: "joined" });
-    expect(confirmation.storageEvent?.governingRuleVersionId).toBe(
-      soundClock.governingRuleVersionId,
-    );
+    // TODO(T-16) — no activity type describes a placement, so no storage
+    // event is written; the record's status row carries the placement.
+    expect(confirmation.storageEvent).toBeNull();
     expect(result.clockStart?.joinsExistingClock).toBe(true);
     expect(result.clockStart?.clockStartAt).toBe(soundClock.clockStartAt);
     expect(result.clockStart?.dueAt).toBe(soundClock.dueAt);
 
     const types = confirmation.auditEvents.map((event) => event.eventType);
-    expect(types).toContain("storage_event.recorded");
+    expect(types).not.toContain("storage_event.recorded");
     expect(types).not.toContain("storage_clock.status_changed");
+
+    // The person's own row names where the record lands and what it joined.
+    const landing = confirmation.auditEvents.find(
+      (event) => event.eventType === "battery_record.status_changed",
+    );
+    expect(landing?.actorUserId).toBe(ctx.userId);
+    expect(landing?.beforeState).toEqual({ status: record.status });
+    expect(landing?.afterState).toEqual({
+      status: "stored",
+      containerId: soundDrum.id,
+      joinedStorageClockId: soundClock.id,
+    });
+    expect(landing?.changedFields).toEqual(["status", "containerId"]);
+    expect(landing?.governingRuleVersionId).toBe(
+      soundClock.governingRuleVersionId,
+    );
   });
 
   it("starts a new clock on a container's first placement and stamps its accumulation start", () => {
@@ -625,10 +659,11 @@ describe("a placed commit", () => {
     );
     expect(confirmation.storageClock?.status).toBe("running");
     expect(confirmation.containerAccumulationStartedAt).toBe(AT);
-    expect(confirmation.storageEvent?.payload).toEqual({ placement: "first" });
+    expect(confirmation.storageEvent).toBeNull();
     const types = confirmation.auditEvents.map((event) => event.eventType);
     expect(types).toContain("storage_clock.status_changed");
-    expect(types).toContain("storage_event.recorded");
+    expect(types).toContain("battery_record.status_changed");
+    expect(types).not.toContain("storage_event.recorded");
     for (const event of confirmation.auditEvents) {
       expect(event.correlationId).toBe(ctx.correlationId);
     }
