@@ -1,14 +1,11 @@
 import Link from "next/link";
 import type { ReactElement } from "react";
-import { CircleAlert, TriangleAlert } from "lucide-react";
 
+import { ClassificationOutcome } from "@/components/classification/classification-outcome";
 import { FieldList } from "@/components/page";
 import { FieldSourceBadge } from "@/components/provenance/field-source-badge";
-import { INTENT_SURFACE_CLASSES } from "@/components/status/intent-classes";
 import { StatusBadge } from "@/components/status/status-badge";
 import { StorageClockMeter } from "@/components/storage/storage-clock-meter";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Separator } from "@/components/ui/separator";
 import { data } from "@/data";
 import type { RequestContext } from "@/data/contracts";
 import { canReadRoute } from "@/domain/access/route-capability";
@@ -19,15 +16,11 @@ import {
   CELL_FORM_FACTOR_LABELS,
 } from "@/domain/taxonomy/cell-form-factor";
 import { CHEMISTRIES, CHEMISTRY_LABELS } from "@/domain/taxonomy/chemistry";
-import { CLASSIFICATION_BASIS_CODE_LABELS } from "@/domain/taxonomy/classification-basis-code";
 import { DATE_CODE_PRECISION_LABELS } from "@/domain/taxonomy/date-code-precision";
 import { labelFor, readTaxonomyValue } from "@/domain/taxonomy/lookup";
-import { ROLE_LABELS } from "@/domain/taxonomy/role";
 import type { BatteryRecord } from "@/types/battery-record";
 import type { IsoTimestamp } from "@/types/common";
-import type { ClassificationDecision } from "@/types/documents";
 import type { DateCodeDecode } from "@/types/intake";
-import { cn } from "@/lib/utils";
 import {
   chemistryFieldSource,
   fieldSourceFor,
@@ -36,12 +29,11 @@ import {
   type FieldSourceInput,
 } from "./field-source";
 import { absoluteInstant, civilDateLabel } from "./format-instant";
-import { jsonText, snapshotEntries } from "./json-text";
+import { jsonText } from "./json-text";
 import {
   DetailCard,
   FieldRow,
   NotRecorded,
-  SnapshotList,
   TaxonomyText,
 } from "./record-display";
 import { resolveUserNames } from "./user-names";
@@ -298,7 +290,7 @@ export async function OverviewTab({
         </FieldList>
       </DetailCard>
 
-      <ClassificationCard decisions={decisions.items} />
+      <ClassificationOutcome decisions={decisions.items} />
 
       <DetailCard title="Placement and clock">
         <FieldList>
@@ -422,137 +414,6 @@ function ManufactureDateRow({
         civilDateLabel(decoded)
       )}
     </FieldRow>
-  );
-}
-
-/**
- * The classification outcome, **with its recorded reasoning shown rather than
- * hidden behind a disclosure** (Rule 3.7).
- *
- * The reasoning trail is what survives an audit: the inputs the evaluation
- * consumed, every rule version that applied and the citation each carried, all
- * frozen at decision time. It is not a detail view.
- *
- * Where no decision exists the card states **what is missing and who can supply
- * it**, by name. Classification blocks rather than defaults — there is no
- * fallback jurisdiction, no assumed federal baseline, no default threshold and
- * no placeholder citation (Rules 3.4, 3.10; E-13).
- */
-function ClassificationCard({
-  decisions,
-}: {
-  readonly decisions: readonly ClassificationDecision[];
-}) {
-  if (decisions.length === 0) {
-    return (
-      <DetailCard title="Classification outcome">
-        <Alert
-          role="status"
-          data-classification-state="blocked"
-          className={cn(INTENT_SURFACE_CLASSES.attention, "gap-2")}
-        >
-          <TriangleAlert aria-hidden="true" />
-          <AlertTitle className="text-body-strong text-balance">
-            No classification has been recorded for this battery.
-          </AlertTitle>
-          <AlertDescription className="grid gap-2 text-body text-current">
-            <p className="max-w-[72ch]">
-              Classification runs once identification is confirmed, and it stops
-              rather than assuming an answer when an input is missing.
-            </p>
-            <p className="max-w-[72ch] text-body-strong">
-              {`A ${ROLE_LABELS.facility_manager} or a ${ROLE_LABELS.platform_admin} can supply what is missing.`}
-            </p>
-          </AlertDescription>
-        </Alert>
-      </DetailCard>
-    );
-  }
-
-  return (
-    <DetailCard title="Classification outcome">
-      {decisions.map((decision) => (
-        <div key={decision.id} className="flex flex-col gap-4 py-2">
-          <div className="flex flex-wrap items-center gap-2">
-            <StatusBadge
-              system="waste_classification"
-              value={decision.wasteClassification}
-            />
-            {decision.basisCodes.map((code) => (
-              <span key={code} className="text-caption text-muted-foreground">
-                {labelFor(CLASSIFICATION_BASIS_CODE_LABELS, code)}
-              </span>
-            ))}
-          </div>
-
-          <p className="max-w-[72ch] text-body">{decision.reasoning}</p>
-
-          {decision.wasteClassification === "fully_regulated" ? (
-            <ManifestGap />
-          ) : null}
-
-          <div className="flex flex-col gap-2">
-            <h3 className="text-label">Inputs the evaluation consumed</h3>
-            <SnapshotList entries={snapshotEntries(decision.inputsSnapshot)} />
-          </div>
-
-          <Separator />
-
-          <div className="flex flex-col gap-2">
-            <h3 className="text-label">Rule versions applied</h3>
-            <ul className="grid gap-3">
-              {decision.evaluationTrace.map((applied) => (
-                <li
-                  key={applied.ruleVersionId}
-                  data-applied-rule={applied.ruleKey}
-                  className="grid gap-1"
-                >
-                  <span className="text-body-strong">
-                    <span className="text-mono">{applied.ruleKey}</span>{" "}
-                    <span className="text-mono">{applied.versionLabel}</span>
-                  </span>
-                  {/* The citation is copied from the rule version, never written
-                      into logic (Rule 1.23). */}
-                  <span className="text-body">{applied.citation}</span>
-                  <span className="text-caption text-muted-foreground">
-                    {applied.outcome}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </div>
-      ))}
-    </DetailCard>
-  );
-}
-
-/**
- * E-14 — a fully-regulated outcome carries a manifest obligation this phase does
- * not satisfy, and **the gap is stated rather than left silent** (Rules 3.11,
- * 3.12).
- *
- * No screen may present this record or a shipment carrying it as fully
- * documented.
- */
-function ManifestGap() {
-  return (
-    <Alert
-      role="status"
-      data-manifest-gap="true"
-      className={cn(INTENT_SURFACE_CLASSES.attention, "gap-2")}
-    >
-      <CircleAlert aria-hidden="true" />
-      <AlertTitle className="text-body-strong text-balance">
-        This outcome carries a hazardous waste manifest obligation.
-      </AlertTitle>
-      <AlertDescription className="text-body text-current">
-        <p className="max-w-[72ch]">
-          BMMP does not produce a manifest, so this record is not fully
-          documented by anything on this screen.
-        </p>
-      </AlertDescription>
-    </Alert>
   );
 }
 

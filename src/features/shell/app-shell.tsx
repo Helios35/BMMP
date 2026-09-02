@@ -1,7 +1,9 @@
 import { Suspense, type ReactNode } from "react";
 
+import { OfflineBanner } from "@/components/offline/offline-banner";
 import type { AppRoute } from "@/domain/access/routes";
 import type { RoleCode } from "@/domain/taxonomy/role";
+import type { IsoTimestamp } from "@/types/common";
 
 import type { AlertBellProps } from "./chrome/alert-bell";
 import { MockDataBanner } from "./chrome/mock-data-banner";
@@ -30,12 +32,14 @@ import type { NavBadges } from "./navigation/nav-items";
  * (only one of the two is in the accessibility tree at a time), `<header>` in
  * `TopBar`, and `<main id="main-content">` here.
  *
- * The slot above `TopBar` is left for `OfflineBanner` (`UX_SPEC.md` §2.10),
- * which belongs to the unit that first needs it. Nothing renders there yet.
+ * The slot above `TopBar` holds `OfflineBanner` (`UX_SPEC.md` §2.10): absent
+ * online, and stating the page's render instant as a timestamp when offline.
  */
 
 export interface AppShellProps {
   readonly children: ReactNode;
+  /** When this render's reads were made — the staleness time the offline banner states. */
+  readonly renderedAt: IsoTimestamp;
   readonly role: RoleCode;
   /** `readableRoutesFor(role)` — the navigation's only source of what exists for this role. */
   readonly visibleRoutes: readonly AppRoute[];
@@ -52,6 +56,7 @@ export interface AppShellProps {
 
 export function AppShell({
   children,
+  renderedAt,
   role,
   visibleRoutes,
   writableRoutes,
@@ -82,6 +87,8 @@ export function AppShell({
         />
 
         <div className="flex min-w-0 flex-1 flex-col">
+          <OfflineBanner renderedAt={renderedAt} />
+
           <TopBar
             organizationSwitcher={organizationSwitcher}
             alertBell={alertBell}

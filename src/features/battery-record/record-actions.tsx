@@ -8,27 +8,41 @@ import {
   controlTreatmentReason,
 } from "@/domain/access/control-treatment";
 import type { RoleCode } from "@/domain/taxonomy/role";
+import type { BatteryRecord } from "@/types/battery-record";
+import type { DamageAssessment } from "@/types/condition";
+import {
+  applyCatalogRematch,
+  findCatalogCandidatesForRecord,
+  recordDamageAssessment,
+  voidBatteryRecord,
+} from "./actions";
+import { RecordActionsMenu } from "./components/record-actions-menu";
 
 /**
- * Every mutating affordance on `/batteries/[id]`, in one component — E-8a.
+ * Every mutating affordance on `/batteries/[id]`, in one component — E-8a,
+ * `UX_SPEC.md` §3.7.
  *
- * The brief asks for two things that look incompatible: **every write path on
- * this screen belongs to unit 02 and none of it is built here**, and **E-8a must
- * still be demonstrable.** They are compatible, because a disabled control has
- * no handler to call. `disabled` is the auditor's terminal state by definition,
- * so the auditor branch can be finished today and is.
+ * Unit 01 built the auditor branch and left the enabled branch unbuilt on
+ * purpose: a control with no handler is a dead button, and nothing rendered
+ * until the handler existed. Unit 02 supplies the handlers — the four write
+ * paths in `./actions.ts` — and this component now has both branches. **The
+ * auditor branch is unchanged, byte for byte**: `guard-auditor-controls.spec.ts`
+ * asserts on it, and a unit test holds its rendered output against a fixture.
  *
  * ## What renders, for whom
  *
+ * - **A role holding `write` (P1, P6)** gets the four real controls through
+ *   `RecordActionsMenu`, each opening its dialog. The decision is
+ *   `controlTreatment`'s, not this file's.
  * - **The auditor** gets the three non-destructive controls, rendered inert with
  *   the stated reason. Controls she cannot see, she cannot assess — and what the
  *   organisation is able to do to a record is exactly what she came to evaluate.
- * - **The destructive control is absent**, produced by `controlTreatment` rather
- *   than by omission here: there is no value in showing an auditor a disabled
- *   **Void this record**, and a greyed-out one invites the question *"then who
- *   can?"*, which on an irreversible act is not a question this screen should
- *   raise. (There is no Delete at all — a battery record is never deleted,
- *   Rule 12.12.)
+ * - **The destructive control is absent** for her, produced by `controlTreatment`
+ *   rather than by omission here: there is no value in showing an auditor a
+ *   disabled **Void this record**, and a greyed-out one invites the question
+ *   *"then who can?"*, which on an irreversible act is not a question this
+ *   screen should raise. (There is no Delete at all — a battery record is never
+ *   deleted, Rule 12.12.)
  * - **Every other role gets nothing.** Not a disabled button, not a dead button,
  *   not a "coming soon". A control with no handler shown to a colleague teaches
  *   her she is missing a permission she is not missing, which is the precise
@@ -43,9 +57,8 @@ import type { RoleCode } from "@/domain/taxonomy/role";
  * it is reachable by touch, by keyboard and by screen reader.
  *
  * **Server-side rejection is the enforcement; the attribute is a courtesy**
- * (`SITE_ARCHITECTURE.md` §5.3(6)).
- *
- * `// [b1a-02] the enabled branches land here; the auditor branch is final.`
+ * (`SITE_ARCHITECTURE.md` §5.3(6)). Every action in `./actions.ts` re-checks
+ * the role through `requireWrite` and records the denial.
  */
 
 interface RecordControl {
@@ -82,16 +95,26 @@ export interface RecordActionsProps {
   readonly role: RoleCode;
   /** This role's capability on `/batteries/[id]`, from `ROUTE_ACCESS`. */
   readonly capability: Capability;
-  /** The record these controls will act on when unit 02 wires them. */
+  /** The record these controls act on. */
   readonly recordId: string;
+  /**
+   * The record's facts the enabled branch needs — its intake session (a photo
+   * has nowhere else to attach), its catalog entry and its DDR flags. Optional
+   * so the auditor branch, which reads none of them, keeps its call shape.
+   */
+  readonly record?: BatteryRecord;
+  /** The assessment currently governing the record, where one is recorded. */
+  readonly currentAssessment?: DamageAssessment;
 }
 
 export function RecordActions({
   role,
   capability,
   recordId,
+  record,
+  currentAssessment,
 }: RecordActionsProps): ReactElement | null {
-  const rendered = RECORD_CONTROLS.map((control) => ({
+  const treatments = RECORD_CONTROLS.map((control) => ({
     control,
     treatment: controlTreatment({
       role,
@@ -101,12 +124,43 @@ export function RecordActions({
       // the print link lives in the page header (Rule 5.27).
       isExportOrPrint: false,
     }),
-  })).filter((entry) => entry.treatment === "disabled_with_reason");
+  }));
 
-  // [b1a-02] the enabled branches land here; the auditor branch is final.
-  // A role holding `write` gets `enabled` from controlTreatment, and this unit
-  // builds no write path — so an enabled control would be a dead button, and
-  // nothing renders until the handler exists.
+  // A role holding `write` gets `enabled` from controlTreatment, and every
+  // control has a handler now — so the real controls render. Without the
+  // record's facts there is nothing to act on, and nothing renders rather than
+  // a control that would open a dialog over a record it cannot name.
+  if (
+    record !== undefined &&
+    treatments.some((entry) => entry.treatment === "enabled")
+  ) {
+    return (
+      <RecordActionsMenu
+        facts={{
+          recordId: record.id,
+          recordNumber: record.recordNumber,
+          intakeSessionId: record.intakeSessionId,
+          catalogEntryId: record.catalogEntryId,
+          currentAssessmentStatus: currentAssessment?.status ?? null,
+          currentFindings: currentAssessment?.findingTypes ?? [],
+          // T-30 — `defective` is the functional flag, set beside the findings
+          // rather than among them.
+          currentIsDefective: record.ddrFlags.includes("defective"),
+        }}
+        actions={{
+          recordDamageAssessment,
+          findCatalogCandidatesForRecord,
+          applyCatalogRematch,
+          voidBatteryRecord,
+        }}
+      />
+    );
+  }
+
+  const rendered = treatments.filter(
+    (entry) => entry.treatment === "disabled_with_reason",
+  );
+
   if (rendered.length === 0) return null;
 
   return (
