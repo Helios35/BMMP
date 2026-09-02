@@ -193,6 +193,7 @@ export default async function AppLayout({
 
   return (
     <AppShell
+      renderedAt={asOf}
       role={ctx.role}
       visibleRoutes={visibleRoutes}
       writableRoutes={writableRoutes}

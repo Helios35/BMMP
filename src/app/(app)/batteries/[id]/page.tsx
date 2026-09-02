@@ -23,6 +23,7 @@ import {
   RECORD_TAB_SPEC,
   RecordTabs,
 } from "@/features/battery-record/record-tabs";
+import { LoggedToast } from "@/features/intake/components/logged-toast";
 import { Breadcrumbs } from "@/features/shell/chrome/breadcrumbs";
 import { breadcrumbTrail } from "@/features/shell/navigation/breadcrumb-ancestors";
 import { requireRoute } from "@/lib/auth/guard";
@@ -32,11 +33,12 @@ import { nowIso, resolveRequestContext } from "@/lib/auth/session";
 /**
  * `/batteries/[id]` — `UX_SPEC.md` §3.7.
  *
- * **Read-only in this unit, with all four tabs present and all four rendering
- * fixture data.** Every write path here belongs to unit 02, and none of it is
- * built: no editing assessed condition, no re-running catalog matching, no
- * attaching a photo. E-8a is still fully demonstrable, because a disabled
- * control has no handler to call — see `RecordActions`.
+ * **All four tabs render, and the four write paths are live for P1 and P6**
+ * through `RecordActions`: edit assessed condition, re-run catalog matching,
+ * attach a photo, void. Each is a dialog over a Server Action in
+ * `src/features/battery-record/actions.ts`; the page passes the record and its
+ * current assessment and makes no write decision itself. E-8a's auditor
+ * branch is unchanged — a disabled control has no handler to call.
  *
  * ## The cross-tenant path
  *
@@ -140,6 +142,10 @@ export default async function BatteryRecordPage({
 
   return (
     <PageShell>
+      {/* "Battery logged" with **Log another**, fired once from `?logged=1`
+          after `confirmIntake` redirects here; the parameter is stripped
+          (`UX_SPEC.md` §6.1 puts a toast on the destination). */}
+      <LoggedToast containerId={record.containerId} />
       <RecordHeader
         record={record}
         container={container}
@@ -178,6 +184,10 @@ export default async function BatteryRecordPage({
               role={ctx.role}
               capability={capability}
               recordId={record.id}
+              record={record}
+              {...(currentAssessment === undefined
+                ? {}
+                : { currentAssessment })}
             />
           </>
         }

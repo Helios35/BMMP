@@ -22,3 +22,5 @@ export * from "./storage/storage-clock-meter";
 export * from "./access/read-only-banner";
 export * from "./access/gated-control";
 export * from "./provenance/field-source-badge";
+export * from "./extraction-review";
+export * from "./classification/classification-outcome";
