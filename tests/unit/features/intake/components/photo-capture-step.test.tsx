@@ -72,6 +72,7 @@ const SENT: UploadPhotoResult = {
     width: 1600,
     height: 1200,
     contentHash: "hash",
+    fileName: "label-clean.png",
   },
 };
 
@@ -146,7 +147,11 @@ describe("PhotoCaptureStep — the primary", () => {
         container.querySelector("[data-upload-state='sent']"),
       ).not.toBeNull();
     });
-    expect(onLabelPhotoReady).toHaveBeenCalledWith("photo-1");
+    // The file name travels with the id: the read is keyed on it (§7.3).
+    expect(onLabelPhotoReady).toHaveBeenCalledWith(
+      "photo-1",
+      "label-clean.png",
+    );
     expect(
       container.querySelector("[data-photo-capture-step]"),
     ).toHaveAttribute("data-label-sent", "true");
@@ -386,8 +391,19 @@ describe("PhotoCaptureStep — parsing the route's replies", () => {
         width: 1,
         height: 2,
         contentHash: "h",
-      }),
-    ).not.toBeNull();
+        fileName: "label-low.png",
+      })?.fileName,
+    ).toBe("label-low.png");
+    // The name is optional on the wire; absent reads as null, never as "".
+    expect(
+      parseUploadedPhoto({
+        intakePhotoId: "p",
+        storagePath: "org/o/s/h.png",
+        width: 1,
+        height: 2,
+        contentHash: "h",
+      })?.fileName,
+    ).toBeNull();
     expect(parseUploadedPhoto({ intakePhotoId: "p" })).toBeNull();
     expect(parseUploadedPhoto("nope")).toBeNull();
   });

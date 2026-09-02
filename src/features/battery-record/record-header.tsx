@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { ReactElement, ReactNode } from "react";
-import { Printer } from "lucide-react";
+import { Printer, RotateCcw } from "lucide-react";
 
 import { ACTION_BUTTON_CLASS, PageHeader } from "@/components/page";
 import { StatusBadge } from "@/components/status/status-badge";
@@ -30,6 +30,12 @@ import { NotRecorded, TaxonomyText } from "./record-display";
  * (Rule 5.27, E-8a). Every render touching this record is on the Documents tab,
  * each linking to its own `/documents/[id]`, so the control opens the tab rather
  * than guessing which of several documents a reader meant.
+ *
+ * **Resume intake** renders only where the page has resolved an href for it:
+ * the record is still a draft or pending review, its intake session is open,
+ * and the role holds `write` on `/batteries/new` (Flow A-a). Every one of
+ * those is the page's decision; this header renders the link it is given and
+ * nothing for the roles it is not.
  */
 
 export function RecordHeader({
@@ -38,6 +44,7 @@ export function RecordHeader({
   clock,
   role,
   documentsHref,
+  resumeIntakeHref = null,
   breadcrumbs,
   notice,
 }: {
@@ -46,6 +53,8 @@ export function RecordHeader({
   readonly clock: StorageClock | undefined;
   readonly role: RoleCode;
   readonly documentsHref: string;
+  /** `/batteries/new?session=…&step=…` while the intake is still open and the role may write it. */
+  readonly resumeIntakeHref?: string | null;
   readonly breadcrumbs?: ReactNode;
   /** The read-only banner, the hard block and the gated controls (§2.9). */
   readonly notice?: ReactNode;
@@ -116,6 +125,19 @@ export function RecordHeader({
             size="sm"
           />
           <ContainerLink container={container} role={role} />
+          {resumeIntakeHref === null ? null : (
+            <Button
+              asChild
+              variant="outline"
+              size="lg"
+              className={ACTION_BUTTON_CLASS}
+            >
+              <Link href={resumeIntakeHref} data-resume-intake="true">
+                <RotateCcw aria-hidden="true" />
+                Resume intake
+              </Link>
+            </Button>
+          )}
         </>
       }
       notice={notice}

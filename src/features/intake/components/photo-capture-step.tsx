@@ -99,6 +99,14 @@ export interface UploadedPhoto {
   readonly width: number;
   readonly height: number;
   readonly contentHash: string;
+  /**
+   * The original file name, as the route echoed it back. **Carried, not
+   * dropped**: the label read is keyed on it — `runLabelExtraction` takes it
+   * as `labelFileName`, and the fixture vision provider picks its scenario
+   * from the stem — so a step that lost it here would read every label the
+   * same way. `null` when the browser gave the file no name.
+   */
+  readonly fileName: string | null;
 }
 
 export type UploadPhotoResult =
@@ -146,6 +154,9 @@ export function parseUploadedPhoto(body: unknown): UploadedPhoto | null {
   const width = readNumber(body.width);
   const height = readNumber(body.height);
   const contentHash = readString(body.contentHash);
+  // Optional on the wire: a body without it is still a stored photo, and a
+  // missing name simply means the read falls back to the provider's default.
+  const fileName = readString(body.fileName) ?? null;
   if (
     intakePhotoId === undefined ||
     storagePath === undefined ||
@@ -155,7 +166,7 @@ export function parseUploadedPhoto(body: unknown): UploadedPhoto | null {
   ) {
     return null;
   }
-  return { intakePhotoId, storagePath, width, height, contentHash };
+  return { intakePhotoId, storagePath, width, height, contentHash, fileName };
 }
 
 /** Parse an RFC 9457 `problem+json` body into the reader's message and the trace id. */
@@ -308,8 +319,16 @@ export interface PhotoCaptureStepProps {
   >;
   /** `/api/intake/photos`. */
   readonly uploadUrl: string;
-  /** Fired once per label photo that reached the server, with its `intake_photo.id`. */
-  readonly onLabelPhotoReady: (photoId: string) => void;
+  /**
+   * Fired once per label photo that reached the server, with its
+   * `intake_photo.id` and the file's original name. The name is what
+   * `runLabelExtraction` is handed as `labelFileName` — the route keeps hold
+   * of both because the read cannot be keyed on an id alone.
+   */
+  readonly onLabelPhotoReady: (
+    photoId: string,
+    fileName: string | null,
+  ) => void;
   /** Photos already stored on a resumed session. */
   readonly existingPhotos: readonly ExistingIntakePhoto[];
   readonly primary: {
@@ -514,7 +533,13 @@ export function PhotoCaptureStep({
           captureQueue.markSent(id);
           updateItem(id, { state: "sent", progress: 100, photo: result.photo });
           if (item.photoType === "label") {
-            onLabelPhotoReady(result.photo.intakePhotoId);
+            // The route echoes the name; the file on the device is the
+            // fallback for a reply that did not, and an unnamed file is null.
+            onLabelPhotoReady(
+              result.photo.intakePhotoId,
+              result.photo.fileName ??
+                (item.file.name === "" ? null : item.file.name),
+            );
           }
           return;
         }

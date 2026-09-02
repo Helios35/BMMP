@@ -97,129 +97,156 @@ const seededAuditEvents: readonly TenantAuditEvent[] = FIXTURES.auditEvents.map(
 );
 
 /**
- * Built once, at module load, and **re-seeded in place** by
+ * Built once, per process, and **re-seeded in place** by
  * {@link resetMockStore}.
  *
  * The tables are constructed once and never replaced, because every repository
  * closes over its table. Swapping the store object on reset would leave the
  * repositories pointing at the old tables — a reset that silently does nothing
  * is worse than no reset at all.
+ *
+ * **Per process, not per module instance.** The built app loads this file
+ * twice: Turbopack gives an `app/api/*` route handler and the Server
+ * Component / Server Action graph separate module graphs
+ * (`.next/server/chunks/src_data_index_ts_*.js` beside
+ * `.next/server/chunks/ssr/*.js`), and each would otherwise construct its own
+ * database. `POST /api/intake/photos` then could not find the session
+ * `startIntakeSession` had just created — the mock behaving like two
+ * databases that share nothing, which no real adapter does. The one instance
+ * therefore lives on `globalThis` under a namespaced symbol, exactly as a
+ * development-mode database client does; the first graph to load builds it and
+ * every later one adopts it. Nothing else about the store changes.
  */
-const store: MockStore = {
-  organizations: new PlatformTable(
-    "organization",
-    "organizations",
-    FIXTURES.organizations,
-  ),
-  users: new PlatformTable("user", "users", FIXTURES.users),
-  memberships: new TenantTable(
-    "membership",
-    "memberships",
-    FIXTURES.memberships,
-  ),
-  tosAcceptances: new TenantTable(
-    "tos_acceptance",
-    "tosAcceptances",
-    FIXTURES.tosAcceptances,
-  ),
+const STORE_SLOT: unique symbol = Symbol.for("bmmp.data.mock.store");
 
-  jurisdictions: new PlatformTable(
-    "jurisdiction",
-    "jurisdictions",
-    FIXTURES.jurisdictions,
-  ),
-  jurisdictionRules: new PlatformTable(
-    "jurisdiction_rule",
-    "jurisdictionRules",
-    FIXTURES.jurisdictionRules,
-  ),
-  ruleVersions: new PlatformTable(
-    "rule_version",
-    "ruleVersions",
-    FIXTURES.ruleVersions,
-  ),
-  formatClassifications: new TenantTable(
-    "format_classification",
-    "formatClassifications",
-    FIXTURES.formatClassifications,
-  ),
+interface StoreHost {
+  [STORE_SLOT]?: MockStore;
+}
 
-  batteryRecords: new TenantTable(
-    "battery_record",
-    "batteryRecords",
-    FIXTURES.batteryRecords,
-  ),
-  catalogEntries: new PlatformTable(
-    "catalog_entry",
-    "catalogEntries",
-    FIXTURES.catalogEntries,
-  ),
-  intakeSessions: new TenantTable(
-    "intake_session",
-    "intakeSessions",
-    FIXTURES.intakeSessions,
-  ),
-  intakePhotos: new TenantTable(
-    "intake_photo",
-    "intakePhotos",
-    FIXTURES.intakePhotos,
-  ),
-  labelExtractions: new TenantTable(
-    "label_extraction",
-    "labelExtractions",
-    FIXTURES.labelExtractions,
-  ),
-  dateCodeDecodes: new TenantTable(
-    "date_code_decode",
-    "dateCodeDecodes",
-    FIXTURES.dateCodeDecodes,
-  ),
+function buildStore(): MockStore {
+  return {
+    organizations: new PlatformTable(
+      "organization",
+      "organizations",
+      FIXTURES.organizations,
+    ),
+    users: new PlatformTable("user", "users", FIXTURES.users),
+    memberships: new TenantTable(
+      "membership",
+      "memberships",
+      FIXTURES.memberships,
+    ),
+    tosAcceptances: new TenantTable(
+      "tos_acceptance",
+      "tosAcceptances",
+      FIXTURES.tosAcceptances,
+    ),
 
-  containers: new TenantTable("container", "containers", FIXTURES.containers),
-  lots: new TenantTable("lot", "lots", FIXTURES.lots),
-  storageClocks: new TenantTable(
-    "storage_clock",
-    "storageClocks",
-    FIXTURES.storageClocks,
-  ),
-  storageEvents: new TenantTable(
-    "storage_event",
-    "storageEvents",
-    FIXTURES.storageEvents,
-  ),
-  alerts: new TenantTable("alert", "alerts", FIXTURES.alerts),
+    jurisdictions: new PlatformTable(
+      "jurisdiction",
+      "jurisdictions",
+      FIXTURES.jurisdictions,
+    ),
+    jurisdictionRules: new PlatformTable(
+      "jurisdiction_rule",
+      "jurisdictionRules",
+      FIXTURES.jurisdictionRules,
+    ),
+    ruleVersions: new PlatformTable(
+      "rule_version",
+      "ruleVersions",
+      FIXTURES.ruleVersions,
+    ),
+    formatClassifications: new TenantTable(
+      "format_classification",
+      "formatClassifications",
+      FIXTURES.formatClassifications,
+    ),
 
-  classificationDecisions: new TenantTable(
-    "classification_decision",
-    "classificationDecisions",
-    FIXTURES.classificationDecisions,
-  ),
-  shipments: new TenantTable("shipment", "shipments", FIXTURES.shipments),
-  shippingPapers: new TenantTable(
-    "shipping_paper",
-    "shippingPapers",
-    FIXTURES.shippingPapers,
-  ),
-  containerLabels: new TenantTable(
-    "container_label",
-    "containerLabels",
-    FIXTURES.containerLabels,
-  ),
-  documentRenders: new TenantTable(
-    "document_render",
-    "documentRenders",
-    FIXTURES.documentRenders,
-  ),
+    batteryRecords: new TenantTable(
+      "battery_record",
+      "batteryRecords",
+      FIXTURES.batteryRecords,
+    ),
+    catalogEntries: new PlatformTable(
+      "catalog_entry",
+      "catalogEntries",
+      FIXTURES.catalogEntries,
+    ),
+    intakeSessions: new TenantTable(
+      "intake_session",
+      "intakeSessions",
+      FIXTURES.intakeSessions,
+    ),
+    intakePhotos: new TenantTable(
+      "intake_photo",
+      "intakePhotos",
+      FIXTURES.intakePhotos,
+    ),
+    labelExtractions: new TenantTable(
+      "label_extraction",
+      "labelExtractions",
+      FIXTURES.labelExtractions,
+    ),
+    dateCodeDecodes: new TenantTable(
+      "date_code_decode",
+      "dateCodeDecodes",
+      FIXTURES.dateCodeDecodes,
+    ),
 
-  damageAssessments: new TenantTable(
-    "damage_assessment",
-    "damageAssessments",
-    FIXTURES.damageAssessments,
-  ),
-  auditEvents: new TenantTable("audit_event", "auditEvents", seededAuditEvents),
+    containers: new TenantTable("container", "containers", FIXTURES.containers),
+    lots: new TenantTable("lot", "lots", FIXTURES.lots),
+    storageClocks: new TenantTable(
+      "storage_clock",
+      "storageClocks",
+      FIXTURES.storageClocks,
+    ),
+    storageEvents: new TenantTable(
+      "storage_event",
+      "storageEvents",
+      FIXTURES.storageEvents,
+    ),
+    alerts: new TenantTable("alert", "alerts", FIXTURES.alerts),
 
-  objects: new Map(),
-};
+    classificationDecisions: new TenantTable(
+      "classification_decision",
+      "classificationDecisions",
+      FIXTURES.classificationDecisions,
+    ),
+    shipments: new TenantTable("shipment", "shipments", FIXTURES.shipments),
+    shippingPapers: new TenantTable(
+      "shipping_paper",
+      "shippingPapers",
+      FIXTURES.shippingPapers,
+    ),
+    containerLabels: new TenantTable(
+      "container_label",
+      "containerLabels",
+      FIXTURES.containerLabels,
+    ),
+    documentRenders: new TenantTable(
+      "document_render",
+      "documentRenders",
+      FIXTURES.documentRenders,
+    ),
+
+    damageAssessments: new TenantTable(
+      "damage_assessment",
+      "damageAssessments",
+      FIXTURES.damageAssessments,
+    ),
+    auditEvents: new TenantTable(
+      "audit_event",
+      "auditEvents",
+      seededAuditEvents,
+    ),
+
+    objects: new Map(),
+  };
+}
+
+const host = globalThis as typeof globalThis & StoreHost;
+const store: MockStore = (host[STORE_SLOT] ??= buildStore());
 
 export function mockStore(): MockStore {
   return store;

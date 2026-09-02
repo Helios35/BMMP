@@ -8,17 +8,41 @@
  * on their shape.
  */
 
-let sequence = 0;
+/**
+ * The counters live on `globalThis`, for the same reason the store does
+ * (`./store.ts`): the built app loads this module once per Turbopack module
+ * graph — the `app/api/*` route handlers in one, Server Components and Server
+ * Actions in another — and two module-level counters would mint the same id
+ * twice into one table. An `audit_event` written by the upload route and one
+ * written by a Server Action must not share an id any more than two Postgres
+ * inserts would.
+ */
+const IDS_SLOT: unique symbol = Symbol.for("bmmp.data.mock.ids");
+
+interface IdState {
+  sequence: number;
+  readonly counters: Map<string, number>;
+}
+
+interface IdHost {
+  [IDS_SLOT]?: IdState;
+}
+
+const host = globalThis as typeof globalThis & IdHost;
+const state: IdState = (host[IDS_SLOT] ??= {
+  sequence: 0,
+  counters: new Map<string, number>(),
+});
 
 /** A UUID-shaped identifier, unique within the process. */
 export function nextId(): string {
-  sequence += 1;
-  const tail = sequence.toString(16).padStart(12, "0");
+  state.sequence += 1;
+  const tail = state.sequence.toString(16).padStart(12, "0");
   return `0b000000-0000-4000-8000-${tail}`;
 }
 
 export function resetIdSequence(): void {
-  sequence = 0;
+  state.sequence = 0;
 }
 
 /**
@@ -30,7 +54,7 @@ export function resetIdSequence(): void {
  * table and no race (`ERD.md` §3.1). Here they are incremented in the same
  * synchronous step, which is the same guarantee in a single-threaded process.
  */
-const counters = new Map<string, number>();
+const counters = state.counters;
 
 export function nextSequenceNumber(
   organizationId: string,
