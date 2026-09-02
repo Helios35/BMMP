@@ -15,7 +15,7 @@ import {
   PHOTO_UNREADABLE,
 } from "@/features/intake/copy";
 import { firstIssue, intakePhotoUploadSchema } from "@/features/intake/schemas";
-import { userEvent } from "@/features/intake/server/audit";
+import { sessionThread, userEvent } from "@/features/intake/server/audit";
 import {
   fileExtensionFor,
   INTAKE_PHOTO_BUCKET,
@@ -32,6 +32,7 @@ import {
   stripJpegExif,
 } from "@/lib/images";
 import type { Uuid } from "@/types/common";
+import type { IntakeSession } from "@/types/intake";
 
 /**
  * `POST /api/intake/photos` — one captured image onto an open intake
@@ -235,15 +236,35 @@ interface StoreRequest {
 }
 
 async function storePhoto(
-  ctx: RequestContext,
+  requestCtx: RequestContext,
   request: Request,
   input: StoreRequest,
 ): Promise<Response> {
-  const session = await data.intakeSessions.get(ctx, input.sessionId);
+  const session = await data.intakeSessions.get(requestCtx, input.sessionId);
   if (session === null) {
-    await recordNotFound(ctx, "intake_session", input.sessionId);
-    return problem("NOT_FOUND", INTAKE_NOT_FOUND, ctx.correlationId);
+    // No session to thread on: the denial keeps the request's own id.
+    await recordNotFound(requestCtx, "intake_session", input.sessionId);
+    return problem("NOT_FOUND", INTAKE_NOT_FOUND, requestCtx.correlationId);
   }
+
+  // One intake, one thread: from here the request acts as the session, so
+  // the photo's row, its audit row and any refusal carry
+  // `intake_session.correlation_id` beside the start, the read and the
+  // commit (`ERD.md` §5.3; `audit.ts`).
+  const ctx = sessionThread(requestCtx, session);
+  try {
+    return await storeOnSession(ctx, request, session, input);
+  } catch (error) {
+    return await problemFor(error, ctx);
+  }
+}
+
+async function storeOnSession(
+  ctx: RequestContext,
+  request: Request,
+  session: IntakeSession,
+  input: StoreRequest,
+): Promise<Response> {
   if (session.status === "completed" || session.status === "abandoned") {
     return problem(
       "CONFLICT",

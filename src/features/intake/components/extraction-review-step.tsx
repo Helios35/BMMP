@@ -158,6 +158,9 @@ export function ExtractionReviewStep({
         navigate: (href) => router.push(href),
         refresh: () => router.refresh(),
         enterManually: () => setManual(true),
+        // A failed read is the session's state (EC-14): the manual path is
+        // then a write the server records, and the step re-reads from it.
+        readFailed: card.state === "error",
       }),
     [
       sessionId,
@@ -166,6 +169,7 @@ export function ExtractionReviewStep({
       labelPhotoId,
       proposal,
       catalogQuery,
+      card.state,
       router,
     ],
   );
@@ -214,7 +218,12 @@ export function ExtractionReviewStep({
     >
       <div
         data-review-layout="true"
-        className="flex flex-col gap-6 lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] lg:items-start lg:gap-8"
+        // One part photos to three parts rows. At two the review card's
+        // column measured 581px at 1280 and its value column collapsed to
+        // 38px; at three it is 653px there and 516px at 1024 (`field-row.tsx`
+        // carries the per-track arithmetic). The photos are placeholders at
+        // their own aspect ratio and read fine at 172px.
+        className="flex flex-col gap-6 lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,3fr)] lg:items-start lg:gap-8"
       >
         <aside
           aria-label="Label photos"

@@ -22,6 +22,7 @@ import {
   markDraftExtractionRejected,
   markDraftManualEntry,
   rejectDraftField,
+  seedDraftFromExtraction,
   selectDraftCandidate,
   setDraftCondition,
   setDraftManufacturedOn,
@@ -71,6 +72,7 @@ import {
   findingsRefused,
   INTAKE_HAS_NO_RECORD,
   LABEL_READ_NEEDS_CROP,
+  MANUAL_ENTRY_NOT_OPEN,
   REASON_SAVED_TO_QUEUE,
   reviewIncomplete,
   STEP_NOT_OPEN,
@@ -98,7 +100,11 @@ import {
   startIntakeSessionSchema,
   voidIntakeSessionSchema,
 } from "./schemas";
-import { userEvent, type RequestAttribution } from "./server/audit";
+import {
+  sessionThread,
+  userEvent,
+  type RequestAttribution,
+} from "./server/audit";
 import {
   previewClassification,
   resolveIntakeRules,
@@ -171,6 +177,16 @@ function actor(ctx: RequestContext, at: IsoTimestamp): DraftActor {
  * also recorded as a denial, because an identifier that resolves to nothing
  * is an attempt (§5.3(5), E-15) — and it reads the same whether the row is
  * absent or another tenant's (Rule 1.2).
+ *
+ * **One intake, one thread.** Once the parsed input names a session that
+ * resolves in this tenant, the handler runs — and every failure envelope
+ * and denial row after that point is built — as the session's thread
+ * (`sessionThread`), so `/audit` reads the start, each photo, the read, the
+ * confirmations, the commit and any refusal under `intake_session.
+ * correlation_id`. A session that does not resolve keeps the request's own
+ * id, and so does the `NotFound` denial it records: there was no session to
+ * thread it on. `startIntakeSession` is the one action with no session yet;
+ * it stores the request's id on the session it opens.
  */
 async function intakeAction<TInput, TData>(
   attempted: string,
@@ -200,19 +216,25 @@ async function intakeAction<TInput, TData>(
     });
   }
 
+  // The request's own context until the session is known; the session's
+  // thread from then on. Declared outside the `try` so the `catch` answers
+  // with whichever id the failure happened under.
+  let bound: RequestContext = ctx;
+  const sessionId = (parsed.data as { sessionId?: unknown }).sessionId;
   try {
+    if (typeof sessionId === "string") {
+      const session = await data.intakeSessions.get(ctx, sessionId);
+      if (session !== null) bound = sessionThread(ctx, session);
+    }
     const attribution = await requestAttribution();
-    const result = await run(ctx, parsed.data, attribution);
+    const result = await run(bound, parsed.data, attribution);
     revalidatePath(INTAKE_ROUTE);
     return actionSucceeded(result);
   } catch (error) {
-    if (error instanceof NotFoundError) {
-      const sessionId = (parsed.data as { sessionId?: unknown }).sessionId;
-      if (typeof sessionId === "string") {
-        await recordNotFound(ctx, "intake_session", sessionId);
-      }
+    if (error instanceof NotFoundError && typeof sessionId === "string") {
+      await recordNotFound(bound, "intake_session", sessionId);
     }
-    return actionFailedFrom<TData>(error, ctx.correlationId);
+    return actionFailedFrom<TData>(error, bound.correlationId);
   }
 }
 
@@ -715,6 +737,88 @@ export async function rejectExtraction(
       // and Rule 12.1 audits it, but AUDIT_EVENT_TYPES carries no
       // `label_extraction.rejected` value and TAXONOMY.md §1.1 forbids
       // inventing one. Proposed value `label_extraction.rejected`.
+      return { sessionId: session.id, draft: updated.draft ?? next };
+    },
+  );
+}
+
+/**
+ * The way on when the read cannot happen — E-3(5), E-4, EC-14, D-20.
+ *
+ * A read that failed (T-08 `failed`) and a session nobody has read yet both
+ * leave the person on step 1 with nothing to confirm. This opens step 2 for
+ * them by hand: the draft is seeded with every T-09 field pending and
+ * `not_extracted` — nothing a camera never read is proposed as a value
+ * (Rule 2.11) — and marked as the manual path, and the session moves to
+ * `awaiting_confirmation` at `extraction_review` with review required, so
+ * the person types each value and confirms it exactly as they would a read
+ * one. **Manual entry does not bypass the gate** (E-4): the three hard-gated
+ * fields still need their attributable confirmations, and chemistry still
+ * needs a source (Rules 2.10, 2.15).
+ *
+ * Refused as a conflict once a run is awaiting confirmation: that card has
+ * its own E-4 and E-5 paths, and re-seeding it would discard the rows the
+ * person is looking at. A second call after this one succeeded is likewise
+ * refused, because the session is by then awaiting confirmation. What the
+ * person already did on the session — the drum they started beside, the
+ * photos they kept, a run that failed — stays on the draft; only what a
+ * read would have proposed is reset.
+ *
+ * Reason codes: a failed session already carries T-52 `extraction_failed`
+ * from the gate, and it is kept. A session that was never read gains none —
+ * `no_fields_extracted` is "extraction returned no readable field", and no
+ * extraction ran; T-52 has no value for a person choosing the manual path
+ * before a read, and one is not invented here.
+ */
+export async function enterDetailsManually(
+  input: unknown,
+): Promise<ActionResult<DraftActionData>> {
+  return intakeAction(
+    "enterDetailsManually",
+    sessionIdSchema,
+    input,
+    async (ctx, parsed) => {
+      const { session, draft } = await openDraft(ctx, parsed.sessionId);
+      const readInHand =
+        session.status === "awaiting_confirmation" ||
+        session.status === "extracting" ||
+        (session.status === "open" && resolveIntakeStep(session) !== "capture");
+      if (readInHand) {
+        throw new ConflictError({
+          userMessage: MANUAL_ENTRY_NOT_OPEN,
+          correlationId: ctx.correlationId,
+          context: { intakeSessionId: session.id, status: session.status },
+        });
+      }
+
+      const seeded = seedDraftFromExtraction([], [], null, null);
+      const next = markDraftManualEntry({
+        ...seeded,
+        containerId: draft.containerId,
+        sourceDevice: draft.sourceDevice,
+        manufacturedOnEntered: draft.manufacturedOnEntered,
+        extractionRejected: draft.extractionRejected,
+        labelPhotoId: draft.labelPhotoId,
+        labelCropId: draft.labelCropId,
+        // No read stands behind these rows, so the card shows no read time
+        // and no score for them; the failed run's rows stay on the session
+        // as the record of the failure (T-10).
+        extractionRunId: null,
+      });
+
+      const updated = await data.intakeSessions.update(ctx, session.id, {
+        status: "awaiting_confirmation",
+        currentStep: "extraction_review",
+        isReviewRequired: true,
+        reviewReasonCodes: session.reviewReasonCodes,
+        draft: next,
+      });
+      // TODO(T-43): choosing the manual path is a person's act on the session
+      // and Rule 12.1 audits it, but AUDIT_EVENT_TYPES carries no value for
+      // it — `battery_record.routed_to_review` is a gate's or a save's row,
+      // not this — and TAXONOMY.md §1.1 forbids inventing one. Proposed
+      // value `intake_session.manual_entry_chosen`. Nothing is written
+      // rather than a row filed under a neighbour.
       return { sessionId: session.id, draft: updated.draft ?? next };
     },
   );

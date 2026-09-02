@@ -92,7 +92,10 @@ export function VoidRecordDialog({
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent
         data-record-dialog="void-this-record"
-        className="rounded-lg text-body"
+        // Capped to the viewport and scrolling, as its sibling dialogs are,
+        // so a long reason or a narrow viewport never puts the footer out of
+        // reach (§2.6). The 2rem is the primitive's own inset.
+        className="max-h-[calc(100dvh-2rem)] overflow-y-auto rounded-lg text-body"
       >
         <AlertDialogHeader>
           <AlertDialogTitle className="text-h2">

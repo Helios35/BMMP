@@ -6,6 +6,8 @@ import { CircleAlert, Crop } from "lucide-react";
 
 import { GatedControl } from "@/components/access/gated-control";
 import {
+  ENTER_MANUALLY,
+  InlineActionError,
   READ_FAILED_BODY,
   READ_FAILED_TITLE,
   TRY_AGAIN,
@@ -17,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import type { IntakeFlowStep } from "@/domain/intake/steps";
 import type { IntakeSessionStatus } from "@/domain/taxonomy/intake-session-status";
 import {
+  enterDetailsManually,
   runLabelExtraction,
   setLabelCropRegion,
   startIntakeSession,
@@ -61,10 +64,20 @@ import { StepFrame, type StepFrameProps } from "./step-frame";
  *   such.
  * - **a failed read** — the session is left `failed` and recoverable with its
  *   photos (EC-14). The `critical` alert says so and offers **Try again** on
- *   the same photo. It renders again after a reload, from the session's
- *   status, so a failure survives a locked phone.
+ *   the same photo beside **Enter details manually**. It renders again after
+ *   a reload, from the session's status, so a failure survives a locked
+ *   phone.
  * - **nothing to read** — the primary is gated by the capture step until a
  *   label photo has been sent (E-3(5)).
+ *
+ * ## Enter details manually
+ *
+ * The step's secondary, and the failure alert's second action: the way on
+ * when the read cannot happen (E-3(5), EC-14, D-20). It starts the session
+ * if no capture has, asks the server to open step 2 by hand
+ * (`enterDetailsManually` — the draft is seeded unread and marked as the
+ * manual path), and moves there. Manual entry does not bypass the gate
+ * (E-4): every row is *Not read* until a person types and confirms it.
  *
  * The photo's own size, for the whole-photo region, comes from the upload
  * reply: the transport is wrapped so every stored photo's facts are kept
@@ -118,6 +131,7 @@ const USE_WHOLE_PHOTO = "Use the whole photo as the label";
 const USING_WHOLE_PHOTO = "Reading the whole photo…";
 const PHOTO_SIZE_UNKNOWN =
   "The photo's size has not been read yet. Send the photo again to continue.";
+const MANUAL_ENTRY_PENDING = "Opening manual entry…";
 
 export function IntakeStart({
   frame,
@@ -147,6 +161,7 @@ export function IntakeStart({
   const [cropNeeded, setCropNeeded] = useState<string | null>(null);
   const [cropPending, setCropPending] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
+  const [manualError, setManualError] = useState<string | null>(null);
 
   /** Every stored photo's reply, kept beside its id for the crop geometry. */
   const recordingTransport: UploadTransport = async (request, onProgress) => {
@@ -242,6 +257,32 @@ export function IntakeStart({
     }
   }
 
+  /**
+   * The way on without a read (E-3(5), EC-14, D-20): the session is started
+   * if the first capture has not started one, the server opens step 2 by
+   * hand, and the person is taken there. Nothing is marked done here; step
+   * 2 re-reads the draft the server wrote.
+   */
+  async function enterManually(): Promise<void> {
+    setManualError(null);
+    let session = activeSessionId;
+    if (session === null) {
+      const started = await startSession();
+      if (!started.ok) {
+        setManualError(started.error.message);
+        return;
+      }
+      session = started.data.sessionId;
+    }
+    const result = await enterDetailsManually({ sessionId: session });
+    if (!result.ok) {
+      setManualError(result.error.message);
+      router.refresh();
+      return;
+    }
+    router.push(intakeStepHref(session, "extraction_review"));
+  }
+
   const sizeKnown = label !== null && label.width > 0 && label.height > 0;
   const showFailure = failure !== null || sessionStatus === "failed";
 
@@ -266,21 +307,40 @@ export function IntakeStart({
           </AlertTitle>
           <AlertDescription className="flex flex-col items-start gap-3 text-current">
             <p className="max-w-[72ch] text-body">{READ_FAILED_BODY}</p>
-            {label === null ? null : (
+            <div className="flex flex-col gap-2 sm:flex-row">
+              {label === null ? null : (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="lg"
+                  data-read-label-retry="true"
+                  onClick={() => void readLabel()}
+                  className={ACTION_BUTTON_CLASS}
+                >
+                  {TRY_AGAIN}
+                </Button>
+              )}
               <Button
                 type="button"
                 variant="outline"
                 size="lg"
-                data-read-label-retry="true"
-                onClick={() => void readLabel()}
+                data-read-label-manual="true"
+                onClick={() => void enterManually()}
                 className={ACTION_BUTTON_CLASS}
               >
-                {TRY_AGAIN}
+                {ENTER_MANUALLY}
               </Button>
-            )}
+            </div>
           </AlertDescription>
         </Alert>
       ) : null}
+
+      {manualError === null ? null : (
+        <InlineActionError
+          dataAttribute="data-enter-manually-error"
+          message={manualError}
+        />
+      )}
 
       {cropNeeded !== null ? (
         <Alert
@@ -311,6 +371,11 @@ export function IntakeStart({
         onLabelPhotoReady={onLabelPhotoReady}
         existingPhotos={existingPhotos}
         primary={{ label: READ_LABEL, onContinue: readLabel }}
+        secondary={{
+          label: ENTER_MANUALLY,
+          pendingLabel: MANUAL_ENTRY_PENDING,
+          onClick: enterManually,
+        }}
         transport={recordingTransport}
         {...(readImageSize === undefined ? {} : { readImageSize })}
       />

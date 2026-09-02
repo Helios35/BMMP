@@ -159,7 +159,7 @@ function isJsonObject(
 
 /**
  * A tolerance arrives as a JavaScript fraction; the comparison happens on the
- * quantities as decimal strings. `String(0.02)` is `"0.02"`; a fraction small
+ * quantities as decimal strings. `String(0.25)` is `"0.25"`; a fraction small
  * enough to print in exponent form is written out in full instead, so the
  * decimal parser never sees an `e`.
  */

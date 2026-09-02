@@ -58,6 +58,19 @@ export function ShellToaster() {
         // error passes its own longer duration; this is the floor for the rest.
         duration: 4000,
         closeButton: true,
+        classNames: {
+          // The generated primitive's own toast class, restated because a
+          // `toastOptions` prop replaces its object rather than merging into it.
+          toast: "cn-toast",
+          // §1.5 — the action (*Log another*) is tapped between every battery,
+          // and sonner's own rule renders it 24px tall. sonner's stylesheet is
+          // unlayered, so on any property it sets it outranks a Tailwind
+          // utility whatever the specificity; `min-height` it never sets, so
+          // the 44px floor lands, and the radius, padding and type it does set
+          // are taken back with `!`. Colour stays sonner's — `--normal-bg` and
+          // `--normal-text` are the popover tokens the primitive maps.
+          actionButton: "min-h-11 rounded-md! px-3! text-label!",
+        },
       }}
     />
   );

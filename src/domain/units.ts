@@ -272,7 +272,7 @@ export function energyWhFromVoltageAndCapacity(
 /**
  * A JavaScript `number` as exact digits, for the one place a number is allowed
  * to meet a decimal: a configured cutoff or score arriving as `number` and
- * being compared against a stored `Decimal`. `String(0.82)` is `"0.82"`, but
+ * being compared against a stored `Decimal`. `String(0.75)` is `"0.75"`, but
  * `String(1e-7)` is `"1e-7"`, so the exponent form is expanded rather than
  * passed through. Throws `RangeError` for anything not finite — a threshold
  * that is `NaN` is not a threshold.

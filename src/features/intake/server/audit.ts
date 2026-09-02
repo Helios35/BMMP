@@ -20,6 +20,11 @@ import type { IsoTimestamp, JsonObject, Uuid } from "@/types/common";
  *
  * Every row shares `ctx.correlationId`, which is what lets `/audit` show one
  * intake as one thread from the first photo to the placement (§11.1 step 6.8).
+ * **The thread is the session's, not the request's**: `intake_session.
+ * correlation_id` (`ERD.md` §5.3) is minted by the request that opened the
+ * session and every later request on that session — a photo, a read, a
+ * confirmation, the commit, a refusal — rebinds to it through
+ * {@link sessionThread} before it writes or answers.
  *
  * **Only T-43's values are written.** Where a step has no type — a crop, a
  * failed extraction, a gate that routed nowhere, an abandonment — the call
@@ -64,6 +69,29 @@ export const NO_ATTRIBUTION: RequestAttribution = {
  */
 export function actorTypeFor(ctx: RequestContext): AuditActorType {
   return ctx.isPlatformAdmin ? "platform_admin" : "user";
+}
+
+/**
+ * The request, rebound to the session's thread.
+ *
+ * One intake is several requests — start, each photo, the read, every
+ * confirmation, the commit — and each arrives with a correlation id of its
+ * own. Written as they arrive, one intake reads on `/audit` as that many
+ * threads and the reviewer's checklist ("every step under one correlation
+ * id, failures included") cannot be met. So once the session is known, the
+ * request acts as the session: every row it writes and every failure it
+ * returns carries `intake_session.correlation_id`. A denial recorded before
+ * the session is known keeps the request's own id, which is right — there
+ * was no session to thread it on. A session with no thread of its own
+ * (nothing authored one) leaves the request as it is rather than binding to
+ * an empty string.
+ */
+export function sessionThread(
+  ctx: RequestContext,
+  session: { readonly correlationId: string },
+): RequestContext {
+  if (session.correlationId.trim() === "") return ctx;
+  return { ...ctx, correlationId: session.correlationId };
 }
 
 /** `intake_pipeline:<step>:<provider>` — the step that ran and what produced its answer (Rule 12.5). */

@@ -118,9 +118,51 @@ import type {
  * as a caption, because that is what they are (T-09): they set nothing.
  * Chemistry on the record comes from a catalog candidate or a person
  * (Rules 2.9, 2.10; `_ANCHORS.md` §7.2).
+ *
+ * ## Layout — the value column never collapses
+ *
+ * Below `md` the row is a flex column. From `md` it is a **two-column grid
+ * over two rows**: name over source-and-band on the left, value over the
+ * controls on the right. Four columns — name · value · source-and-band ·
+ * controls — only when the rows' own container is at least `@4xl` (896px):
+ * the card marks `[data-field-rows]` as `@container/field-rows`, so the row
+ * lays out by the width it actually has rather than by the viewport.
+ *
+ * The arithmetic that forced this. The previous `md` grid was
+ * `minmax(10rem,1fr) minmax(0,2fr) auto auto` with `gap-x-6`. The two `auto`
+ * columns size to their content — the source badge with *Always confirmed by
+ * a person* beneath it (≈200px) and *Confirm* over *Correct · Reject*
+ * (≈160px) — and the legend claims its 160px floor, so the value column got
+ * what was left after 72px of gaps: `row − 592`. The row's content width is
+ * the card's column less the card's 24px padding each side, the row's 12px
+ * padding each side and its 2px focus bar: `column − 74`.
+ *
+ * | viewport | nav, gutter        | content | step 2 column               | row | value, before | value, now |
+ * | 768      | 64px rail, `px-6`  | 656     | 656 — one column below `lg` | 582 | 0 (−10)       | 366        |
+ * | 1024     | 240px, `px-8`      | 720     | (720 − 32) × ¾ = 516        | 442 | 0 (−150)      | 226        |
+ * | 1280     | 240px, `px-8`      | 976     | measured 581 at ⅔; 653 at ¾ | 579 | 38, measured  | 363        |
+ *
+ * A value paragraph in a 0px column measures 0 and paints over the next
+ * column — the defect the e2e pass measured at 1280×800. In the two-column
+ * grid the value takes `row − 24 − legend`, and `minmax(12rem,1fr)` on the
+ * value against `minmax(10rem,12rem)` on the legend means the legend gives
+ * way first: the value never drops below 192px until the row itself is under
+ * 376px, which no `md` layout reaches. Four columns need ≈786px of row
+ * (160 + 192 + 200 + 160 + 72), so ≈812px of container; `@4xl` is the first
+ * token that fits with room. Step 2's column tops out at 888px of container
+ * under the 1280px page cap, so in this unit the four-column layout is reached
+ * only by a full-width card — the review queue, unit 03.
  */
 
 const CHEMISTRY_FIELD = "chemistry_code";
+
+/**
+ * The row's grid from `md`, shared with {@link FieldRowSkeleton} so the
+ * skeleton is the row's resting shape and nothing jumps (§2.1.6). *Layout*
+ * above carries the arithmetic behind every track.
+ */
+const FIELD_ROW_GRID_CLASS =
+  "md:grid md:grid-cols-[minmax(10rem,12rem)_minmax(12rem,1fr)] md:items-start md:gap-x-6 @4xl/field-rows:grid-cols-[minmax(10rem,12rem)_minmax(12rem,1fr)_auto_auto]";
 
 /** T-01 without `unknown`: a person enters a chemistry; unknown is the absence of one. */
 const ENTERABLE_CHEMISTRIES = optionsFor(CHEMISTRIES, CHEMISTRY_LABELS).filter(
@@ -294,7 +336,7 @@ export function FieldRow({
         // §2.1.6 Focus — a 2px left bar identifies the focused row at a glance.
         // Hover — a wash, desktop only, revealing nothing not already visible.
         "flex min-w-0 flex-col gap-3 rounded-md border-l-2 border-l-transparent p-3 transition-colors duration-100 focus-within:border-l-ring motion-reduce:transition-none md:hover:bg-muted/50",
-        "md:grid md:grid-cols-[minmax(10rem,1fr)_minmax(0,2fr)_auto_auto] md:items-start md:gap-x-6",
+        FIELD_ROW_GRID_CLASS,
         disabled.reason !== null && "opacity-60",
       )}
     >
@@ -332,7 +374,7 @@ export function FieldRow({
       {/* Source, then confidence — in that order, always. The accessible
           name (§2.1.7) is assembled from the source badge's own text and two
           sr-only spans, so the band's secondary lines never enter it. */}
-      <div className="flex flex-wrap items-start gap-2 md:flex-col">
+      <div className="flex flex-wrap items-start gap-2 @4xl/field-rows:flex-col">
         <span id={ids.source} className="inline-flex">
           {sourceBadge ?? <span className="sr-only">{NO_SOURCE_YET}</span>}
           <span className="sr-only">,</span>
@@ -376,7 +418,7 @@ export function FieldRow({
       )}
 
       {confirmCall.error !== null || rejectCall.error !== null ? (
-        <div className="md:col-span-4">
+        <div className="md:col-span-full">
           <InlineActionError
             dataAttribute="data-row-error"
             message={confirmCall.error ?? rejectCall.error ?? ""}
@@ -912,11 +954,11 @@ export function FieldRowSkeleton(): ReactElement {
   return (
     <div
       data-field-row-skeleton="true"
-      className="flex flex-col gap-3 rounded-md p-3 md:grid md:grid-cols-[minmax(10rem,1fr)_minmax(0,2fr)_auto_auto] md:items-start md:gap-x-6"
+      className={cn("flex flex-col gap-3 rounded-md p-3", FIELD_ROW_GRID_CLASS)}
     >
       <Skeleton className="h-5 w-32 rounded-md" />
       <Skeleton className="h-6 w-48 rounded-md" />
-      <div className="flex flex-wrap gap-2 md:flex-col">
+      <div className="flex flex-wrap gap-2 @4xl/field-rows:flex-col">
         <FieldSourceBadgeSkeleton />
         <ConfidenceBandDisplaySkeleton />
       </div>

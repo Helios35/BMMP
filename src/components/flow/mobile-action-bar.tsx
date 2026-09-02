@@ -172,7 +172,13 @@ function ActionControl({
     return (
       <GatedControl
         reason={reason}
-        className="w-full md:w-auto [&>span]:w-full md:[&>span]:w-auto [&>span>*]:w-full md:[&>span>*]:w-auto"
+        className="w-full md:w-auto"
+        // The trigger, and only the trigger, stretches with the control below
+        // `md`. A rule on every child span also reached the reason caption:
+        // `md:[&>span]:w-auto` outranked `sr-only`'s 1px width, the caption
+        // was laid out at its text width, and a 1280px viewport scrolled
+        // sideways by 49px. The button carries its own `w-full md:w-auto`.
+        triggerClassName="w-full md:w-auto"
       >
         <Button
           type="button"

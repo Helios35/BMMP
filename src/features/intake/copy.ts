@@ -75,6 +75,10 @@ export const LABEL_READ_MALFORMED =
 export const LABEL_READ_NEEDS_CROP =
   "The label could not be found in the photo. Draw a box around it to continue.";
 
+/** E-4's own path handles a read that is in hand; the manual path from step 1 is for a read that never was. */
+export const MANUAL_ENTRY_NOT_OPEN =
+  "This label has already been read and is waiting on your confirmation. Review the read, or enter the details by hand from the card.";
+
 // --- the extraction review card ---------------------------------------------------
 
 export function fieldValueRefused(

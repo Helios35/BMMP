@@ -287,7 +287,13 @@ export function ExtractionReviewCard(
                 <BulkConfirm fields={fields} actions={actions} />
               ) : null}
 
-              <div data-field-rows="true" className="flex flex-col gap-2">
+              {/* The rows' size container: `FieldRow` widens to four columns
+                  by the width it actually has, not the viewport (its docblock
+                  carries the arithmetic). */}
+              <div
+                data-field-rows="true"
+                className="@container/field-rows flex flex-col gap-2"
+              >
                 {fields.map((field) => (
                   <FieldRow
                     key={field.fieldCode}
@@ -520,7 +526,10 @@ function LoadingBody({
       >
         {slow ? STILL_READING : READING_LABEL}
       </p>
-      <div data-field-rows-skeleton="true" className="flex flex-col gap-2">
+      <div
+        data-field-rows-skeleton="true"
+        className="@container/field-rows flex flex-col gap-2"
+      >
         {Array.from({ length: 6 }, (_, index) => (
           <FieldRowSkeleton key={index} />
         ))}

@@ -106,7 +106,10 @@ export function AttachPhotoDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         data-record-dialog="attach-a-photo"
-        className="rounded-lg text-body sm:max-w-lg"
+        // Capped to the viewport and scrolling, so the footer — the save — is
+        // reachable at 1280×720, where the body alone is taller than the
+        // viewport (§2.6). The 2rem is the primitive's own inset.
+        className="max-h-[calc(100dvh-2rem)] overflow-y-auto rounded-lg text-body sm:max-w-lg"
       >
         <DialogHeader>
           <DialogTitle className="text-h2">Attach a photo</DialogTitle>

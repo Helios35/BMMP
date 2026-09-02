@@ -117,6 +117,9 @@ function cardState(view: IntakeStepView): {
   if (view.session.status === "extracting") return { state: "loading" };
   if (view.session.status === "failed")
     return { state: "error", errorMessage: LABEL_READ_UNAVAILABLE };
+  // The manual path (E-4, EC-14, D-20): the rows render for typing, each
+  // *Not read*, rather than the no-read state that offers the path again.
+  if (view.draft.manualEntry) return { state: "default" };
   const runRows = latestRunRows(view.extractions, view.draft.extractionRunId);
   const readAnything =
     runRows.some((row) => row.fieldValue !== null) ||
@@ -135,11 +138,15 @@ function photoImage(
 
 export function reviewCardView(view: IntakeStepView): ReviewCardView {
   const runRows = latestRunRows(view.extractions, view.draft.extractionRunId);
+  // A draft that names no run came from no read (the manual path): no read
+  // time, even where a failed run's rows are still on the session.
   const readAt =
-    runRows
-      .map((row) => row.respondedAt ?? row.createdAt)
-      .sort()
-      .at(-1) ?? null;
+    view.draft.extractionRunId === null
+      ? null
+      : (runRows
+          .map((row) => row.respondedAt ?? row.createdAt)
+          .sort()
+          .at(-1) ?? null);
   const candidates = candidateViews(view);
   const fieldsBelowThreshold = view.draft.fields.filter(
     (field) =>
@@ -399,6 +406,9 @@ export function commitGateInput(
     containerChosen: view.draft.containerId !== null,
     // Unplaced intake is permitted in B1a; the container is chosen, never demanded.
     requiresContainer: false,
-    classificationBlocked: view.classificationPreview.kind === "unresolved",
+    // EC-16 / Rule 3.10 — identification completes while classification
+    // blocks; the server gate in confirmation.ts passes the same, and the
+    // two must never drift (commit-gate.ts). E-13 states the missing input.
+    classificationBlocked: false,
   };
 }

@@ -96,6 +96,10 @@ export function PhotoCaptureInput({
       aria-label={label}
       data-photo-type={photoType}
       className="sr-only"
+      // The visible button is the accessible control (§1.5); the input is
+      // reached only through it. Hidden from the tree as well as the tab
+      // order, so a 1×1px box is never counted as a target.
+      aria-hidden="true"
       tabIndex={-1}
       onChange={(event) => {
         accept(event.currentTarget.files?.[0]);

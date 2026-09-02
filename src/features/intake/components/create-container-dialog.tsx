@@ -93,7 +93,13 @@ export function CreateContainerDialog({
           Create a container
         </Button>
       </DialogTrigger>
-      <DialogContent className="rounded-lg" data-create-container-dialog="true">
+      {/* Capped to the viewport and scrolling, so the footer is reachable
+          however short the viewport (§2.6). The 2rem is the primitive's own
+          inset. */}
+      <DialogContent
+        className="max-h-[calc(100dvh-2rem)] overflow-y-auto rounded-lg"
+        data-create-container-dialog="true"
+      >
         <DialogHeader>
           <DialogTitle className="text-h2">Create a container</DialogTitle>
           <DialogDescription className="text-body">

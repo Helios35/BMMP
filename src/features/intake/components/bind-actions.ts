@@ -13,6 +13,7 @@ import {
   confirmIntake,
   createContainerForIntake,
   enterChemistry,
+  enterDetailsManually,
   enterFieldValue,
   proposeCatalogEntry,
   rejectExtraction,
@@ -54,12 +55,15 @@ import { intakeStepHref } from "./intake-hrefs";
  *   href and never touches `next/navigation` itself, so the same bindings
  *   render under a test with no router.
  *
- * Two members have no server action of their own and say so in the code:
- * `enterManually` is a change of view (the rows render for typing; typing is
- * `enterValue`), and `confirmAllHighConfidence` is the card's own eligible
- * set confirmed one field at a time through `confirmField`, because there is
- * no bulk write and a bulk write would be the path §2.1.4(4) forbids for the
- * hard-gated three.
+ * Two members are not one action each and say so in the code:
+ * `enterManually` is a change of view behind a read that produced nothing
+ * (E-4 — the rows render for typing; typing is `enterValue`) but a write
+ * behind a read that failed (EC-14 — `enterDetailsManually` opens step 2 on
+ * the server, because a failed session's step is still capture and a view
+ * change alone would not survive a reload); and `confirmAllHighConfidence`
+ * is the card's own eligible set confirmed one field at a time through
+ * `confirmField`, because there is no bulk write and a bulk write would be
+ * the path §2.1.4(4) forbids for the hard-gated three.
  */
 
 export interface ReviewActionBindings {
@@ -89,6 +93,13 @@ export interface ReviewActionBindings {
   readonly refresh: () => void;
   /** Show the rows for hand entry (E-4, E-5). A view change, not a write. */
   readonly enterManually: () => void;
+  /**
+   * The read failed (T-08 `failed`, EC-14). *Enter details manually* then
+   * opens step 2 on the server through `enterDetailsManually` rather than
+   * flipping the view: the session's step is still capture and the view
+   * alone would not survive a reload.
+   */
+  readonly readFailed: boolean;
 }
 
 const NO_LABEL_PHOTO_TO_READ =
@@ -215,6 +226,9 @@ export function bindReviewActions(
     },
 
     enterManually: () => {
+      if (bindings.readFailed) {
+        return write(() => enterDetailsManually({ sessionId }));
+      }
       enterManually();
       return Promise.resolve({ ok: true, data: null });
     },
