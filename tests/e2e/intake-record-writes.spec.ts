@@ -36,15 +36,7 @@ import { personaFor, storageStateFor } from "./support/roles";
  */
 
 test.describe("the record's write paths, on a record this spec logged", () => {
-  // A tall desk viewport, on purpose: at the default 1280×720 the edit dialog
-  // is taller than the viewport and its footer — the save — sits below the
-  // fold with no way to scroll to it (`edit-condition-dialog.tsx`). That is a
-  // §2.6 finding reported in this unit's build notes, not a reason to skip
-  // the proof; the height here is what lets the save be reached at all.
-  test.use({
-    storageState: storageStateFor("p1"),
-    viewport: { width: 1280, height: 1100 },
-  });
+  test.use({ storageState: storageStateFor("p1") });
 
   test("edit assessed condition warns before saving, supersedes visibly; void needs a reason and retains the record", async ({
     page,

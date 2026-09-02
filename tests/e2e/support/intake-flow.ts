@@ -93,6 +93,13 @@ export function primaryAction(page: Page): Locator {
   return page.locator('[data-mobile-action-bar] [data-primary-action="true"]');
 }
 
+/** The step's secondary — on step 1, *Enter details manually* (D-20). */
+export function secondaryAction(page: Page): Locator {
+  return page.locator(
+    '[data-mobile-action-bar] [data-action-role="secondary"]',
+  );
+}
+
 /** One row of the extraction review card. */
 export function fieldRow(page: Page, fieldCode: LabelFieldCode): Locator {
   return page.locator(`[data-field-row="${fieldCode}"]`);

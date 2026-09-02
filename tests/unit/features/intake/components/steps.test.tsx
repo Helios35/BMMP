@@ -79,6 +79,7 @@ const actions = vi.hoisted(() => {
       },
     })),
     setLabelCropRegion: ok(),
+    enterDetailsManually: ok(),
     confirmField: ok(),
     rejectField: ok(),
     enterFieldValue: ok(),
@@ -310,6 +311,81 @@ describe("IntakeStart — step 1", () => {
       labelFileName: null,
     });
   });
+
+  it("offers Enter details manually beside Try again on a failed read, and opens step 2 by hand on the server (EC-14, D-20)", async () => {
+    const { container } = renderStart({
+      sessionId: "s-1",
+      sessionStatus: "failed",
+      labelPhoto: {
+        id: "photo-stored",
+        width: 800,
+        height: 600,
+        fileName: null,
+      },
+    });
+    const manual = container.querySelector<HTMLElement>(
+      "[data-read-label-error] [data-read-label-manual]",
+    );
+    expect(manual).not.toBeNull();
+    expect(manual).toHaveTextContent("Enter details manually");
+    fireEvent.click(manual as HTMLElement);
+    await waitFor(() =>
+      expect(actions.enterDetailsManually).toHaveBeenCalledWith({
+        sessionId: "s-1",
+      }),
+    );
+    // The session already exists: nothing is started, and step 2 is where
+    // the person lands only after the server has opened it.
+    expect(actions.startIntakeSession).not.toHaveBeenCalled();
+    await waitFor(() =>
+      expect(push).toHaveBeenCalledWith("/batteries/new?session=s-1&step=2"),
+    );
+  });
+
+  it("starts the session first when no capture has, then enters manually — the way on without a read (E-3(5))", async () => {
+    const { container } = renderStart();
+    const secondary = container.querySelector<HTMLElement>(
+      '[data-mobile-action-bar] [data-action-role="secondary"]',
+    );
+    expect(secondary).not.toBeNull();
+    expect(secondary).toHaveTextContent("Enter details manually");
+    fireEvent.click(secondary as HTMLElement);
+    await waitFor(() =>
+      expect(actions.enterDetailsManually).toHaveBeenCalledWith({
+        sessionId: "s-new",
+      }),
+    );
+    expect(actions.startIntakeSession).toHaveBeenCalledTimes(1);
+    await waitFor(() =>
+      expect(push).toHaveBeenCalledWith("/batteries/new?session=s-new&step=2"),
+    );
+  });
+
+  it("renders the refusal when the manual path is not open, and stays on step 1", async () => {
+    actions.enterDetailsManually.mockResolvedValueOnce({
+      ok: false,
+      error: {
+        code: "CONFLICT",
+        message: "This label has already been read.",
+        correlationId: "corr-1",
+      },
+    } as never);
+    const { container } = renderStart({
+      sessionId: "s-1",
+      sessionStatus: "open",
+    });
+    fireEvent.click(
+      container.querySelector<HTMLElement>(
+        '[data-mobile-action-bar] [data-action-role="secondary"]',
+      ) as HTMLElement,
+    );
+    await waitFor(() =>
+      expect(
+        container.querySelector("[data-enter-manually-error]"),
+      ).toHaveTextContent("This label has already been read."),
+    );
+    expect(push).not.toHaveBeenCalled();
+  });
 });
 
 /* ------------------------------------------------------------- step 2 */
@@ -523,6 +599,51 @@ describe("ExtractionReviewStep — step 2", () => {
     expect(
       container.querySelectorAll("[data-field-row]").length,
     ).toBeGreaterThan(0);
+    // A read that produced nothing is a view change, not a write.
+    expect(actions.enterDetailsManually).not.toHaveBeenCalled();
+  });
+
+  it("opens step 2 on the server behind a read that failed (EC-14), rather than flipping the view", async () => {
+    const { container } = renderReview({
+      card: {
+        sessionId: "s-1",
+        readAt: null,
+        timeZone: "America/Los_Angeles",
+        state: "error",
+        errorMessage: "The label could not be read right now.",
+        gate: {
+          isReviewRequired: true,
+          fieldsBelowThreshold: 0,
+          reasonCodes: [],
+        },
+        fields: [],
+        candidates: [],
+        selectedCatalogEntryId: null,
+        catalogMatchState: "empty",
+        cannotShipNote: true,
+        cropThumbnail: null,
+        originalPhoto: null,
+        ownsCondition: true,
+        bulkConfirmAvailable: false,
+        loadingSince: null,
+      },
+    });
+    expect(container.querySelector("[data-review-card]")).toHaveAttribute(
+      "data-review-state",
+      "error",
+    );
+    fireEvent.click(
+      container.querySelector<HTMLElement>(
+        "[data-review-error] [data-enter-manually]",
+      ) as HTMLElement,
+    );
+    await waitFor(() =>
+      expect(actions.enterDetailsManually).toHaveBeenCalledWith({
+        sessionId: "s-1",
+      }),
+    );
+    // Never optimistic: the step re-reads from the server's answer.
+    await waitFor(() => expect(refresh).toHaveBeenCalled());
   });
 
   it("binds the card's actions to the session's Server Actions", async () => {

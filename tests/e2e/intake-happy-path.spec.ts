@@ -233,17 +233,17 @@ test.describe("Flow A — the clean label, one-handed", () => {
       LABEL_FIELD_CODES.length,
     );
 
-    // **Log another** returns to intake with the drum pre-selected. Clicked
-    // without the 44px measurement: sonner renders its action as a 24px
-    // control (`src/components/ui/sonner.tsx`, generated), which is under
-    // §1.5's floor on the one control a handler taps between every battery.
-    // Reported in this unit's build notes rather than lowered here.
+    // **Log another** returns to intake with the drum pre-selected — the one
+    // control a handler taps between every battery, measured against §1.5's
+    // floor like every other control on the path.
     await page.goto(`${recordPath}?logged=1`);
-    await page
-      .locator("[data-sonner-toast]")
-      .first()
-      .getByRole("button", { name: "Log another" })
-      .click();
+    await tap(
+      page
+        .locator("[data-sonner-toast]")
+        .first()
+        .getByRole("button", { name: "Log another" }),
+      "Log another",
+    );
     await expect(page).toHaveURL(
       `/batteries/new?container=${encodeURIComponent(CONTAINER.soundDrum)}`,
     );
@@ -343,13 +343,20 @@ function byType(type: AuditEventType, actor: Actor): string {
 
 /**
  * Every event type the intake wrote, found through the log as a reader would,
- * and the rows of one request sharing one correlation id.
+ * and **all of it under one correlation id** — design §11; the brief's
+ * reviewer checklist ("every step under one correlation ID, failures
+ * included"); `ERD.md` §5.3.
  *
- * Three requests produce the thread: the session start, the label read (which
- * writes the extraction and the match), and the commit (which writes the
- * confirmation, the assessment, the decision and the status change as one
- * operation — design §5). Each request's rows are asserted to share the id
- * that request carried.
+ * Several requests produce the trail — the session start, the photo upload,
+ * the label read (which writes the extraction and the match), the
+ * confirmations and the commit (which writes the confirmation, the
+ * assessment, the decision and the status change as one operation, design
+ * §5) — and each request arrives with an id of its own. The thread is the
+ * session's: the request that opened it minted the id, and every later
+ * request rebinds to it before it writes. So the start row's id is read
+ * first, and every other row of the intake is required to carry it. No row
+ * of this journey legitimately stands outside the thread: the one kind that
+ * would — a denial recorded before a session is known — does not occur here.
  */
 async function expectIntakeTrail(
   page: Page,
@@ -357,62 +364,8 @@ async function expectIntakeTrail(
 ): Promise<void> {
   const recordHref = `/batteries/${ids.recordId}`;
 
-  // The commit — its rows are found from the confirmation, which links the
-  // record, and every other commit row is then required to share its id.
-  const confirmed = (
-    await auditRows(page, byType("battery_record.confirmed", "dana"))
-  ).find((row) => row.hrefs.includes(recordHref));
-  expect(
-    confirmed,
-    `no ${AUDIT_EVENT_TYPE_LABELS["battery_record.confirmed"]} row links ${recordHref}`,
-  ).toBeDefined();
-  const commitCorrelation = confirmed?.correlationId ?? "";
-  expect(commitCorrelation).not.toBe("");
-
-  const commitTypes: readonly (readonly [AuditEventType, Actor])[] = [
-    ["damage_assessment.recorded", "dana"],
-    ["classification_decision.recorded", "system"],
-    ["battery_record.status_changed", "dana"],
-  ];
-  for (const [type, actor] of commitTypes) {
-    const rows = await auditRows(page, byType(type, actor));
-    expect(
-      rows.length,
-      `${type}: the log lists no rows at all`,
-    ).toBeGreaterThan(0);
-    const shared = rows.filter(
-      (row) => row.correlationId === commitCorrelation,
-    );
-    expect(
-      shared.length,
-      `${AUDIT_EVENT_TYPE_LABELS[type]}: no row shares the commit's correlation id ${commitCorrelation}`,
-    ).toBeGreaterThan(0);
-  }
-
-  // The label read — the match links the record; the extraction shares its
-  // request and names the session.
-  const matched = (
-    await auditRows(page, byType("catalog_entry.matched", "system"))
-  ).find((row) => row.hrefs.includes(recordHref));
-  expect(
-    matched,
-    `no ${AUDIT_EVENT_TYPE_LABELS["catalog_entry.matched"]} row links ${recordHref}`,
-  ).toBeDefined();
-  const readCorrelation = matched?.correlationId ?? "";
-  expect(readCorrelation).not.toBe("");
-
-  const extraction = (
-    await auditRows(page, byType("label_extraction.completed", "system"))
-  ).find(
-    (row) =>
-      row.correlationId === readCorrelation && row.text.includes(ids.sessionId),
-  );
-  expect(
-    extraction,
-    `no ${AUDIT_EVENT_TYPE_LABELS["label_extraction.completed"]} row shares the read's correlation id and names session ${ids.sessionId}`,
-  ).toBeDefined();
-
-  // The start — Dana's own row, naming the draft record it opened.
+  // The start — Dana's own row, naming the draft record it opened. Its id is
+  // the thread.
   const started = (
     await auditRows(page, byType("intake_session.started", "dana"))
   ).find((row) => row.text.includes(ids.recordId));
@@ -420,5 +373,68 @@ async function expectIntakeTrail(
     started,
     `no ${AUDIT_EVENT_TYPE_LABELS["intake_session.started"]} row names record ${ids.recordId}`,
   ).toBeDefined();
-  expect(started?.correlationId ?? "").not.toBe("");
+  const thread = started?.correlationId ?? "";
+  expect(thread).not.toBe("");
+
+  // Rows that link or name the record or the session: found by that, then
+  // required to share the thread.
+  const namedRows: readonly (readonly [
+    AuditEventType,
+    Actor,
+    (row: AuditRow) => boolean,
+  ])[] = [
+    [
+      "intake_photo.captured",
+      "dana",
+      (row) => row.text.includes(ids.sessionId),
+    ],
+    [
+      "label_extraction.completed",
+      "system",
+      (row) => row.text.includes(ids.sessionId),
+    ],
+    [
+      "catalog_entry.matched",
+      "system",
+      (row) => row.hrefs.includes(recordHref),
+    ],
+    [
+      "battery_record.confirmed",
+      "dana",
+      (row) => row.hrefs.includes(recordHref),
+    ],
+  ];
+  for (const [type, actor, names] of namedRows) {
+    const rows = (await auditRows(page, byType(type, actor))).filter(names);
+    expect(
+      rows.length,
+      `no ${AUDIT_EVENT_TYPE_LABELS[type]} row names this intake`,
+    ).toBeGreaterThan(0);
+    for (const row of rows) {
+      expect(
+        row.correlationId,
+        `${AUDIT_EVENT_TYPE_LABELS[type]}: a row of this intake carries ${row.correlationId}, not the session's thread ${thread}`,
+      ).toBe(thread);
+    }
+  }
+
+  // The commit's other rows name neither the record link nor the session in
+  // their text; they are found by the thread itself, beside a positive count
+  // that the log lists rows of that type at all.
+  const threadedRows: readonly (readonly [AuditEventType, Actor])[] = [
+    ["damage_assessment.recorded", "dana"],
+    ["classification_decision.recorded", "system"],
+    ["battery_record.status_changed", "dana"],
+  ];
+  for (const [type, actor] of threadedRows) {
+    const rows = await auditRows(page, byType(type, actor));
+    expect(
+      rows.length,
+      `${type}: the log lists no rows at all`,
+    ).toBeGreaterThan(0);
+    expect(
+      rows.filter((row) => row.correlationId === thread).length,
+      `${AUDIT_EVENT_TYPE_LABELS[type]}: no row carries the session's thread ${thread}`,
+    ).toBeGreaterThan(0);
+  }
 }

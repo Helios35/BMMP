@@ -421,3 +421,72 @@ describe("Void this record", () => {
     ).toHaveAttribute("data-destructive", "true");
   });
 });
+
+describe("every record dialog keeps its footer reachable (§2.6)", () => {
+  // At 1280×720 the edit dialog's body alone is taller than the viewport, and
+  // a footer below the fold with no scroll is a save nobody can reach. The
+  // content is capped to the viewport and scrolls; the classes are asserted
+  // because jsdom lays nothing out, and the e2e spec runs at the suite's
+  // default viewport to prove the save is reached.
+  const SCROLL_CAP = ["max-h-[calc(100dvh-2rem)]", "overflow-y-auto"] as const;
+
+  function expectScrollCap(selector: string): void {
+    const content = document.querySelector(selector);
+    expect(content, selector).not.toBeNull();
+    for (const className of SCROLL_CAP) {
+      expect(content?.className, selector).toContain(className);
+    }
+  }
+
+  it("edit assessed condition", () => {
+    render(
+      <EditConditionDialog
+        open
+        onOpenChange={() => {}}
+        facts={{
+          recordId: RECORD_ID,
+          intakeSessionId: SESSION_ID,
+          currentStatus: "assessed_sound",
+          currentFindings: ["none_observed"],
+          currentIsDefective: false,
+        }}
+        action={pending()}
+      />,
+    );
+    expectScrollCap('[data-record-dialog="edit-assessed-condition"]');
+  });
+
+  it("attach a photo", () => {
+    render(
+      <AttachPhotoDialog open onOpenChange={() => {}} intakeSessionId={null} />,
+    );
+    expectScrollCap('[data-record-dialog="attach-a-photo"]');
+  });
+
+  it("re-run catalog matching", () => {
+    render(
+      <RematchDialog
+        open
+        onOpenChange={() => {}}
+        recordId={RECORD_ID}
+        currentCatalogEntryId={null}
+        findCandidates={async () => actionSucceeded([])}
+        applyRematch={pending()}
+      />,
+    );
+    expectScrollCap('[data-record-dialog="rerun-catalog-matching"]');
+  });
+
+  it("void this record", () => {
+    render(
+      <VoidRecordDialog
+        open
+        onOpenChange={() => {}}
+        recordId={RECORD_ID}
+        recordNumber="BR-0001"
+        action={async () => undefined}
+      />,
+    );
+    expectScrollCap('[data-record-dialog="void-this-record"]');
+  });
+});

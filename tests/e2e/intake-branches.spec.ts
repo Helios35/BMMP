@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 
 import {
   CHEMISTRY_UNSET,
+  ENTER_MANUALLY,
   NO_READ_ENTER,
   NO_READ_RETAKE,
   NO_READ_SEARCH,
@@ -10,6 +11,7 @@ import {
 import { BATTERY_RECORD_STATUS_LABELS } from "@/domain/taxonomy/battery-record-status";
 import { CHEMISTRY_LABELS } from "@/domain/taxonomy/chemistry";
 import { CONTAINER_TYPE_LABELS } from "@/domain/taxonomy/container-type";
+import { LABEL_FIELD_CODES } from "@/domain/taxonomy/label-field-code";
 import { CANNOT_SHIP_WITHOUT_CATALOG } from "@/features/intake/copy";
 
 import {
@@ -21,6 +23,7 @@ import {
   fieldRow,
   openReview,
   primaryAction,
+  secondaryAction,
   selectTopCandidate,
   sendLabelPhoto,
   startedSessionId,
@@ -44,7 +47,9 @@ import { fixtureIds, storageStateFor } from "./support/roles";
  * - **unreadable** — E-4: zero fields is not eleven low fields. A distinct
  *   state, three equal actions, and nothing to confirm.
  * - **fail** — the provider refuses; the session stays recoverable with its
- *   photos (EC-14) and survives a reload.
+ *   photos (EC-14) and survives a reload, and **Enter details manually** is
+ *   the way on (D-20): step 2 opens with every row unread, and that too
+ *   survives a reload.
  * - **damaged** — a swelling finding derives *damaged or defective* on its own
  *   (Rule 6.4), the sound drum refuses the pack with the reason on the row
  *   (Rule 4.28), and the record lands quarantined behind the hard block.
@@ -218,20 +223,27 @@ test.describe("the branches off Flow A", () => {
     expect(await page.locator("[data-field-row]").count()).toBeGreaterThan(0);
   });
 
-  test("fail — the read is refused, the session keeps its photos, and it survives a reload", async ({
+  test("fail — the read is refused, the session keeps its photos, survives a reload, and Enter details manually is the way on", async ({
     page,
   }) => {
     await sendLabelPhoto(page, "label-fail.png");
     const sessionId = await startedSessionId(page);
 
+    // D-20 — the way on without a read is offered before anything is read.
+    await expect(secondaryAction(page)).toHaveText(ENTER_MANUALLY);
+
     await tap(primaryAction(page), "Read label");
 
-    // EC-14 — a `critical` alert with **Try again**; the flow does not advance.
+    // EC-14 — a `critical` alert with **Try again** beside **Enter details
+    // manually**; the flow does not advance on its own.
     const alert = page.locator("[data-read-label-error]");
     await expect(alert).toBeVisible();
     await expect(alert).toHaveAttribute("role", "alert");
     await expect(alert.locator("[data-read-label-retry]")).toHaveText(
       TRY_AGAIN,
+    );
+    await expect(alert.locator("[data-read-label-manual]")).toHaveText(
+      ENTER_MANUALLY,
     );
     expect(new URL(page.url()).searchParams.get("step")).not.toBe("2");
 
@@ -264,6 +276,42 @@ test.describe("the branches off Flow A", () => {
     );
     await page.waitForURL((url) => url.searchParams.get("step") === "1");
     await expect(page.locator("[data-read-label-error]")).toBeVisible();
+
+    // The way on (E-4, EC-14, D-20): the server opens step 2 by hand, and the
+    // card renders every T-09 row for typing — the default state, each row
+    // pending and *Not read* — not the no-read state, which would offer the
+    // path again. Manual entry does not bypass the gate: the primary stays
+    // inert until the hard-gated rows are confirmed by a person.
+    await tap(
+      page.locator("[data-read-label-error] [data-read-label-manual]"),
+      ENTER_MANUALLY,
+    );
+    await page.waitForURL((url) => url.searchParams.get("step") === "2");
+    await expect(page).toHaveURL(
+      `/batteries/new?session=${encodeURIComponent(sessionId)}&step=2`,
+    );
+    const card = page.locator("[data-review-card]");
+    await expect(card).toHaveAttribute("data-review-state", "default");
+    await expect(card.locator("[data-no-read-state]")).toHaveCount(0);
+    const rows = card.locator("[data-field-row]");
+    await expect(rows).toHaveCount(LABEL_FIELD_CODES.length);
+    await expect(
+      card.locator('[data-field-row][data-field-status="pending"]'),
+    ).toHaveCount(LABEL_FIELD_CODES.length);
+    await expect(primaryAction(page)).toHaveAttribute("aria-disabled", "true");
+
+    // A locked phone, again: the manual path is the session's state.
+    await page.reload();
+    await expect(page).toHaveURL(
+      `/batteries/new?session=${encodeURIComponent(sessionId)}&step=2`,
+    );
+    await expect(page.locator("[data-review-card]")).toHaveAttribute(
+      "data-review-state",
+      "default",
+    );
+    await expect(
+      page.locator('[data-field-row][data-field-status="pending"]'),
+    ).toHaveCount(LABEL_FIELD_CODES.length);
   });
 
   test("damaged — swelling derives the condition, the sound drum refuses with its reason, and the record is quarantined", async ({

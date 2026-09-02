@@ -15,9 +15,11 @@ import * as ID from "@/data/mock/fixtures/ids";
  *
  * What is proven: a whole intake from `startIntakeSession` to the redirect
  * `confirmIntake` issues, with every row it leaves behind under one
- * correlation id; the commit refusing without the three confirmations; the
- * Terms of Service gate refusing a blocked organization; and the upload route
- * stripping, hashing, measuring and stamping a photo before it lands.
+ * correlation id — the session's, whichever request wrote the row (`ERD.md`
+ * §5.3); the commit refusing without the three confirmations; the Terms of
+ * Service gate refusing a blocked organization; the upload route stripping,
+ * hashing, measuring and stamping a photo before it lands; and the manual
+ * path opening step 2 where the read failed or never ran (E-4, EC-14, D-20).
  */
 
 const guardState: { ctx: RequestContext | null } = { ctx: null };
@@ -76,6 +78,14 @@ const { POST } = await import("@/app/api/intake/photos/route");
 const { data } = await import("@/data");
 const { mockStore, resetMockStore } = await import("@/data/mock");
 const { PHOTO_ALREADY_ON_INTAKE } = await import("@/features/intake/copy");
+const { readIntakeStepView } =
+  await import("@/features/intake/server/read-intake");
+const { reviewCardView } = await import("@/features/intake/server/step-views");
+const { LABEL_FIELD_CODES } =
+  await import("@/domain/taxonomy/label-field-code");
+
+/** A well-formed id no session carries — absent reads as not found (Rule 1.2). */
+const MISSING_SESSION_ID = "00000000-0000-4000-8000-000000000000";
 
 function ctx(overrides: Partial<RequestContext> = {}): RequestContext {
   return {
@@ -745,5 +755,257 @@ describe("a whole intake, start to redirect", () => {
       }),
     );
     expect(retried.kind).toBe("reviewed");
+  });
+});
+
+describe("one intake, one thread — intake_session.correlation_id (ERD §5.3)", () => {
+  it("writes every later request's rows under the session's id, and answers a refusal with it", async () => {
+    const { sessionId } = ok(await actions.startIntakeSession({}));
+    // The request that opened the session minted the thread.
+    expect(
+      (await data.intakeSessions.get(HANDLER, sessionId))?.correlationId,
+    ).toBe(HANDLER.correlationId);
+
+    // A later request from the same person arrives with an id of its own:
+    // a new photo, the read, a confirmation. None of it is written under it.
+    const later = ctx({ correlationId: "test-corr-actions-0002" });
+    guardState.ctx = later;
+    const labelPhotoId = await upload(sessionId, "label-clean.png");
+    ok(
+      await actions.runLabelExtraction({
+        sessionId,
+        labelPhotoId,
+        labelFileName: "label-clean.png",
+      }),
+    );
+    ok(
+      await actions.confirmField({
+        sessionId,
+        fieldCode: "model",
+        value: null,
+      }),
+    );
+
+    expect(auditRows(later.correlationId)).toHaveLength(0);
+    const thread = auditRows(HANDLER.correlationId).map((row) => row.eventType);
+    for (const expected of [
+      "intake_session.started",
+      "intake_photo.captured",
+      "label_extraction.completed",
+      "catalog_entry.matched",
+    ]) {
+      expect(thread, expected).toContain(expected);
+    }
+
+    // A refusal on the session is part of the thread too: the id a person
+    // reads back over the phone is the intake's, whichever request failed.
+    const refused = await actions.confirmField({
+      sessionId,
+      fieldCode: "chemistry_code",
+      value: null,
+    });
+    expect(refused.ok).toBe(false);
+    if (refused.ok) return;
+    expect(refused.error.correlationId).toBe(HANDLER.correlationId);
+
+    const duplicate = await POST(uploadRequest(sessionId, "label-clean.png"));
+    expect(duplicate.status).toBe(409);
+    expect(
+      ((await duplicate.json()) as { correlationId: string }).correlationId,
+    ).toBe(HANDLER.correlationId);
+  });
+
+  it("keeps the request's own id where no session resolves — there is nothing to thread on", async () => {
+    const later = ctx({ correlationId: "test-corr-actions-0003" });
+    guardState.ctx = later;
+    const result = await actions.confirmField({
+      sessionId: MISSING_SESSION_ID,
+      fieldCode: "model",
+      value: null,
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.code).toBe("NOT_FOUND");
+    expect(result.error.correlationId).toBe(later.correlationId);
+    expect(recordNotFound).toHaveBeenCalledWith(
+      later,
+      "intake_session",
+      MISSING_SESSION_ID,
+    );
+  });
+});
+
+describe("Enter details manually — the way on when the read cannot happen (E-4, EC-14, D-20)", () => {
+  it("opens step 2 by hand on a failed session, keeps the failure's reason, refuses a second call, and the manual record commits", async () => {
+    const { sessionId, batteryRecordId } = ok(
+      await actions.startIntakeSession({}),
+    );
+    const labelPhotoId = await upload(sessionId, "label-fail.png");
+    const failed = await actions.runLabelExtraction({
+      sessionId,
+      labelPhotoId,
+      labelFileName: "label-fail.png",
+    });
+    expect(failed.ok).toBe(false);
+    const rowsBefore = auditRows(HANDLER.correlationId).length;
+
+    const opened = ok(await actions.enterDetailsManually({ sessionId }));
+    expect(opened.draft.manualEntry).toBe(true);
+    expect(opened.draft.fields).toHaveLength(LABEL_FIELD_CODES.length);
+    // Nothing a camera never read is proposed as a value (Rule 2.11).
+    expect(
+      opened.draft.fields.every(
+        (field) =>
+          field.status === "pending" &&
+          field.value === null &&
+          field.confidenceBand === "not_extracted",
+      ),
+    ).toBe(true);
+    // The photos the person kept stay on the draft (Rule 2.29).
+    expect(opened.draft.labelPhotoId).toBe(labelPhotoId);
+
+    const session = await data.intakeSessions.get(HANDLER, sessionId);
+    expect(session?.status).toBe("awaiting_confirmation");
+    expect(session?.currentStep).toBe("extraction_review");
+    expect(session?.isReviewRequired).toBe(true);
+    expect(session?.reviewReasonCodes).toContain("extraction_failed");
+    // No T-43 type names the choice: nothing is written (the TODO(T-43) in
+    // the action), rather than a row filed under a neighbour.
+    expect(auditRows(HANDLER.correlationId)).toHaveLength(rowsBefore);
+
+    // The step reads as the card's default state with every row unread —
+    // not the no-read state, which would offer the path again.
+    const view = await readIntakeStepView(HANDLER, sessionId);
+    if (view === null) throw new Error("the session did not read back");
+    expect(view.step).toBe("extraction_review");
+    const card = reviewCardView(view);
+    expect(card.state).toBe("default");
+    expect(card.readAt).toBeNull();
+    expect(card.fields.every((field) => field.status === "pending")).toBe(true);
+
+    // Refused once the session is awaiting confirmation — this call included.
+    const again = await actions.enterDetailsManually({ sessionId });
+    expect(again.ok).toBe(false);
+    if (!again.ok) expect(again.error.code).toBe("CONFLICT");
+
+    // Step 2 is open; asking for it changes nothing.
+    expect(
+      ok(await actions.advanceToStep({ sessionId, step: "extraction_review" }))
+        .step,
+    ).toBe("extraction_review");
+
+    // Manual entry does not bypass the gate (E-4).
+    const tooEarly = await actions.confirmIntake({ sessionId });
+    expect(tooEarly.ok).toBe(false);
+
+    ok(
+      await actions.enterFieldValue({
+        sessionId,
+        fieldCode: "model",
+        value: "HB-12",
+      }),
+    );
+    const model = ok(
+      await actions.confirmField({
+        sessionId,
+        fieldCode: "model",
+        value: null,
+      }),
+    );
+    const modelField = model.draft.fields.find(
+      (field) => field.fieldCode === "model",
+    );
+    expect(modelField?.status).toBe("confirmed");
+    expect(modelField?.source).toBe("entered_by");
+    expect(modelField?.confirmedBy).toBe(HANDLER.userId);
+    ok(await actions.enterChemistry({ sessionId, chemistry: "li_lfp" }));
+    ok(
+      await actions.confirmField({
+        sessionId,
+        fieldCode: "chemistry_code",
+        value: null,
+      }),
+    );
+    // Every other row is resolved by an explicit *leave empty* (§2.1.5) —
+    // nothing unread is silently committed as absent.
+    for (const fieldCode of [
+      "manufacturer",
+      "voltage",
+      "capacity_ah",
+      "energy_wh",
+      "date_code",
+      "serial_number",
+      "certification_marks",
+      "transport_test_marking",
+    ] as const) {
+      ok(await actions.confirmField({ sessionId, fieldCode, value: null }));
+    }
+    ok(
+      await actions.setCondition({
+        sessionId,
+        findingTypes: ["none_observed"],
+        isDefective: false,
+      }),
+    );
+    ok(await actions.confirmCondition({ sessionId }));
+    await expect(actions.confirmIntake({ sessionId })).rejects.toThrow(
+      RedirectSignal,
+    );
+
+    const record = await data.batteryRecords.get(HANDLER, batteryRecordId);
+    expect(record?.status).toBe("classified");
+    expect(record?.partNumber).toBe("HB-12");
+    expect(record?.chemistry).toBe("li_lfp");
+    expect(record?.chemistrySource).toBe("human_entry");
+    expect(record?.containerId).toBeNull();
+    expect((await data.intakeSessions.get(HANDLER, sessionId))?.status).toBe(
+      "completed",
+    );
+  });
+
+  it("opens step 2 by hand on a session nobody has read, adding no reason code T-52 does not define for it", async () => {
+    const { sessionId } = ok(
+      await actions.startIntakeSession({ containerId: ID.CONTAINER.soundDrum }),
+    );
+    const opened = ok(await actions.enterDetailsManually({ sessionId }));
+    expect(opened.draft.manualEntry).toBe(true);
+    // The drum the person started beside survives the seed.
+    expect(opened.draft.containerId).toBe(ID.CONTAINER.soundDrum);
+
+    const session = await data.intakeSessions.get(HANDLER, sessionId);
+    expect(session?.status).toBe("awaiting_confirmation");
+    expect(session?.currentStep).toBe("extraction_review");
+    expect(session?.isReviewRequired).toBe(true);
+    expect(session?.reviewReasonCodes ?? []).toEqual([]);
+    expect(
+      (
+        await data.labelExtractions.list(HANDLER, {
+          intakeSessionId: sessionId,
+          limit: 50,
+        })
+      ).items,
+    ).toHaveLength(0);
+  });
+
+  it("is refused once a read is awaiting confirmation — the card's own E-4 path handles that", async () => {
+    const { sessionId } = ok(await actions.startIntakeSession({}));
+    const labelPhotoId = await upload(sessionId, "label-clean.png");
+    ok(
+      await actions.runLabelExtraction({
+        sessionId,
+        labelPhotoId,
+        labelFileName: "label-clean.png",
+      }),
+    );
+    const refused = await actions.enterDetailsManually({ sessionId });
+    expect(refused.ok).toBe(false);
+    if (refused.ok) return;
+    expect(refused.error.code).toBe("CONFLICT");
+    // The read the person is looking at was not discarded.
+    const session = await data.intakeSessions.get(HANDLER, sessionId);
+    expect(session?.draft?.manualEntry).toBe(false);
+    expect(session?.draft?.fields.some((field) => field.value !== null)).toBe(
+      true,
+    );
   });
 });

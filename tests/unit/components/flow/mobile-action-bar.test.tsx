@@ -76,6 +76,37 @@ describe("MobileActionBar — disabled with a checklist", () => {
     expect(container.querySelector("[data-gated-control]")).not.toBeNull();
   });
 
+  it("stretches the trigger and never the reason caption, so the caption stays sr-only from md", () => {
+    // The caption is absolutely positioned by `sr-only`. A width rule on the
+    // wrapper that reached every child span outranked that 1px width, laid
+    // the caption out at its text width, and scrolled a 1280px viewport
+    // sideways by 49px. These are the classes the fix relies on: the trigger
+    // carries the widths, the caption carries `md:sr-only` and no width.
+    const reason = "Add a label photo to read it.";
+    const { container } = render(
+      <MobileActionBar
+        primary={{
+          label: "Read label",
+          disabled: true,
+          disabledReason: reason,
+        }}
+      />,
+    );
+    const gated = container.querySelector("[data-gated-control]");
+    expect(gated).not.toBeNull();
+    expect(gated?.className).not.toMatch(/\[&>span/);
+
+    const trigger = gated?.querySelector("[aria-describedby]");
+    expect(trigger?.className).toContain("w-full");
+    expect(trigger?.className).toContain("md:w-auto");
+
+    const caption = gated?.querySelector("[data-gated-reason]");
+    expect(caption?.textContent).toBe(reason);
+    expect(caption?.className).toContain("md:sr-only");
+    expect(caption?.className).not.toMatch(/(^|\s|:)w-(full|auto)(\s|$)/);
+    expect(trigger?.getAttribute("aria-describedby")).toBe(caption?.id);
+  });
+
   it("hides the checklist when the primary is enabled", () => {
     const { container } = render(
       <MobileActionBar

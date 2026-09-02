@@ -101,6 +101,42 @@ describe("ExtractionReviewCard — default", () => {
     }
   });
 
+  it("gives the value column a floor and lets the skeleton share the row's grid (§2.1.6)", () => {
+    // At 1280×800 the previous grid — `minmax(0,2fr)` for the value beside
+    // two content-sized columns — left the value 38px wide and a paragraph
+    // measuring 0px. The value now has a 12rem floor from `md`, the four-
+    // column layout is a container query on the rows rather than a viewport
+    // breakpoint, and the skeleton carries the identical grid so nothing
+    // jumps when the rows arrive. jsdom lays nothing out; the classes are the
+    // contract and `field-row.tsx`'s docblock is the arithmetic.
+    const gridClassesOf = (element: Element | null): readonly string[] =>
+      (element?.className ?? "")
+        .split(/\s+/)
+        .filter((name) => /(^|:)grid-cols-/.test(name));
+
+    const { container, rerenderWith } = renderCard();
+    expect(container.querySelector("[data-field-rows]")?.className).toContain(
+      "@container/field-rows",
+    );
+
+    const gridClasses = gridClassesOf(row(container, "manufacturer"));
+    expect(gridClasses).toEqual([
+      "md:grid-cols-[minmax(10rem,12rem)_minmax(12rem,1fr)]",
+      "@4xl/field-rows:grid-cols-[minmax(10rem,12rem)_minmax(12rem,1fr)_auto_auto]",
+    ]);
+    for (const name of gridClasses) {
+      expect(name).not.toContain("minmax(0,");
+    }
+
+    rerenderWith({ state: "loading" });
+    expect(
+      container.querySelector("[data-field-rows-skeleton]")?.className,
+    ).toContain("@container/field-rows");
+    expect(
+      gridClassesOf(container.querySelector("[data-field-row-skeleton]")),
+    ).toEqual(gridClasses);
+  });
+
   it("marks the hard-gated rows and says a person always confirms them", () => {
     const { container } = renderCard();
     for (const code of HARD_GATED_LABEL_FIELD_CODES) {
