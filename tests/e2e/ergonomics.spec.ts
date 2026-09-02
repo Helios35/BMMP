@@ -291,7 +291,7 @@ function expectNoHorizontalOverflow(
  * `/documents/[id]`, `/settings/catalog` — are absent because they do not exist
  * yet. **Each of those units extends this list when it builds them.**
  */
-const { BATTERY, CATALOG } = fixtureIds;
+const { BATTERY, CATALOG, INTAKE_SESSION } = fixtureIds;
 
 const PUBLIC_ROUTES: readonly string[] = [
   "/sign-in",
@@ -315,14 +315,22 @@ const MANAGER_ROUTES: readonly string[] = [
 ];
 
 /**
- * The handler's routes, including the two narrowed list states.
+ * The handler's routes, including the two narrowed list states and step 2 of
+ * two fixture sessions.
  *
  * The narrowed states are swept because they are the only screens that render
  * **Clear search** and **Clear filters**, and a control nobody sweeps is a
- * control that regresses.
+ * control that regresses. The two review cards are swept because they render
+ * the most controls of any screen in the product — a confirm, a correct and a
+ * reject per row, the gate banner's two actions, the mobile action bar's
+ * checklist — on the one screen §1.5 was written for: the spread session's
+ * card carries rows in every band, and the scuffed session's carries the E-4
+ * state, whose three actions are the whole of its offer.
  */
 const HANDLER_ROUTES: readonly string[] = [
   "/batteries/new",
+  `/batteries/new?session=${INTAKE_SESSION.spreadInReview}&step=2`,
+  `/batteries/new?session=${INTAKE_SESSION.scuffedInReview}&step=2`,
   "/batteries?q=zzzz-no-such-record",
   "/batteries?from=2099-01-01",
 ];

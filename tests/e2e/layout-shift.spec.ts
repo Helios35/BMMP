@@ -208,14 +208,14 @@ function viaFirstRow(): (page: Page) => Locator {
 }
 
 /**
- * The seven routes with a `loading.tsx`.
+ * The seven routes with a `loading.tsx` that a Facility Manager reaches.
  *
  * `/` has none, and correctly: its four regions stream inside their own
  * `<Suspense>` boundaries and the page header renders before any of them, so
  * there is no whole-page fallback that could disagree with anything.
  *
- * `/batteries/new` has none either — the route is the consent gate and a read
- * that resolves before the first paint.
+ * `/batteries/new` gained one in unit 02 and is walked below as the role that
+ * can reach it — P2 holds nothing on it, so it cannot join this list.
  */
 const JOURNEYS: readonly Journey[] = [
   { from: "/", link: viaSidebar("/batteries"), to: "/batteries" },
@@ -266,6 +266,56 @@ test.describe("a skeleton's dimensions match the content that replaces it", () =
       from: "/",
       link: (page_) => page_.locator('[data-mobile-tab="/batteries"]'),
       to: "/batteries",
+    };
+    expectNoShift(journey, "phone 375×812", await measure(page, journey));
+  });
+});
+
+/**
+ * `/batteries/new`, which only a Compliance Handler reaches.
+ *
+ * Unit 02 gave the intake route a `loading.tsx` — a breadcrumb trail, the
+ * title, the stepper's line and one card — and the header block it stands in
+ * for has to be the same height, or every tap on the centre tab drops the
+ * capture surface under the thumb that pressed it (§6.3).
+ *
+ * Two ways in, both walked as P1: the dashboard's **Log a battery** quick
+ * action from `md` up, and the raised centre tab on the phone — the route's
+ * only entry from the tab bar and the form factor the flow is designed for
+ * (`SITE_ARCHITECTURE.md` §2.2).
+ */
+test.describe("the intake route's skeleton, as the handler reaches it", () => {
+  test.use({ storageState: storageStateFor("p1") });
+
+  const viaQuickAction: Journey = {
+    from: "/",
+    link: (page_) =>
+      page_.locator('#main-content a[href="/batteries/new"]').first(),
+    to: "/batteries/new",
+  };
+
+  for (const viewport of VIEWPORTS) {
+    test(`from the dashboard's quick action, at ${viewport.name}`, async ({
+      page,
+    }) => {
+      await page.setViewportSize(viewport);
+      expectNoShift(
+        viaQuickAction,
+        viewport.name,
+        await measure(page, viaQuickAction),
+      );
+    });
+  }
+
+  test("from the mobile centre tab, on the phone", async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    const journey: Journey = {
+      from: "/",
+      link: (page_) =>
+        page_.locator(
+          '[data-mobile-tab="centre"][data-mobile-tab-route="/batteries/new"]',
+        ),
+      to: "/batteries/new",
     };
     expectNoShift(journey, "phone 375×812", await measure(page, journey));
   });
