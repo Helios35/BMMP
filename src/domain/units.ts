@@ -268,3 +268,29 @@ export function energyWhFromVoltageAndCapacity(
 ): string {
   return scaleDecimal(multiplyDecimal(volts, ampHours), 3);
 }
+
+/**
+ * A JavaScript `number` as exact digits, for the one place a number is allowed
+ * to meet a decimal: a configured cutoff or score arriving as `number` and
+ * being compared against a stored `Decimal`. `String(0.82)` is `"0.82"`, but
+ * `String(1e-7)` is `"1e-7"`, so the exponent form is expanded rather than
+ * passed through. Throws `RangeError` for anything not finite — a threshold
+ * that is `NaN` is not a threshold.
+ */
+export function decimalFromNumber(value: number): string {
+  if (!Number.isFinite(value)) {
+    throw new RangeError(`not a finite number: ${String(value)}`);
+  }
+  const plain = String(value);
+  if (isDecimalString(plain)) return plain;
+  // A whole number beyond 1e21 prints in exponent form and `toFixed` cannot
+  // expand it; BigInt holds every integer a double can represent exactly.
+  if (Number.isInteger(value)) return BigInt(value).toString();
+  // Exponent form. `toFixed` expands it; the trailing zeros it pads with carry
+  // no information and are dropped so the scale reflects the value.
+  const expanded = value.toFixed(20).replace(/(\.\d*?[1-9])0+$|\.0+$/, "$1");
+  if (!isDecimalString(expanded)) {
+    throw new RangeError(`cannot express ${String(value)} as a decimal`);
+  }
+  return normalizeDecimal(expanded);
+}

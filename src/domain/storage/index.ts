@@ -8,3 +8,4 @@
  */
 
 export * from "./clock-display";
+export * from "./placement";

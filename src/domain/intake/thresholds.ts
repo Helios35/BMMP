@@ -59,6 +59,25 @@ export interface MatchTolerances {
   readonly energyRelative: number;
 }
 
+/**
+ * The weights the catalog scorer assigns to each way an entry can match
+ * (`TECHNICAL_SPEC.md` §11.1 step 4), each a score in (0, 1].
+ *
+ * Configuration rather than code for the same reason the thresholds are: a
+ * weight decides which candidate ranks first, and the top candidate's score is
+ * what the gate measures against `minMatchScore`. An exact part-number match
+ * is the ceiling of 1 and is not tunable — a label that resolves the part
+ * number outright is the strongest evidence the pipeline has.
+ */
+export interface MatchScoring {
+  /** A model string the entry's own label patterns name. */
+  readonly labelPatternScore: number;
+  /** Text similarity alone is scaled into this ceiling and can never exceed it. */
+  readonly similarityCeiling: number;
+  /** Added once per nameplate figure that agrees within tolerance. */
+  readonly numericAgreementBonus: number;
+}
+
 /** Everything the intake pipeline reads from platform configuration, in one shape. */
 export interface IntakeGateConfiguration {
   /** Which configuration row produced this set, so a stamped set can be traced. */
@@ -66,6 +85,7 @@ export interface IntakeGateConfiguration {
   readonly thresholds: GateThresholds;
   readonly bandCutoffs: BandCutoffs;
   readonly matchTolerances: MatchTolerances;
+  readonly matchScoring: MatchScoring;
 }
 
 export type ConfigurationValidation =
@@ -150,6 +170,21 @@ export function validateIntakeGateConfiguration(
     }
   }
 
+  // The gate compares bands and the stamp records a threshold; the two are
+  // one number seen from two sides, and a set where they differ would stamp a
+  // threshold the gate never applied (Rule 2.16).
+  if (
+    thresholds !== null &&
+    cutoffs !== null &&
+    isUnitScore(thresholds.minFieldConfidence) &&
+    isUnitScore(cutoffs.high) &&
+    thresholds.minFieldConfidence !== cutoffs.high
+  ) {
+    issues.push(
+      "thresholds.minFieldConfidence must equal bandCutoffs.high — the gate compares bands, and the stamp must name the cutoff it applied",
+    );
+  }
+
   const tolerances = isRecord(value.matchTolerances)
     ? value.matchTolerances
     : null;
@@ -167,6 +202,21 @@ export function validateIntakeGateConfiguration(
     }
   }
 
+  const scoring = isRecord(value.matchScoring) ? value.matchScoring : null;
+  if (scoring === null) {
+    issues.push("matchScoring must be an object");
+  } else {
+    for (const key of [
+      "labelPatternScore",
+      "similarityCeiling",
+      "numericAgreementBonus",
+    ] as const) {
+      if (!isUnitScore(scoring[key])) {
+        issues.push(`matchScoring.${key} must be a number in (0, 1]`);
+      }
+    }
+  }
+
   if (issues.length > 0) return { ok: false, issues };
 
   // Every branch above has run, so the narrowing below is sound; the casts are
@@ -174,6 +224,7 @@ export function validateIntakeGateConfiguration(
   const t = thresholds as Readonly<Record<keyof GateThresholds, number>>;
   const c = cutoffs as Readonly<Record<keyof BandCutoffs, number>>;
   const m = tolerances as Readonly<Record<keyof MatchTolerances, number>>;
+  const w = scoring as Readonly<Record<keyof MatchScoring, number>>;
 
   return {
     ok: true,
@@ -189,6 +240,11 @@ export function validateIntakeGateConfiguration(
         voltageRelative: m.voltageRelative,
         capacityRelative: m.capacityRelative,
         energyRelative: m.energyRelative,
+      },
+      matchScoring: {
+        labelPatternScore: w.labelPatternScore,
+        similarityCeiling: w.similarityCeiling,
+        numericAgreementBonus: w.numericAgreementBonus,
       },
     },
   };

@@ -42,4 +42,9 @@ export const PLATFORM_INTAKE_GATE_CONFIGURATION = {
     capacityRelative: 0.05,
     energyRelative: 0.05,
   },
+  matchScoring: {
+    labelPatternScore: 0.9,
+    similarityCeiling: 0.8,
+    numericAgreementBonus: 0.05,
+  },
 } as const;

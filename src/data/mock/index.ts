@@ -1132,11 +1132,16 @@ const intakeSessions: IntakeRepository = {
         context: { rule: "6.6" },
       });
     }
+    // The assessment row and the outcome it produced are one determination
+    // seen from two sides (Rules 6.4, 6.5): the condition, the air prohibition
+    // and whether any flag is set must all agree with the row's status.
     if (
       input.damageAssessment.assessedCondition !==
         input.conditionOutcome.assessedCondition ||
       input.damageAssessment.isAirTransportProhibited !==
-        input.conditionOutcome.isAirTransportProhibited
+        input.conditionOutcome.isAirTransportProhibited ||
+      input.conditionOutcome.ddrFlags.length > 0 !==
+        (input.damageAssessment.status === "assessed_damaged")
     ) {
       throw new DataIntegrityError({
         userMessage: "Something went wrong and nothing was changed. Try again.",
