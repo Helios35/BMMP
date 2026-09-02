@@ -1,4 +1,7 @@
+import type { CreateAuditEvent } from "./audit";
+import type { CreateDamageAssessment } from "./condition";
 import type { RequestContext } from "./context";
+import type { CreateClassificationDecision } from "./documents";
 import type {
   AppendInput,
   AppendOnlyRepository,
@@ -8,6 +11,7 @@ import type {
   SortRequest,
   UpdateInput,
 } from "./repository";
+import type { CreateStorageClock, CreateStorageEvent } from "./storage";
 import type { BatteryRecord } from "@/types/battery-record";
 import type { CatalogEntry } from "@/types/catalog";
 import type {
@@ -101,17 +105,55 @@ export interface BatteryRecordQuery
   readonly isAirTransportProhibited?: boolean;
   /** Excludes `voided` records, which are retained but sit outside every operational count. */
   readonly excludeVoided?: boolean;
+  /**
+   * Excludes `draft` records — T-22: *"Created within an intake session, not
+   * yet submitted. Visible only in that session."* The list is not that
+   * session.
+   */
+  readonly excludeDrafts?: boolean;
   /** The `/batteries` date range, over `created_at`. Half-open, both bounds optional. */
   readonly loggedAfter?: IsoTimestamp;
   readonly loggedBefore?: IsoTimestamp;
 }
 
-export type BatteryRecordRepository = Repository<
+/**
+ * What a confirmed damage assessment sets on the record — the two legal
+ * booleans and the version that set them (`TECHNICAL_SPEC.md` §3.2, Rules 6.4,
+ * 6.5), plus the assessed condition and its human confirmation.
+ */
+export interface ConditionOutcome {
+  /** T-49. */
+  readonly assessedCondition: string;
+  readonly ddrFlags: readonly DdrFlag[];
+  readonly isAirTransportProhibited: boolean;
+  readonly conditionRuleVersionId: Uuid | null;
+  readonly conditionConfirmedBy: Uuid;
+  readonly conditionConfirmedAt: IsoTimestamp;
+}
+
+export interface BatteryRecordRepository extends Repository<
   BatteryRecord,
   CreateBatteryRecord,
   UpdateBatteryRecord,
   BatteryRecordQuery
->;
+> {
+  /**
+   * **The one door through which `ddrFlags` and `isAirTransportProhibited`
+   * move.** `update` strips both (Rules 6.4, 6.5, 6.8): they are set by rule
+   * evaluation from a confirmed damage assessment, never by a caller editing a
+   * record. This method takes the determination the domain produced from that
+   * assessment and writes it — the caller supplies a determination, not a
+   * flag, and the determination names the person who confirmed the finding.
+   *
+   * Under Supabase this is the trigger that fires on a `damage_assessment`
+   * insert; the contract exposes it so the mock can hold the same invariant.
+   */
+  applyConditionOutcome(
+    ctx: RequestContext,
+    id: Uuid,
+    outcome: ConditionOutcome,
+  ): Promise<BatteryRecord>;
+}
 
 // --- catalog_entry ----------------------------------------------------------
 
@@ -206,6 +248,8 @@ export interface IntakeSessionQuery extends BaseQuery {
   readonly startedBy?: Uuid;
   readonly batteryRecordId?: Uuid;
   readonly correlationId?: string;
+  /** Status is neither `completed` nor `abandoned` — the drafts a person can pick up. */
+  readonly isOpen?: boolean;
 }
 
 /**
@@ -214,16 +258,29 @@ export interface IntakeSessionQuery extends BaseQuery {
  * The shape is deliberately whole rather than a sequence of calls: there is no
  * state in which a battery has a shipping-ready record but no classification
  * decision or no running clock (`TECHNICAL_SPEC.md` §11.1 step 6).
+ *
+ * **The rows arrive already decided.** The pipeline orchestrator runs the pure
+ * evaluators in `src/domain` and hands the adapter what to persist; the adapter
+ * validates the preconditions it can see (the three attributable confirmations,
+ * the container's admission) and writes all of it or none of it. Under Supabase
+ * this is `app.commit_intake_confirmation(payload jsonb)`, one `security
+ * invoker` function; in the mock it is one snapshot-and-restore operation.
  */
 export interface IntakeConfirmation {
   readonly intakeSessionId: Uuid;
-  /** The confirmed record fields. Chemistry, model and condition are confirmed per field. */
-  readonly batteryRecord: CreateBatteryRecord;
+  /** The draft record the session created when it started (T-22 `draft`). */
+  readonly batteryRecordId: Uuid;
+  /**
+   * The confirmed record fields. Status is not among them — the adapter sets
+   * `confirmed` → `classified` → `stored` from what else is in the payload.
+   */
+  readonly batteryRecord: UpdateBatteryRecord;
   /**
    * Which fields the human confirmed, and by whom.
    *
    * **Confirmation is per field and attributable — Rule 2.21 forbids "confirmed
-   * by the system" as a value.**
+   * by the system" as a value.** The adapter refuses without all three
+   * hard-gated fields here (Rule 2.15), at any confidence band.
    */
   readonly confirmedFields: readonly {
     readonly fieldCode: LabelFieldCode;
@@ -232,8 +289,40 @@ export interface IntakeConfirmation {
   }[];
   /** The catalog entry a human picked. Never auto-selected (Rule 2.19). */
   readonly catalogEntryId: Uuid | null;
-  /** Where the record is placed. Placement starts the clock (Rule 4.4). */
+  /** Where the record is placed. Placement starts the clock (Rule 4.4). Null when unplaced. */
   readonly containerId: Uuid | null;
+  /** Appended when a date code was read (§11.1 step 6.3). */
+  readonly dateCodeDecode: CreateDateCodeDecode | null;
+  /**
+   * Always present — every battery record carries a damage assessment
+   * (Rule 6.1), and a model never produces one without a person (Rule 6.6).
+   */
+  readonly damageAssessment: CreateDamageAssessment;
+  /**
+   * What that assessment sets on the record — the same determination, as the
+   * record's two legal booleans and the version that set them. The adapter
+   * refuses a payload whose assessment and outcome disagree.
+   */
+  readonly conditionOutcome: ConditionOutcome;
+  /**
+   * Null only where classification could not run at all — no jurisdiction
+   * profile, or no rule version in force (Rule 3.10; E-13). Never a default.
+   */
+  readonly classificationDecision: CreateClassificationDecision | null;
+  /** A **new** clock to start on this placement, or null when joining one or unplaced. */
+  readonly storageClock: CreateStorageClock | null;
+  /** The container's running clock the record joins (Rule 4.4). */
+  readonly joinStorageClockId: Uuid | null;
+  /** The placement event. Null when unplaced. */
+  readonly storageEvent: CreateStorageEvent | null;
+  /** Set on the container when this placement is its first (Rule 4.4). */
+  readonly containerAccumulationStartedAt: IsoTimestamp | null;
+  /**
+   * One event per row written above, sharing `ctx.correlationId`. The adapter
+   * appends them through the `security definer` door as part of the same
+   * all-or-nothing operation (§11.1 step 6.8).
+   */
+  readonly auditEvents: readonly CreateAuditEvent[];
 }
 
 export interface IntakeRepository extends Repository<

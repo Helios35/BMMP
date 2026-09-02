@@ -1,3 +1,4 @@
+import type { RequestContext } from "./context";
 import type {
   AppendInput,
   AppendOnlyRepository,
@@ -37,8 +38,25 @@ export interface DamageAssessmentQuery extends BaseQuery {
  *
  * A model proposes; **a human sets** (Rules 6.2, 6.6).
  */
-export type DamageAssessmentRepository = AppendOnlyRepository<
+export interface DamageAssessmentRepository extends AppendOnlyRepository<
   DamageAssessment,
   CreateDamageAssessment,
   DamageAssessmentQuery
->;
+> {
+  /**
+   * Mark an assessment superseded by a later one — **the only permitted
+   * update**, applied by trigger on the old row when a superseding assessment
+   * is appended (T-46). Every other column stays exactly as recorded: the
+   * superseded assessment is displayed alongside the current one with its
+   * author, timestamp, findings and evidence, permanently (Rule 6.12).
+   *
+   * Mirrors `documentRenders.markSuperseded`. Refuses when the superseding row
+   * does not exist, so a row can never be retired by an assessment that was
+   * never written.
+   */
+  markSuperseded(
+    ctx: RequestContext,
+    id: Uuid,
+    supersededByDamageAssessmentId: Uuid,
+  ): Promise<DamageAssessment>;
+}

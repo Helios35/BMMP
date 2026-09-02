@@ -7,6 +7,7 @@ import type {
 } from "@/data/contracts/repository";
 import type {
   BatteryRecordQuery,
+  BatteryRecordRepository,
   BatteryRecordSortField,
   CatalogCandidateFilter,
   CatalogEntrySortField,
@@ -47,6 +48,7 @@ import type {
 } from "@/data/contracts/storage";
 import type {
   ClassificationDecisionQuery,
+  ClassificationDecisionRepository,
   ContainerLabelQuery,
   CreateClassificationDecision,
   CreateContainerLabel,
@@ -93,7 +95,9 @@ import type {
 import type {
   CreateDamageAssessment,
   DamageAssessmentQuery,
+  DamageAssessmentRepository,
 } from "@/data/contracts/condition";
+import type { PlatformConfigurationRepository } from "@/data/contracts/platform-configuration";
 import type {
   AuditEventQuery,
   AuditEventRepository,
@@ -143,13 +147,23 @@ import type {
   RuleVersionCandidate,
 } from "@/domain/rules/resolve";
 import { resolveRules } from "@/domain/rules/resolve";
+import { validateIntakeGateConfiguration } from "@/domain/intake/thresholds";
+import { requiredContainerType } from "@/domain/storage/placement";
+import type { BatteryRecordStatus } from "@/domain/taxonomy/battery-record-status";
+import {
+  HARD_GATED_LABEL_FIELD_CODES,
+  LABEL_FIELD_CODE_LABELS,
+} from "@/domain/taxonomy/label-field-code";
+import { addDecimal } from "@/domain/units";
 import {
   ConflictError,
+  DataIntegrityError,
   DocumentIntegrityError,
   NotFoundError,
   PermissionError,
   ValidationError,
 } from "@/lib/errors";
+import { PLATFORM_INTAKE_GATE_CONFIGURATION } from "./fixtures/platform-configuration";
 import { assertPolicy } from "./policy";
 import { mockStore, type TenantAuditEvent } from "./store";
 import {
@@ -697,6 +711,8 @@ function matchesBatteryRecord(
     (query.ddrFlag === undefined ||
       (row.ddrFlags as readonly string[]).includes(query.ddrFlag)) &&
     (query.excludeVoided !== true || row.status !== "voided") &&
+    // T-22: a draft is visible only inside the intake session that holds it.
+    (query.excludeDrafts !== true || row.status !== "draft") &&
     // Half-open on both ends, over `created_at` — the date a record was logged,
     // never a date derived from anything else.
     (query.loggedAfter === undefined || row.createdAt >= query.loggedAfter) &&
@@ -768,7 +784,7 @@ const batteryRecords = tenantRepository<
  * trigger is what actually holds, and the mock has to refuse the same write or a
  * screen would discover the refusal for the first time after migration.
  */
-const guardedBatteryRecords: typeof batteryRecords = {
+const guardedBatteryRecords: BatteryRecordRepository = {
   ...batteryRecords,
   async list(ctx, query) {
     return store().batteryRecords.list(
@@ -783,6 +799,31 @@ const guardedBatteryRecords: typeof batteryRecords = {
     delete permitted.ddrFlags;
     delete permitted.isAirTransportProhibited;
     return batteryRecords.update(ctx, id, permitted as typeof input);
+  },
+  /**
+   * The one door for the two legal booleans — in Postgres the trigger on a
+   * `damage_assessment` insert, here an explicit method that takes a
+   * determination the domain produced from a confirmed assessment. A caller
+   * cannot hand this a flag without also handing it the person who confirmed
+   * the finding (Rules 6.4, 6.5, 6.6).
+   */
+  async applyConditionOutcome(ctx, id, outcome) {
+    if (outcome.conditionConfirmedBy.trim() === "") {
+      throw new ValidationError({
+        userMessage:
+          "The assessed condition must be confirmed by a person. A model may propose it; a model never sets it.",
+        correlationId: ctx.correlationId,
+        context: { rule: "6.6", batteryRecordId: id },
+      });
+    }
+    return batteryRecords.update(ctx, id, {
+      assessedCondition: outcome.assessedCondition,
+      ddrFlags: outcome.ddrFlags,
+      isAirTransportProhibited: outcome.isAirTransportProhibited,
+      conditionRuleVersionId: outcome.conditionRuleVersionId,
+      conditionConfirmedBy: outcome.conditionConfirmedBy,
+      conditionConfirmedAt: outcome.conditionConfirmedAt,
+    } as Partial<BatteryRecord>);
   },
 };
 
@@ -909,6 +950,7 @@ const intakeBase = tenantRepository<
       startedBy?: Uuid;
       batteryRecordId?: Uuid;
       correlationId?: string;
+      isOpen?: boolean;
       search?: string;
     },
   ) =>
@@ -917,6 +959,9 @@ const intakeBase = tenantRepository<
     eq(query.startedBy, row.startedBy) &&
     eq(query.batteryRecordId, row.batteryRecordId ?? undefined) &&
     eq(query.correlationId, row.correlationId) &&
+    (query.isOpen === undefined ||
+      query.isOpen ===
+        (row.status !== "completed" && row.status !== "abandoned")) &&
     matchesSearch(query.search, row.correlationId),
   build: (ctx, input, id) => ({
     ...input,
@@ -932,100 +977,401 @@ const intakeBase = tenantRepository<
   }),
 });
 
+/**
+ * Every table one confirmation can touch, so the commit can snapshot all of
+ * them and put every one back if any write fails.
+ */
+function commitSnapshot(): readonly {
+  readonly table: { all(): readonly unknown[]; replaceAll(rows: never): void };
+  readonly rows: readonly unknown[];
+}[] {
+  const s = store();
+  const tables = [
+    s.batteryRecords,
+    s.intakeSessions,
+    s.dateCodeDecodes,
+    s.damageAssessments,
+    s.classificationDecisions,
+    s.storageClocks,
+    s.storageEvents,
+    s.containers,
+    s.auditEvents,
+  ] as const;
+  // `all()` hands back the live array, so the copy is what makes this a
+  // snapshot rather than a second pointer at the rows about to change.
+  return tables.map((table) => ({
+    table: table as unknown as {
+      all(): readonly unknown[];
+      replaceAll(rows: never): void;
+    },
+    rows: [...table.all()],
+  }));
+}
+
 const intakeSessions: IntakeRepository = {
   ...intakeBase,
   /**
-   * One transaction. **All or nothing.**
+   * One transaction. **All or nothing** (`TECHNICAL_SPEC.md` §11.1 step 6).
    *
-   * The mock cannot open a database transaction, so it assembles every row
-   * first and commits them together — if any precondition fails, nothing is
-   * written. That is the same guarantee `app.commit_intake_confirmation` gives
-   * in Postgres, and it is why this is one contract method rather than eight.
+   * The mock cannot open a database transaction, so it does the next honest
+   * thing: it validates every precondition it can see, snapshots every table
+   * the commit can touch, performs the writes, and on any failure — a seeded
+   * fault, a policy refusal, a bad row — restores every snapshot and rethrows.
+   * There is no state in which a battery has a shipping-ready record but no
+   * classification decision or no running clock.
+   *
+   * ## What is refused here, and why here
+   *
+   * - **The three hard-gated fields without an attributable confirmation**
+   *   (Rules 2.15, 2.21). The gate decides which queue; it never decides
+   *   whether a person is involved, and "confirmed by the system" is not a
+   *   value. Refused at any confidence band, for every role including P6
+   *   (Rule 2.17).
+   * - **Chemistry that is null, `unknown` or unconfirmed** (Rule 2.34, T-22).
+   * - **A damage assessment nobody confirmed** (Rule 6.6), or one that
+   *   disagrees with the condition outcome it is meant to have produced.
+   * - **Placement into an overdue container** (Rule 4.16) or into a container
+   *   of the wrong segregation class (Rule 4.28, T-23). The domain names the
+   *   class; this checks the container matches it.
+   *
+   * The rows themselves arrive decided — the orchestrator ran the pure
+   * evaluators — and the audit events arrive with them, appended through the
+   * `security definer` door inside the same all-or-nothing operation, so a
+   * commit that fails leaves no audit row claiming it happened, and one that
+   * succeeds leaves every step under one correlation id (§11.1 step 6.8).
    */
   async commitConfirmation(
     ctx: RequestContext,
     input: IntakeConfirmation,
   ): Promise<BatteryRecord> {
     assertPolicy(ctx, "intake_session", "update");
-    assertPolicy(ctx, "battery_record", "insert");
+    assertPolicy(ctx, "battery_record", "update");
+    assertPolicy(ctx, "damage_assessment", "insert");
+    if (input.classificationDecision !== null) {
+      assertPolicy(ctx, "classification_decision", "insert");
+    }
+    if (input.dateCodeDecode !== null) {
+      assertPolicy(ctx, "date_code_decode", "insert");
+    }
+    if (input.containerId !== null) {
+      assertPolicy(ctx, "storage_event", "insert");
+      assertPolicy(ctx, "container", "update");
+      if (input.storageClock !== null) {
+        assertPolicy(ctx, "storage_clock", "insert");
+      }
+    }
 
     const session = await store().intakeSessions.getOrThrow(
       ctx,
       input.intakeSessionId,
     );
+    if (session.status === "completed" || session.status === "abandoned") {
+      throw new ConflictError({
+        userMessage:
+          "This intake has already been closed. Nothing was changed.",
+        correlationId: ctx.correlationId,
+        context: { intakeSessionId: session.id, status: session.status },
+      });
+    }
+
+    const record = await store().batteryRecords.getOrThrow(
+      ctx,
+      input.batteryRecordId,
+    );
+    if (
+      record.intakeSessionId !== session.id &&
+      session.batteryRecordId !== record.id
+    ) {
+      throw new ValidationError({
+        userMessage:
+          "That battery record does not belong to this intake. Nothing was changed.",
+        correlationId: ctx.correlationId,
+        context: { intakeSessionId: session.id, batteryRecordId: record.id },
+      });
+    }
 
     // Human confirmation of chemistry, model and condition is required on both
     // the pass and the fail path — the gate decides which queue, not whether a
     // human is involved (Rule 2.15). Confirmation is per field and attributable;
     // "confirmed by the system" is not a value (Rule 2.21).
-    const confirmed = new Set(
-      input.confirmedFields.map((field) => field.fieldCode),
+    const confirmed = new Map(
+      input.confirmedFields
+        .filter((field) => field.confirmedBy.trim() !== "")
+        .map((field) => [field.fieldCode, field]),
     );
-    const missing = (
-      ["model", "chemistry_code", "assessed_condition"] as const
-    ).filter((field) => !confirmed.has(field));
+    const missing = HARD_GATED_LABEL_FIELD_CODES.filter(
+      (field) => !confirmed.has(field),
+    );
     if (missing.length > 0) {
       throw new ValidationError({
         userMessage:
-          `Confirm ${missing.join(", ")} before this record can be committed. ` +
+          `Confirm ${missing.map((code) => LABEL_FIELD_CODE_LABELS[code]).join(", ")} before this record can be committed. ` +
           "Chemistry, model and condition are always confirmed by a person, at every confidence band.",
         correlationId: ctx.correlationId,
         context: { rule: "2.15", missing },
       });
     }
-    if (input.batteryRecord.chemistryConfirmedBy === null) {
+    const chemistry = input.batteryRecord.chemistry ?? null;
+    if (
+      chemistry === null ||
+      chemistry === "unknown" ||
+      (input.batteryRecord.chemistryConfirmedBy ?? null) === null
+    ) {
       throw new ValidationError({
         userMessage:
-          "Chemistry must be confirmed by a person before this record can produce a document.",
+          "Chemistry must be confirmed by a person before this record can be committed.",
         correlationId: ctx.correlationId,
-        context: { rule: "2.34" },
+        context: { rule: "2.34", chemistry },
+      });
+    }
+    if (input.damageAssessment.confirmedBy === null) {
+      throw new ValidationError({
+        userMessage:
+          "The assessed condition must be confirmed by a person. A model may propose it; a model never sets it.",
+        correlationId: ctx.correlationId,
+        context: { rule: "6.6" },
+      });
+    }
+    if (
+      input.damageAssessment.assessedCondition !==
+        input.conditionOutcome.assessedCondition ||
+      input.damageAssessment.isAirTransportProhibited !==
+        input.conditionOutcome.isAirTransportProhibited
+    ) {
+      throw new DataIntegrityError({
+        userMessage: "Something went wrong and nothing was changed. Try again.",
+        correlationId: ctx.correlationId,
+        context: {
+          reason: "damage_assessment_and_condition_outcome_disagree",
+          assessment: input.damageAssessment.assessedCondition,
+          outcome: input.conditionOutcome.assessedCondition,
+        },
       });
     }
 
-    const record = await batteryRecords.create(ctx, {
-      ...input.batteryRecord,
-      intakeSessionId: session.id,
-      catalogEntryId: input.catalogEntryId,
-      containerId: input.containerId,
-    });
+    // Placement admission — the container's own two dimensions must match the
+    // record's (Rule 4.28), and an overdue container accepts no new items
+    // (Rule 4.16). Checked before anything is written.
+    let container: Container | null = null;
+    let joinedClock: StorageClock | null = null;
+    if (input.containerId !== null) {
+      container = await store().containers.getOrThrow(ctx, input.containerId);
+      if (container.status === "overdue") {
+        throw new ValidationError({
+          userMessage:
+            `Container ${container.containerCode} is past its accumulation period and accepts no new items. ` +
+            "Its contents leave by shipment, or by a remediation recorded by a Facility Manager.",
+          correlationId: ctx.correlationId,
+          field: "containerId",
+          context: { rule: "4.16", containerId: container.id },
+        });
+      }
+      if (container.status !== "open") {
+        throw new ValidationError({
+          userMessage: `Container ${container.containerCode} is not open and cannot receive a battery.`,
+          correlationId: ctx.correlationId,
+          field: "containerId",
+          context: { containerId: container.id, status: container.status },
+        });
+      }
+      const required = requiredContainerType(
+        input.classificationDecision?.wasteClassification ?? "undetermined",
+        {
+          ddrFlags: input.conditionOutcome.ddrFlags,
+          assessmentStatus: input.damageAssessment.status,
+        },
+      );
+      if (required === null) {
+        throw new ValidationError({
+          userMessage:
+            "This battery has no classification yet, so it cannot be placed in a container. Classification blocks rather than assumes an answer.",
+          correlationId: ctx.correlationId,
+          field: "containerId",
+          context: { rule: "3.10" },
+        });
+      }
+      if (container.containerType !== required) {
+        throw new ValidationError({
+          userMessage:
+            `Container ${container.containerCode} holds a different segregation class from this battery. ` +
+            "A container holds one class, and placement is blocked rather than advised.",
+          correlationId: ctx.correlationId,
+          field: "containerId",
+          context: {
+            rule: "4.28",
+            containerType: container.containerType,
+            required,
+          },
+        });
+      }
+      if (input.storageEvent === null) {
+        throw new ValidationError({
+          userMessage:
+            "A placement records a storage event. Nothing was changed.",
+          correlationId: ctx.correlationId,
+          context: { rule: "4.4" },
+        });
+      }
+      if (input.joinStorageClockId !== null) {
+        joinedClock = await store().storageClocks.getOrThrow(
+          ctx,
+          input.joinStorageClockId,
+        );
+        if (joinedClock.containerId !== container.id) {
+          throw new ValidationError({
+            userMessage:
+              "That storage clock does not belong to the chosen container. Nothing was changed.",
+            correlationId: ctx.correlationId,
+            context: {
+              storageClockId: joinedClock.id,
+              containerId: container.id,
+            },
+          });
+        }
+      } else if (input.storageClock === null) {
+        throw new ValidationError({
+          userMessage:
+            "Placing a battery starts or joins a storage clock, and neither was supplied. Nothing was changed.",
+          correlationId: ctx.correlationId,
+          context: { rule: "4.4" },
+        });
+      }
+    }
 
-    await store().intakeSessions.update(ctx, session.id, {
-      status: "completed",
-      currentStep: "completed",
-      isReviewRequired: false,
-      batteryRecordId: record.id,
-      completedAt: now(),
-      reviewedBy: ctx.userId,
-      reviewedAt: now(),
-      updatedAt: now(),
-    });
+    const snapshot = commitSnapshot();
+    try {
+      let dateCodeDecodeId: Uuid | null = record.dateCodeDecodeId;
+      if (input.dateCodeDecode !== null) {
+        const decode = await dateCodeDecodes.append(ctx, {
+          ...input.dateCodeDecode,
+          batteryRecordId: record.id,
+          intakeSessionId: session.id,
+        });
+        dateCodeDecodeId = decode.id;
+      }
 
-    await store().auditEvents.insert(ctx, {
-      id: nextId(),
-      sequenceNo: store().auditEvents.all().length + 1,
-      organizationId: ctx.organizationId,
-      actorUserId: ctx.userId,
-      actorType: "user",
-      actorLabel: null,
-      eventType: "battery_record.confirmed",
-      entityTable: "battery_record",
-      entityId: record.id,
-      occurredAt: now(),
-      recordedAt: now(),
-      beforeState: null,
-      afterState: { status: record.status, chemistry: record.chemistry },
-      changedFields: null,
-      governingRuleVersionId: null,
-      ruleVersionsApplied: null,
-      correlationId: ctx.correlationId,
-      requestId: null,
-      ipAddress: null,
-      userAgent: null,
-      reason: null,
-      createdAt: now(),
-    });
+      const assessment = await damageAssessmentsBase.append(ctx, {
+        ...input.damageAssessment,
+        batteryRecordId: record.id,
+      });
 
-    return record;
+      let decisionId: Uuid | null = null;
+      if (input.classificationDecision !== null) {
+        const decision = await classificationDecisionsBase.append(ctx, {
+          ...input.classificationDecision,
+          decisionScope: "battery_record",
+          batteryRecordId: record.id,
+          containerId: null,
+          shipmentId: null,
+        });
+        decisionId = decision.id;
+      }
+
+      let clockId: Uuid | null = joinedClock?.id ?? null;
+      if (container !== null) {
+        if (input.storageClock !== null && joinedClock === null) {
+          const clock = await storageClocks.create(ctx, {
+            ...input.storageClock,
+            containerId: container.id,
+          });
+          clockId = clock.id;
+        }
+        if (input.storageEvent !== null) {
+          await storageEvents.append(ctx, {
+            ...input.storageEvent,
+            storageClockId: clockId,
+            containerId: container.id,
+            batteryRecordId: record.id,
+          });
+        }
+        const mass = input.batteryRecord.batteryMassKg ?? record.batteryMassKg;
+        await containers.update(ctx, container.id, {
+          ...(container.accumulationStartedAt === null &&
+          input.containerAccumulationStartedAt !== null
+            ? {
+                accumulationStartedAt: input.containerAccumulationStartedAt,
+                accumulationStartSource: "first_placement",
+              }
+            : {}),
+          ...(mass === null
+            ? {}
+            : {
+                currentNetMassKg: addDecimal(
+                  container.currentNetMassKg ?? "0",
+                  mass,
+                ),
+              }),
+        } as UpdateContainer);
+      }
+
+      // The status follows what else is in the payload, never the caller's
+      // word for it: placed → in storage (or quarantined under a DDR flag),
+      // classified when a decision exists, otherwise confirmed (T-22).
+      const status: BatteryRecordStatus =
+        container !== null
+          ? input.conditionOutcome.ddrFlags.length > 0
+            ? "quarantined"
+            : "stored"
+          : decisionId !== null
+            ? "classified"
+            : "confirmed";
+
+      // Through the unguarded base: the DDR flags and the air prohibition
+      // arrive as the domain's determination from the confirmed assessment,
+      // which is the one path allowed to move them (Rules 6.4, 6.5).
+      const updated = await batteryRecords.update(ctx, record.id, {
+        ...input.batteryRecord,
+        status,
+        intakeSessionId: session.id,
+        catalogEntryId: input.catalogEntryId,
+        containerId: container?.id ?? null,
+        dateCodeDecodeId,
+        assessedCondition: input.conditionOutcome.assessedCondition,
+        conditionConfirmedBy: input.conditionOutcome.conditionConfirmedBy,
+        conditionConfirmedAt: input.conditionOutcome.conditionConfirmedAt,
+        conditionRuleVersionId: input.conditionOutcome.conditionRuleVersionId,
+        ddrFlags: input.conditionOutcome.ddrFlags,
+        isAirTransportProhibited:
+          input.conditionOutcome.isAirTransportProhibited,
+      } as Partial<BatteryRecord>);
+
+      await store().intakeSessions.update(ctx, session.id, {
+        status: "completed",
+        currentStep: "complete",
+        isReviewRequired: false,
+        batteryRecordId: updated.id,
+        completedAt: now(),
+        reviewedBy: ctx.userId,
+        reviewedAt: now(),
+        reviewOutcome: "confirmed",
+        draft: null,
+        updatedAt: now(),
+      });
+
+      // Every step under one correlation id, written through the definer door
+      // as part of the same operation (Rules 2.4, 12.3; §11.1 step 6.8).
+      for (const event of input.auditEvents) {
+        await store().auditEvents.insertAsDefiner(
+          ctx,
+          buildAuditEvent(
+            ctx,
+            { ...event, correlationId: ctx.correlationId },
+            nextId(),
+          ),
+        );
+      }
+
+      // Referenced so a superseding assessment later has an id to point at,
+      // and so the row cannot be optimised away by a reader of this block.
+      void assessment.id;
+
+      return updated;
+    } catch (cause) {
+      for (const entry of snapshot) {
+        entry.table.replaceAll(entry.rows as never);
+      }
+      throw cause;
+    }
   },
 };
 
@@ -1390,7 +1736,7 @@ const alerts: AlertRepository = {
 // Classification and documents
 // ---------------------------------------------------------------------------
 
-const classificationDecisions = tenantAppendOnlyRepository<
+const classificationDecisionsBase = tenantAppendOnlyRepository<
   ClassificationDecision,
   CreateClassificationDecision,
   ClassificationDecisionQuery
@@ -1429,6 +1775,25 @@ const classificationDecisions = tenantAppendOnlyRepository<
     createdAt: now(),
   }),
 });
+
+const classificationDecisions: ClassificationDecisionRepository = {
+  ...classificationDecisionsBase,
+  /**
+   * The trigger's one update (Rule 3.14, T-45): the old row's status moves to
+   * `superseded` when a re-classification lands, and nothing else on it moves.
+   * Through the definer door, because §9.5 gives this table no UPDATE policy
+   * for any tenant role — nobody issues this statement but the trigger.
+   */
+  async markSuperseded(ctx, id, supersededByClassificationDecisionId) {
+    await store().classificationDecisions.getOrThrow(
+      ctx,
+      supersededByClassificationDecisionId,
+    );
+    return store().classificationDecisions.updateAsDefiner(ctx, id, {
+      status: "superseded",
+    });
+  },
+};
 
 const shipmentBase = tenantRepository<
   Shipment,
@@ -1707,7 +2072,7 @@ const documentRenders: DocumentRenderRepository = {
 // Condition and audit
 // ---------------------------------------------------------------------------
 
-const damageAssessments = tenantAppendOnlyRepository<
+const damageAssessmentsBase = tenantAppendOnlyRepository<
   DamageAssessment,
   CreateDamageAssessment,
   DamageAssessmentQuery
@@ -1739,6 +2104,51 @@ const damageAssessments = tenantAppendOnlyRepository<
     createdAt: now(),
   }),
 });
+
+const damageAssessments: DamageAssessmentRepository = {
+  ...damageAssessmentsBase,
+  /**
+   * The trigger's one update (Rule 6.12, T-46): the superseded assessment's
+   * status moves and every other column stays — author, timestamp, findings
+   * and evidence remain readable beside the current one, permanently. Through
+   * the definer door, because no tenant role holds UPDATE on this table.
+   */
+  async markSuperseded(ctx, id, supersededByDamageAssessmentId) {
+    await store().damageAssessments.getOrThrow(
+      ctx,
+      supersededByDamageAssessmentId,
+    );
+    return store().damageAssessments.updateAsDefiner(ctx, id, {
+      status: "superseded",
+    });
+  },
+};
+
+/**
+ * Platform configuration — D-22, D-40.
+ *
+ * Reads the mock's own row and validates it on every read, exactly as the
+ * Supabase adapter will validate a platform table row: an invalid set is a
+ * `DataIntegrityError`, never a default and never a partial. **There is no
+ * tenant override in B1a** — the platform floor is what every organisation
+ * reads, and raising it is P6's platform table to add when a tenant asks.
+ */
+const platformConfiguration: PlatformConfigurationRepository = {
+  async readIntakeGateConfiguration(ctx) {
+    const validation = validateIntakeGateConfiguration(
+      PLATFORM_INTAKE_GATE_CONFIGURATION,
+    );
+    if (!validation.ok) {
+      throw new DataIntegrityError({
+        userMessage:
+          "The label-reading configuration could not be loaded. Nothing was changed — ask an Admin.",
+        correlationId: ctx.correlationId,
+        context: { issues: validation.issues },
+      });
+    }
+    return validation.configuration;
+  },
+};
 
 function matchesAuditEvent(
   row: TenantAuditEvent,
@@ -1899,6 +2309,8 @@ export const mockAdapter: DataAdapter = {
   users,
   memberships,
   tosAcceptances,
+
+  platformConfiguration,
 
   jurisdictions,
   jurisdictionRules,

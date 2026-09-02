@@ -184,6 +184,32 @@ export class TenantTable<T extends TenantRow> {
 
   async update(ctx: RequestContext, id: Uuid, patch: Partial<T>): Promise<T> {
     await this.begin(ctx, "update", "update");
+    return this.patchRow(ctx, id, patch);
+  }
+
+  /**
+   * The trigger's update — the one column a trigger moves on an append-only
+   * row when a superseding row lands: `status → superseded` on a
+   * `damage_assessment` or a `classification_decision` (T-45, T-46).
+   *
+   * §9.5 gives those tables no UPDATE policy for any tenant role, because in
+   * Postgres nobody issues the statement — the `after insert` trigger on the
+   * superseding row does. This is that trigger's door in the mock, and like
+   * {@link TenantTable.insertAsDefiner} **it skips the policy check and nothing
+   * else**: tenant scope, latency and seeded failures all still apply. A
+   * repository reaching for it to edit any other column has misread the
+   * contract — append-only means append-only.
+   */
+  async updateAsDefiner(
+    ctx: RequestContext,
+    id: Uuid,
+    patch: Partial<T>,
+  ): Promise<T> {
+    await this.begin(ctx, "update", null);
+    return this.patchRow(ctx, id, patch);
+  }
+
+  private patchRow(ctx: RequestContext, id: Uuid, patch: Partial<T>): T {
     const index = this.rows.findIndex(
       (candidate) =>
         candidate.id === id && candidate.organizationId === ctx.organizationId,

@@ -46,11 +46,26 @@ export interface ClassificationDecisionQuery extends BaseQuery {
  * (Rule 3.14), and exactly one row per record sits at `active` — never zero once
  * identified, never two (Rule 3.1).
  */
-export type ClassificationDecisionRepository = AppendOnlyRepository<
+export interface ClassificationDecisionRepository extends AppendOnlyRepository<
   ClassificationDecision,
   CreateClassificationDecision,
   ClassificationDecisionQuery
->;
+> {
+  /**
+   * Mark a decision superseded by a later one — **the only permitted update**,
+   * applied by trigger on the old row when a re-classification is appended
+   * (Rule 3.14; T-45). The old row keeps its inputs, rule version, citation and
+   * reasoning intact, which is what lets an auditor read the decision that
+   * governed a shipment years after the rule changed (Rules 12.15, 12.16).
+   *
+   * Refuses when the superseding row does not exist.
+   */
+  markSuperseded(
+    ctx: RequestContext,
+    id: Uuid,
+    supersededByClassificationDecisionId: Uuid,
+  ): Promise<ClassificationDecision>;
+}
 
 // --- shipment ---------------------------------------------------------------
 
