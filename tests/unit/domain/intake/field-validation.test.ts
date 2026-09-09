@@ -1,0 +1,173 @@
+import { describe, expect, it } from "vitest";
+
+import {
+  TRANSPORT_TEST_MARKING_VALUES,
+  validateExtractedField,
+} from "@/domain/intake/field-validation";
+import { LABEL_FIELD_CODES } from "@/domain/taxonomy/label-field-code";
+
+/**
+ * Shape validation of an extracted field — Rule 2.12, EC-7, EC-11.
+ *
+ * A failing value is returned as unread with the raw text retained, never
+ * corrected. Every T-09 code is exercised.
+ */
+
+describe("validateExtractedField", () => {
+  it("Rule 2.11 — null passes through as an honest null for every field", () => {
+    for (const code of LABEL_FIELD_CODES) {
+      expect(validateExtractedField(code, null)).toEqual({
+        ok: true,
+        value: null,
+      });
+    }
+  });
+
+  describe("nameplate quantities", () => {
+    it("Rule 2.12 — a voltage is a number and a voltage unit, kept as printed", () => {
+      expect(validateExtractedField("voltage", " 355.2 V ")).toEqual({
+        ok: true,
+        value: "355.2 V",
+      });
+      expect(validateExtractedField("voltage", "3700mV").ok).toBe(true);
+    });
+
+    it("Rule 2.12 — a voltage in the wrong unit family is unread, raw text kept", () => {
+      const result = validateExtractedField("voltage", "50 Ah");
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.rawText).toBe("50 Ah");
+        expect(result.reason).toMatch(/voltage/);
+      }
+    });
+
+    it("Rule 2.12 — capacity accepts Ah and mAh and refuses everything else", () => {
+      expect(validateExtractedField("capacity_ah", "220 Ah").ok).toBe(true);
+      expect(validateExtractedField("capacity_ah", "3000 mAh").ok).toBe(true);
+      expect(validateExtractedField("capacity_ah", "220 Wh").ok).toBe(false);
+      expect(validateExtractedField("capacity_ah", "220").ok).toBe(false);
+    });
+
+    it("Rule 2.12 — energy accepts Wh, kWh and mWh and refuses everything else", () => {
+      expect(validateExtractedField("energy_wh", "78100 Wh").ok).toBe(true);
+      expect(validateExtractedField("energy_wh", "1.2 kWh").ok).toBe(true);
+      expect(validateExtractedField("energy_wh", "1.2 kg").ok).toBe(false);
+      expect(validateExtractedField("energy_wh", "kWh").ok).toBe(false);
+    });
+  });
+
+  describe("date_code", () => {
+    it("Rule 2.12 — accepts uppercase letters, digits, hyphen and slash", () => {
+      expect(validateExtractedField("date_code", "2144")).toEqual({
+        ok: true,
+        value: "2144",
+      });
+      expect(validateExtractedField("date_code", "21/44-A").ok).toBe(true);
+    });
+
+    it("EC-11 — refuses lowercase, spaces, stray characters and bad lengths", () => {
+      expect(validateExtractedField("date_code", "21ww").ok).toBe(false);
+      expect(validateExtractedField("date_code", "21 44").ok).toBe(false);
+      expect(validateExtractedField("date_code", "K2##7").ok).toBe(false);
+      expect(validateExtractedField("date_code", "1").ok).toBe(false);
+      expect(validateExtractedField("date_code", "A".repeat(13)).ok).toBe(
+        false,
+      );
+    });
+
+    it("EC-11 — a refused code keeps the raw text for the reviewer", () => {
+      const result = validateExtractedField("date_code", "K2##7");
+      if (!result.ok) expect(result.rawText).toBe("K2##7");
+    });
+  });
+
+  describe("free text", () => {
+    it("Rule 2.12 — manufacturer and model are non-empty printable text", () => {
+      expect(
+        validateExtractedField("manufacturer", "Northvale Cell Systems").ok,
+      ).toBe(true);
+      expect(validateExtractedField("model", "NV-TP400-96S").ok).toBe(true);
+      expect(validateExtractedField("model", "   ").ok).toBe(false);
+      expect(validateExtractedField("manufacturer", "A".repeat(121)).ok).toBe(
+        false,
+      );
+      expect(validateExtractedField("model", "NV\0TP").ok).toBe(false);
+    });
+
+    it("Rule 2.12 — a serial number is printable and bounded", () => {
+      expect(
+        validateExtractedField("serial_number", "NVTP4000000091447").ok,
+      ).toBe(true);
+      expect(validateExtractedField("serial_number", "S".repeat(65)).ok).toBe(
+        false,
+      );
+    });
+
+    it("Rules 2.9, 2.10 — a chemistry code is characters on a label and only its shape is checked", () => {
+      expect(validateExtractedField("chemistry_code", "Li-ion NMC")).toEqual({
+        ok: true,
+        value: "Li-ion NMC",
+      });
+      expect(validateExtractedField("chemistry_code", "C".repeat(33)).ok).toBe(
+        false,
+      );
+    });
+  });
+
+  describe("transport_test_marking", () => {
+    it("§2.1.3 — accepts exactly the three tri-state strings", () => {
+      for (const value of TRANSPORT_TEST_MARKING_VALUES) {
+        expect(validateExtractedField("transport_test_marking", value)).toEqual(
+          { ok: true, value },
+        );
+      }
+    });
+
+    it("§2.1.3 — refuses anything else, including a bare yes", () => {
+      expect(validateExtractedField("transport_test_marking", "yes").ok).toBe(
+        false,
+      );
+      expect(
+        validateExtractedField("transport_test_marking", "Present").ok,
+      ).toBe(false);
+    });
+  });
+
+  describe("certification_marks", () => {
+    it("Rule 2.12 — comma-separated tokens are accepted and tidied", () => {
+      expect(
+        validateExtractedField("certification_marks", "UN38.3,CE "),
+      ).toEqual({
+        ok: true,
+        value: "UN38.3, CE",
+      });
+    });
+
+    it("Rule 2.12 — an empty token is a refusal", () => {
+      expect(
+        validateExtractedField("certification_marks", "UN38.3,,CE").ok,
+      ).toBe(false);
+      expect(validateExtractedField("certification_marks", ",").ok).toBe(false);
+    });
+  });
+
+  describe("assessed_condition", () => {
+    it("T-49 — a proposed condition must be an authored value", () => {
+      expect(validateExtractedField("assessed_condition", "sound").ok).toBe(
+        true,
+      );
+      expect(
+        validateExtractedField("assessed_condition", "damaged_or_defective").ok,
+      ).toBe(true);
+    });
+
+    it("T-49 — a fixture-era or invented value is refused, raw text kept", () => {
+      const result = validateExtractedField("assessed_condition", "damaged");
+      expect(result.ok).toBe(false);
+      if (!result.ok) expect(result.rawText).toBe("damaged");
+      expect(validateExtractedField("assessed_condition", "Sound").ok).toBe(
+        false,
+      );
+    });
+  });
+});

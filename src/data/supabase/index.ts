@@ -95,6 +95,10 @@ export const supabaseAdapter: DataAdapter = {
     "setStatus",
   ]),
 
+  platformConfiguration: unimplemented("platformConfiguration", [
+    "readIntakeGateConfiguration",
+  ]),
+
   jurisdictions: unimplemented("jurisdictions", [...CRUD, "chainFrom"]),
   jurisdictionRules: unimplemented("jurisdictionRules", CRUD),
   ruleVersions: unimplemented("ruleVersions", [
@@ -105,7 +109,10 @@ export const supabaseAdapter: DataAdapter = {
   ]),
   formatClassifications: unimplemented("formatClassifications", APPEND_ONLY),
 
-  batteryRecords: unimplemented("batteryRecords", CRUD),
+  batteryRecords: unimplemented("batteryRecords", [
+    ...CRUD,
+    "applyConditionOutcome",
+  ]),
   catalogEntries: unimplemented("catalogEntries", [...CRUD, "findCandidates"]),
   intakeSessions: unimplemented("intakeSessions", [
     ...CRUD,
@@ -121,10 +128,10 @@ export const supabaseAdapter: DataAdapter = {
   storageEvents: unimplemented("storageEvents", APPEND_ONLY),
   alerts: unimplemented("alerts", [...CRUD, "raiseIfAbsent"]),
 
-  classificationDecisions: unimplemented(
-    "classificationDecisions",
-    APPEND_ONLY,
-  ),
+  classificationDecisions: unimplemented("classificationDecisions", [
+    ...APPEND_ONLY,
+    "markSuperseded",
+  ]),
   shipments: unimplemented("shipments", [...CRUD, "offer"]),
   shippingPapers: unimplemented("shippingPapers", APPEND_ONLY),
   containerLabels: unimplemented("containerLabels", APPEND_ONLY),
@@ -135,7 +142,10 @@ export const supabaseAdapter: DataAdapter = {
     "markSuperseded",
   ]),
 
-  damageAssessments: unimplemented("damageAssessments", APPEND_ONLY),
+  damageAssessments: unimplemented("damageAssessments", [
+    ...APPEND_ONLY,
+    "markSuperseded",
+  ]),
   // `write` is the `security definer` door (§10.5, `app.write_audit_event()`).
   // It refuses here like everything else — an adapter that answered it silently
   // would be an audit trail nobody could tell was empty.

@@ -9,7 +9,9 @@ import {
 } from "@/components/record-table/list-url";
 import { data } from "@/data";
 import { showsReadOnlyBanner } from "@/domain/access/control-treatment";
+import { canWriteRoute } from "@/domain/access/route-capability";
 import { APP_ROUTE_NAMES } from "@/domain/access/routes";
+import { resolveIntakeStep } from "@/domain/intake/steps";
 import { DdrBlockAlert } from "@/features/battery-record/ddr-block-alert";
 import { DocumentsTab } from "@/features/battery-record/documents-tab";
 import { UNPLACED_RECORD_TIME_ZONE } from "@/features/battery-record/format-instant";
@@ -23,20 +25,25 @@ import {
   RECORD_TAB_SPEC,
   RecordTabs,
 } from "@/features/battery-record/record-tabs";
+import { intakeStepHref } from "@/features/intake/components/intake-hrefs";
+import { LoggedToast } from "@/features/intake/components/logged-toast";
 import { Breadcrumbs } from "@/features/shell/chrome/breadcrumbs";
 import { breadcrumbTrail } from "@/features/shell/navigation/breadcrumb-ancestors";
+import type { RequestContext } from "@/data/contracts";
 import { requireRoute } from "@/lib/auth/guard";
 import { recordNotFound } from "@/lib/auth/record-denial";
 import { nowIso, resolveRequestContext } from "@/lib/auth/session";
+import type { BatteryRecord } from "@/types/battery-record";
 
 /**
  * `/batteries/[id]` — `UX_SPEC.md` §3.7.
  *
- * **Read-only in this unit, with all four tabs present and all four rendering
- * fixture data.** Every write path here belongs to unit 02, and none of it is
- * built: no editing assessed condition, no re-running catalog matching, no
- * attaching a photo. E-8a is still fully demonstrable, because a disabled
- * control has no handler to call — see `RecordActions`.
+ * **All four tabs render, and the four write paths are live for P1 and P6**
+ * through `RecordActions`: edit assessed condition, re-run catalog matching,
+ * attach a photo, void. Each is a dialog over a Server Action in
+ * `src/features/battery-record/actions.ts`; the page passes the record and its
+ * current assessment and makes no write decision itself. E-8a's auditor
+ * branch is unchanged — a disabled control has no handler to call.
  *
  * ## The cross-tenant path
  *
@@ -138,14 +145,21 @@ export default async function BatteryRecordPage({
     RECORD_TAB_SPEC,
   );
 
+  const resumeIntakeHref = await resumeIntakeHrefFor(ctx, record);
+
   return (
     <PageShell>
+      {/* "Battery logged" with **Log another**, fired once from `?logged=1`
+          after `confirmIntake` redirects here; the parameter is stripped
+          (`UX_SPEC.md` §6.1 puts a toast on the destination). */}
+      <LoggedToast containerId={record.containerId} />
       <RecordHeader
         record={record}
         container={container}
         clock={clock}
         role={ctx.role}
         documentsHref={documentsHref}
+        resumeIntakeHref={resumeIntakeHref}
         breadcrumbs={
           <Breadcrumbs
             crumbs={breadcrumbTrail(
@@ -178,6 +192,10 @@ export default async function BatteryRecordPage({
               role={ctx.role}
               capability={capability}
               recordId={record.id}
+              record={record}
+              {...(currentAssessment === undefined
+                ? {}
+                : { currentAssessment })}
             />
           </>
         }
@@ -199,4 +217,34 @@ export default async function BatteryRecordPage({
       ) : null}
     </PageShell>
   );
+}
+
+/**
+ * **Resume intake** — Flow A-a, from the record side.
+ *
+ * A record still `draft` or `pending_review` whose intake session is open is
+ * an intake a person can pick up, and the link goes to the step the session
+ * is actually on (`resolveIntakeStep`, T-53) — never ahead of it. Rendered
+ * only for a role holding `write` on `/batteries/new` (P1, P6): no other role
+ * is offered a link it would be redirected away from (§5.3(7), E-11).
+ */
+async function resumeIntakeHrefFor(
+  ctx: RequestContext,
+  record: BatteryRecord,
+): Promise<string | null> {
+  if (!canWriteRoute(ctx.role, "/batteries/new")) return null;
+  if (record.status !== "draft" && record.status !== "pending_review")
+    return null;
+  if (record.intakeSessionId === null) return null;
+
+  const session = await data.intakeSessions.get(ctx, record.intakeSessionId);
+  if (
+    session === null ||
+    session.status === "completed" ||
+    session.status === "abandoned"
+  ) {
+    return null;
+  }
+  const step = resolveIntakeStep(session);
+  return step === "complete" ? null : intakeStepHref(session.id, step);
 }

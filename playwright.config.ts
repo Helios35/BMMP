@@ -101,6 +101,10 @@ export default defineConfig({
      */
     env: {
       DATA_ADAPTER: dataAdapter,
+      // The fixture label reader: deterministic, offline and free (D-25). CI
+      // pins the same value; stating it here keeps a developer's shell from
+      // pointing the suite at a vendor.
+      VISION_PROVIDER: "fixture",
       MOCK_LATENCY_MS: "",
       MOCK_SEEDED_FAILURES: "",
       NEXT_PUBLIC_APP_URL: baseURL,

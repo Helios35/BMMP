@@ -205,9 +205,16 @@ test.describe("no shipped surface expresses a probability of ignition", () => {
     test.use({ storageState: storageStateFor("p1") });
 
     test("renders none of it", async ({ page }) => {
-      // `/batteries/new` is the Terms of Service gate and nothing else in this
-      // unit, and P1 holds the only membership `write` on it.
-      await sweepAppRoute(page, "/batteries/new");
+      // P1 holds the only membership `write` on `/batteries/new`. The capture
+      // step, and step 2 of a fixture session mid-review with confidence spread
+      // across all four bands — the card where a confidence band is most
+      // easily mistaken for a hazard one, and the surface unit 02 built.
+      for (const pathname of [
+        "/batteries/new",
+        `/batteries/new?session=${fixtureIds.INTAKE_SESSION.spreadInReview}&step=2`,
+      ]) {
+        await sweepAppRoute(page, pathname);
+      }
     });
   });
 });

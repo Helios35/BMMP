@@ -36,6 +36,7 @@ import type {
 import type { DamageAssessmentRepository } from "./condition";
 import type { AuditEventRepository } from "./audit";
 import type { IdentityRepository } from "./identity";
+import type { PlatformConfigurationRepository } from "./platform-configuration";
 
 /**
  * The contract every data adapter satisfies.
@@ -107,6 +108,13 @@ export interface DataAdapter {
   readonly memberships: MembershipRepository;
   readonly tosAcceptances: TosAcceptanceRepository;
 
+  /**
+   * Platform configuration — the confidence-gate thresholds and their kin
+   * (D-22, D-40). Read through the seam like every other value; the domain
+   * receives them as arguments and holds none of its own.
+   */
+  readonly platformConfiguration: PlatformConfigurationRepository;
+
   // Rules as data — ERD.md §4
   readonly jurisdictions: JurisdictionRepository;
   readonly jurisdictionRules: JurisdictionRuleRepository;
@@ -169,3 +177,4 @@ export * from "./storage";
 export * from "./documents";
 export * from "./condition";
 export * from "./audit";
+export * from "./platform-configuration";

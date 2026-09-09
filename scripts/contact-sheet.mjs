@@ -90,11 +90,18 @@ const PENDING_INVITE_TOKEN = "inv-pending-handler-7c1f4a9d20b6e358";
 /* ----------------------------------------------------------------- screens */
 
 /**
- * Two records and one catalog entry are resolved from the running product
- * rather than restated as identifiers: the script opens the list, finds the row
- * by the number a warehouse reads, and takes the href off it. A UUID copied into
- * this file would be a second copy of a fixture; a record number is what the
- * screen already shows.
+ * Records, sessions and one catalog entry are resolved from the running
+ * product rather than restated as identifiers: the script opens the list,
+ * finds the row by the number a warehouse reads, and takes the href off it. A
+ * UUID copied into this file would be a second copy of a fixture; a record
+ * number is what the screen already shows.
+ *
+ * A spec resolves in one of two ways. `from` is a list route whose row
+ * matching `match` carries the anchor. `fromResolved` names an earlier entry —
+ * a record page — on which an anchor matching `selector` and `match` is read,
+ * which is how an intake session's URL is found: the **Resume intake** link
+ * on the record, as the person who would tap it (`as`). Entries resolve in
+ * the order written, so a second hop follows the record it hops from.
  */
 const RESOLVE = {
   vehiclePack: {
@@ -108,6 +115,32 @@ const RESOLVE = {
     as: "p2",
     match: "BR-0003",
     label: "the swollen pack, air transport hard-blocked",
+  },
+  scuffedPack: {
+    from: "/batteries",
+    as: "p2",
+    match: "BR-0004",
+    label: "the scuffed pack, read as nothing and unmatched",
+  },
+  spreadPack: {
+    from: "/batteries",
+    as: "p2",
+    match: "BR-0005",
+    label: "the record mid-review with confidence spread across every band",
+  },
+  scuffedResume: {
+    fromResolved: "scuffedPack",
+    as: "p1",
+    selector: 'a[data-resume-intake="true"]',
+    match: "Resume intake",
+    label: "the scuffed pack's open intake session, at its review step",
+  },
+  spreadResume: {
+    fromResolved: "spreadPack",
+    as: "p1",
+    selector: 'a[data-resume-intake="true"]',
+    match: "Resume intake",
+    label: "the spread record's open intake session, at its review step",
   },
   catalogEntry: {
     from: "/catalog",
@@ -216,14 +249,36 @@ const SCREENS = [
     note: "The third empty. A search that misses is not a filter that excludes.",
   },
   {
-    id: "batteries-new-open",
+    id: "batteries-new-capture",
     group: "Batteries",
     route: "/batteries/new",
-    title: "Log a battery — gate open",
+    title: "Log a battery — step 1, capture",
     path: "/batteries/new",
     as: "p1",
-    note: "The gate plus scaffolding. Unit 02 replaces the scaffolding and keeps the gate.",
+    note: "The gate is open and the flow starts: breadcrumbs, the stepper at step 1, the resume notice for Dana's two unfinished intakes, and the capture step with its own pinned action bar. Was `batteries-new-open`, the gate plus scaffolding.",
   },
+  {
+    id: "batteries-new-review",
+    group: "Batteries",
+    route: "/batteries/new",
+    title: "Log a battery — step 2, extraction review",
+    path: (r) => r.spreadResume,
+    as: "p1",
+    note: "The extraction review card on the spread session: every confidence band, the gate banner, the catalog panel, and the page's action bar carrying the primary with its outstanding checklist. Two columns from 1440.",
+  },
+  {
+    id: "batteries-new-review-unreadable",
+    group: "Batteries",
+    route: "/batteries/new",
+    title: "Log a battery — step 2, E-4 nothing read",
+    path: (r) => r.scuffedResume,
+    as: "p1",
+    note: "The same card on the scuffed session, where the read produced nothing: E-4's no-read state with its three actions, distinct from low confidence.",
+  },
+  // `batteries-new-place` — step 3 of the spread session — is deliberately
+  // absent. Step 3 opens only once model and chemistry are confirmed on step
+  // 2, and a URL cannot move the pipeline: `?step=3` on that session redirects
+  // to step 2 (Rule 2.2). A captured image would be a picture of the redirect.
   {
     id: "batteries-new-blocked",
     group: "Batteries",
@@ -535,7 +590,25 @@ async function signIn(page, baseUrl, persona) {
  * the record number the link target and `/catalog` makes the manufacturer one,
  * so the value a person recognises is not always the one carrying the anchor.
  */
-async function resolveHref(page, baseUrl, spec) {
+async function resolveHref(page, baseUrl, spec, resolved) {
+  if (spec.fromResolved !== undefined) {
+    const from = resolved[spec.fromResolved];
+    if (from === undefined) {
+      throw new Error(
+        `Could not resolve ${spec.label}: "${spec.fromResolved}" has not been resolved yet — order the RESOLVE entries so it comes first`,
+      );
+    }
+    await page.goto(`${baseUrl}${from}`);
+    const anchor = page.locator(spec.selector, { hasText: spec.match }).first();
+    const href = await anchor.getAttribute("href");
+    if (href === null) {
+      throw new Error(
+        `Could not resolve ${spec.label}: no "${spec.match}" link on ${from}`,
+      );
+    }
+    return href;
+  }
+
   await page.goto(`${baseUrl}${spec.from}`);
   const anchor = page
     .locator("tr", { hasText: spec.match })
@@ -628,15 +701,29 @@ async function capture(args, baseUrl) {
     console.log(`→ signed in as ${key}`);
   }
 
-  // Resolve the detail hrefs from the product.
-  const resolver = await browser.newContext({ storageState: states.p2 });
-  const resolverPage = await resolver.newPage();
+  // Resolve the detail hrefs from the product, each as the persona its spec
+  // names — a **Resume intake** link renders only for a role holding write on
+  // the intake route, so P2's page carries none to read.
+  const resolvers = {};
   const resolved = {};
   for (const [key, spec] of Object.entries(RESOLVE)) {
-    resolved[key] = await resolveHref(resolverPage, baseUrl, spec);
+    if (resolvers[spec.as] === undefined) {
+      const context = await browser.newContext({
+        storageState: states[spec.as],
+      });
+      resolvers[spec.as] = { context, page: await context.newPage() };
+    }
+    resolved[key] = await resolveHref(
+      resolvers[spec.as].page,
+      baseUrl,
+      spec,
+      resolved,
+    );
     console.log(`→ resolved ${key} → ${resolved[key]}`);
   }
-  await resolver.close();
+  for (const resolver of Object.values(resolvers)) {
+    await resolver.context.close();
+  }
 
   const screens = SCREENS.filter(
     (screen) => args.only === null || screen.id.includes(args.only),

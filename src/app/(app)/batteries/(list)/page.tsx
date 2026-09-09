@@ -113,6 +113,10 @@ export default async function BatteriesPage({
     // operational count (Rule 12.12) — so the list they are outside of is this
     // one.
     excludeVoided: true,
+    // A draft exists from the moment an intake session starts and is visible
+    // only inside that session (T-22). It reaches this list when a person
+    // confirms it, and not before.
+    excludeDrafts: true,
     assessedCondition: selection.assessedCondition,
     chemistry: selection.chemistry,
     containerId,

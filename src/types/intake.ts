@@ -10,13 +10,20 @@ import type {
   Timestamped,
   Uuid,
 } from "@/types/common";
+import type { CellFormFactor } from "@/domain/taxonomy/cell-form-factor";
+import type { Chemistry } from "@/domain/taxonomy/chemistry";
+import type { ChemistrySource } from "@/domain/taxonomy/chemistry-source";
 import type { ConfidenceBand } from "@/domain/taxonomy/confidence-band";
+import type { DamageFindingType } from "@/domain/taxonomy/damage-finding-type";
 import type { DataUseEligibility } from "@/domain/taxonomy/data-use-eligibility";
 import type { DateCodeDecodeMethod } from "@/domain/taxonomy/date-code-decode-method";
 import type { DateCodePrecision } from "@/domain/taxonomy/date-code-precision";
 import type { IntakePhotoType } from "@/domain/taxonomy/intake-photo-type";
 import type { IntakeSessionStatus } from "@/domain/taxonomy/intake-session-status";
 import type { LabelFieldCode } from "@/domain/taxonomy/label-field-code";
+import type { ProvenanceSourceType } from "@/domain/taxonomy/provenance-source-type";
+import type { StateOfChargeBand } from "@/domain/taxonomy/state-of-charge-band";
+import type { StateOfChargeSource } from "@/domain/taxonomy/state-of-charge-source";
 
 /**
  * Intake and identification — `ERD.md` §5.3–5.6.
@@ -83,6 +90,124 @@ export interface IntakeSession extends TenantScoped, Timestamped {
   readonly startedAt: IsoTimestamp;
   readonly completedAt: IsoTimestamp | null;
   readonly abandonedAt: IsoTimestamp | null;
+  /**
+   * The per-field confirmation state of the intake before it commits — what a
+   * person has confirmed, corrected or rejected on the extraction review card,
+   * what they picked from the catalog, and what step 3 has recorded so far.
+   *
+   * **`ERD.md` §5.3 has no column for this, and it needs one.** §2.1.4 makes
+   * confirmation reversible until commit and §6.4 forbids confirming a gated
+   * field optimistically, and Flow A-a says a locked phone loses nothing — which
+   * together mean every confirmation is persisted server-side before it renders
+   * as confirmed, and the only place to persist it before `battery_record` is
+   * written is the session. Reported in this unit's build-notes as the input to
+   * the first migration. Optional so no fixture row has to change; absent reads
+   * as `null`, and the card seeds itself from the `label_extraction` rows.
+   */
+  readonly draft?: IntakeDraft | null;
+}
+
+/** Where a draft value came from. The same five sources `/batteries/[id]` renders. */
+export type DraftFieldSource =
+  | "read_from_label"
+  | "matched_from_catalog"
+  | "decoded"
+  | "detected_from_image"
+  | "entered_by";
+
+export type DraftFieldStatus = "pending" | "confirmed" | "rejected";
+
+/**
+ * One field on the extraction review card, as the draft holds it.
+ *
+ * `originalValue` is what the extraction read; `value` is what the person
+ * confirmed or corrected. **The original is never overwritten** — the
+ * extracted/corrected pair is the training asset (D-7), and the confirmation is
+ * attributable to a person (Rule 2.21).
+ */
+export interface DraftFieldState {
+  readonly fieldCode: LabelFieldCode;
+  readonly status: DraftFieldStatus;
+  readonly value: string | null;
+  readonly originalValue: string | null;
+  readonly source: DraftFieldSource;
+  readonly confidenceBand: ConfidenceBand | null;
+  readonly rawText: string | null;
+  readonly isHardGated: boolean;
+  readonly confirmedBy: Uuid | null;
+  readonly confirmedAt: IsoTimestamp | null;
+}
+
+/** A ranked catalog candidate, as the draft carries it. Never pre-selected (Rule 2.19). */
+export interface DraftCandidate {
+  readonly catalogEntryId: Uuid;
+  /** 0..1. Compared against configuration; never rendered as a number. */
+  readonly matchScore: number;
+  readonly matchMethodCode: string;
+  readonly matchedOn: readonly string[];
+}
+
+/** Step 3's assessed condition, as findings a person selected and confirmed. */
+export interface DraftCondition {
+  readonly findingTypes: readonly DamageFindingType[];
+  /** T-30 `defective` — human-recorded, no visible indicator sets it. */
+  readonly isDefective: boolean;
+  readonly confirmedBy: Uuid | null;
+  readonly confirmedAt: IsoTimestamp | null;
+}
+
+export interface DraftStateOfCharge {
+  readonly band: StateOfChargeBand;
+  readonly percent: Decimal | null;
+  readonly source: StateOfChargeSource | null;
+}
+
+export interface DraftSourceDevice {
+  readonly type: string | null;
+  readonly identifier: string | null;
+  readonly make: string | null;
+  readonly model: string | null;
+  readonly modelYear: number | null;
+  readonly provenanceSourceType: ProvenanceSourceType;
+}
+
+export interface DraftDateCodeDecode {
+  readonly formatKey: string;
+  readonly decodedManufacturedOn: IsoDate | null;
+  readonly decodedPrecision: DateCodePrecision | null;
+  readonly decoderVersion: string;
+}
+
+/**
+ * The whole of an intake's unsaved state. See {@link IntakeSession.draft}.
+ *
+ * `chemistry` is set from a selected catalog candidate or entered by hand, and
+ * `chemistrySource` says which — the only two sources there are (Rule 2.10).
+ * Nothing in this shape can say a photograph supplied it.
+ */
+export interface IntakeDraft {
+  readonly fields: readonly DraftFieldState[];
+  readonly candidates: readonly DraftCandidate[];
+  readonly selectedCatalogEntryId: Uuid | null;
+  /** Rule 2.20 / EC-10 — a person rejected the match and took the manual path. */
+  readonly catalogMatchRejected: boolean;
+  readonly chemistry: Chemistry | null;
+  readonly chemistrySource: ChemistrySource | null;
+  /** T-04, proposed from an image. It still passes the gate and never touches chemistry (Rule 2.25). */
+  readonly formFactorProposal: CellFormFactor | null;
+  readonly manualEntry: boolean;
+  /** §2.1.5 whole-read reject — the extraction is retained and marked, never deleted. */
+  readonly extractionRejected: boolean;
+  readonly dateCodeDecode: DraftDateCodeDecode | null;
+  /** A date a person entered. A decode never overrides it (Rule 2.24). */
+  readonly manufacturedOnEntered: IsoDate | null;
+  readonly condition: DraftCondition | null;
+  readonly stateOfCharge: DraftStateOfCharge | null;
+  readonly containerId: Uuid | null;
+  readonly sourceDevice: DraftSourceDevice | null;
+  readonly labelPhotoId: Uuid | null;
+  readonly labelCropId: Uuid | null;
+  readonly extractionRunId: Uuid | null;
 }
 
 /**

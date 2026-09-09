@@ -119,7 +119,10 @@ export function MobileTabBar({
     <nav
       aria-label="Primary"
       data-mobile-tab-bar
-      className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background pb-[env(safe-area-inset-bottom)] md:hidden"
+      // While a `MobileActionBar` is mounted the flow's action owns the bottom
+      // of the screen and this bar hides (UX_SPEC.md §2.15). A CSS relationship
+      // between two data attributes — no context, nothing to clean up.
+      className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background pb-[env(safe-area-inset-bottom)] md:hidden [body:has([data-mobile-action-bar])_&]:hidden"
     >
       <div className="flex h-16 items-stretch gap-2 px-2">
         {destinations.slice(0, 2).map((slot) => (

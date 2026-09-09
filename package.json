@@ -10,6 +10,7 @@
     "typecheck": "next typegen && tsc --noEmit",
     "check:data-seam": "node scripts/check-data-seam.mjs",
     "contact-sheet": "node scripts/contact-sheet.mjs",
+    "fixtures:images": "node scripts/make-intake-fixture-images.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
