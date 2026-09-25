@@ -5,6 +5,8 @@ import { describe, expect, it } from "vitest";
 import {
   civilDateInZone,
   civilDaysBetween,
+  instantAtSiteTime,
+  siteWallClock,
   storageClockDisplay,
 } from "@/domain/storage/clock-display";
 import * as fixtures from "@/data/mock/fixtures";
@@ -182,5 +184,30 @@ describe("Rule 1.23 — no period, threshold or deadline is a literal here", () 
     ]) {
       expect(code).not.toContain(forbidden);
     }
+  });
+});
+
+describe("a wall-clock time at the site (Rule 4.29)", () => {
+  it("reads the time in the site's zone, not the server's", () => {
+    // 14:30 in Los Angeles in September is PDT, UTC−7.
+    expect(instantAtSiteTime("2026-09-25", 14, 30, "America/Los_Angeles")).toBe(
+      "2026-09-25T21:30:00.000Z",
+    );
+    // …and PST, UTC−8, in January.
+    expect(instantAtSiteTime("2026-01-15", 14, 30, "America/Los_Angeles")).toBe(
+      "2026-01-15T22:30:00.000Z",
+    );
+  });
+
+  it("round-trips through the site's wall clock", () => {
+    const instant = instantAtSiteTime(
+      "2026-11-01",
+      9,
+      5,
+      "America/Los_Angeles",
+    );
+    expect(siteWallClock(instant, "America/Los_Angeles")).toBe(
+      "2026-11-01T09:05",
+    );
   });
 });

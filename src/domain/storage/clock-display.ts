@@ -23,6 +23,7 @@ import type { IsoTimestamp, TimeZone } from "@/types/common";
 
 /** Calendar arithmetic, not a regulatory period. */
 const MILLISECONDS_PER_DAY = 24 * 60 * 60 * 1000;
+const MILLISECONDS_PER_MINUTE = 60 * 1000;
 
 export interface StorageClockDisplay {
   /** Whole calendar days from the accumulation start to `asOf`, in `timeZone`. */
@@ -152,6 +153,48 @@ export function startOfCivilDay(
     localMidnightAsUtc - zoneOffsetMs(localMidnightAsUtc, timeZone);
   const settled = localMidnightAsUtc - zoneOffsetMs(firstGuess, timeZone);
   return new Date(settled).toISOString();
+}
+
+/**
+ * The instant a wall-clock time at the site names — `2026-09-25T14:30` read in
+ * `timeZone`, as an ISO timestamp.
+ *
+ * A person records *when* a storage event happened in the site's time, never
+ * the browser's or the server's (Rule 4.29). The offset is read twice, as in
+ * {@link startOfCivilDay}, so a daylight-saving change on that day lands the
+ * instant on the right side of the jump.
+ */
+export function instantAtSiteTime(
+  civilDate: string,
+  hour: number,
+  minute: number,
+  timeZone: TimeZone,
+): IsoTimestamp {
+  const localAsUtc =
+    civilDateToUtcMs(civilDate) +
+    (hour * 60 + minute) * MILLISECONDS_PER_MINUTE;
+  const firstGuess = localAsUtc - zoneOffsetMs(localAsUtc, timeZone);
+  const settled = localAsUtc - zoneOffsetMs(firstGuess, timeZone);
+  return new Date(settled).toISOString();
+}
+
+/** `YYYY-MM-DDTHH:mm` — an instant as the site's wall clock reads it. */
+export function siteWallClock(
+  instant: IsoTimestamp,
+  timeZone: TimeZone,
+): string {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    hourCycle: "h23",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).formatToParts(new Date(instant));
+  const read = (type: Intl.DateTimeFormatPartTypes): string =>
+    parts.find((part) => part.type === type)?.value ?? "00";
+  return `${read("year")}-${read("month")}-${read("day")}T${read("hour")}:${read("minute")}`;
 }
 
 /**

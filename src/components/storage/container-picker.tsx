@@ -18,7 +18,6 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import type { PlacementAdmission } from "@/domain/storage/placement";
 import type { ActionResult } from "@/lib/action-result";
 import { cn } from "@/lib/utils";
 
@@ -64,8 +63,18 @@ export interface ContainerPickerRow {
   readonly clockTier: string | null;
   /** T-24 as stored. */
   readonly status: string;
-  readonly admission: PlacementAdmission;
+  /**
+   * The domain's own admission — `admitToContainer` at intake,
+   * `admitContentsMove` on a move — so the stated reason is the refusal the
+   * server would give, word for word.
+   */
+  readonly admission: PickerAdmission;
 }
+
+/** Any admission with a stated reason. `PlacementAdmission` is one. */
+export type PickerAdmission =
+  | { readonly ok: true }
+  | { readonly ok: false; readonly reason: string; readonly message: string };
 
 export interface ContainerPickerProps {
   readonly containers: readonly ContainerPickerRow[];
@@ -74,18 +83,27 @@ export interface ContainerPickerProps {
   readonly onSelect: (id: string | null) => Promise<ActionResult<unknown>>;
   /** P1/P6 — the roles that may create a container from here. */
   readonly canCreate: boolean;
-  /** *"A Facility Manager or a Platform Admin can create one."* — for every other role. */
+  /** *"A Facility Manager or a Platform Admin can create one."* — for every other role; empty renders nothing. */
   readonly whoCanCreate: string;
   readonly onCreate: (input: {
     readonly storageLocation: string;
   }) => Promise<ActionResult<{ readonly id: string }>>;
   /** What this record needs, from `requiredContainerType` — `null` while undetermined. */
   readonly requiredTypeLabel: string | null;
+  /** The zero-containers sentence, where the picker is not intake's step 3 (E-2). */
+  readonly emptyCopy?: string;
+  /** Hide **Clear selection** where no selection is a state the caller cannot submit. */
+  readonly clearable?: boolean;
   readonly className?: string;
 }
 
+/**
+ * E-2 at intake step 3, as D-41 corrected it: a classified battery is placed
+ * when it is logged; one whose classification cannot be decided yet is logged
+ * unplaced, and its record says so.
+ */
 export const ZERO_CONTAINERS_COPY =
-  "You need a container before you can log a battery — the storage clock starts when the battery goes into one.";
+  "A battery whose classification is decided needs a container before you can log it — the storage clock starts when the battery goes into one.";
 
 export function ContainerPicker({
   containers,
@@ -95,6 +113,8 @@ export function ContainerPicker({
   whoCanCreate,
   onCreate,
   requiredTypeLabel,
+  emptyCopy = ZERO_CONTAINERS_COPY,
+  clearable = true,
   className,
 }: ContainerPickerProps): ReactElement {
   const [pendingId, setPendingId] = useState<string | null>(null);
@@ -118,7 +138,7 @@ export function ContainerPicker({
       onCreated={(id) => choose(id)}
       requiredTypeLabel={requiredTypeLabel}
     />
-  ) : (
+  ) : whoCanCreate === "" ? null : (
     <p data-who-can-create="true" className="max-w-[72ch] text-body">
       {whoCanCreate}
     </p>
@@ -137,9 +157,7 @@ export function ContainerPicker({
           className={cn("gap-2 border", INTENT_SURFACE_CLASSES.critical)}
         >
           <PackageOpen aria-hidden="true" />
-          <AlertTitle className="text-body-strong">
-            {ZERO_CONTAINERS_COPY}
-          </AlertTitle>
+          <AlertTitle className="text-body-strong">{emptyCopy}</AlertTitle>
           <AlertDescription className="flex flex-col items-start gap-3 text-current">
             {requiredTypeLabel !== null ? (
               <span className="text-body">
@@ -260,7 +278,7 @@ export function ContainerPicker({
       ) : null}
 
       <div className="flex flex-wrap items-center gap-2">
-        {selectedId !== null ? (
+        {clearable && selectedId !== null ? (
           <Button
             type="button"
             variant="ghost"

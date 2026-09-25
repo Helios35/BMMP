@@ -1557,10 +1557,14 @@ const containersBase = tenantRepository<
       shipmentId?: Uuid;
       isOverdue?: boolean;
       isAlerting?: boolean;
+      storageLocation?: string;
+      containerIds?: readonly Uuid[];
       search?: string;
     },
   ) =>
     eq(query.status, row.status) &&
+    eq(query.storageLocation, row.storageLocation ?? undefined) &&
+    (query.containerIds === undefined || query.containerIds.includes(row.id)) &&
     eq(query.containerType, row.containerType) &&
     eq(query.lotId, row.lotId ?? undefined) &&
     eq(query.shipmentId, row.shipmentId ?? undefined) &&

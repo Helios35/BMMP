@@ -68,6 +68,14 @@ export interface ContainerQuery extends BaseQuery {
   readonly isOverdue?: boolean;
   /** Containers with an unresolved `alert` against them (`/containers?filter=alerting`). */
   readonly isAlerting?: boolean;
+  /** Exact `storage_location` — the `/containers` location filter. */
+  readonly storageLocation?: string;
+  /**
+   * The `/containers` clock-tier filter resolves to a **set** of containers: a
+   * tier belongs to a clock, so the screen reads the clocks at that tier first
+   * and narrows this list by the containers they run on.
+   */
+  readonly containerIds?: readonly Uuid[];
 }
 
 /** Who a person's request came from — stamped on the audit rows a storage write produces. */

@@ -11,3 +11,4 @@ export * from "./page-layout";
 export * from "./leading-icon";
 export * from "./page-section";
 export * from "./empty-state";
+export * from "./route-tabs";
