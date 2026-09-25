@@ -169,6 +169,10 @@ export const ROUTE_ACCESS: Readonly<Record<AppRoute, RouteAccessRule>> = {
       auditor: "none",
       platform_admin: "write",
     },
+    // Rule 2.22 — only P1 and P6 confirm an identification; P2 views the queue
+    // and may not confirm; P5 never confirms. The refusal a Facility Manager
+    // gets from a confirm or void posted to the server names it (Rule 1.26).
+    deniedRule: "2.22",
     note:
       "P2 is view-only (Rule 2.22). Her view is composed for her question — which " +
       "batteries in her containers are still unidentified — not a disabled copy of " +

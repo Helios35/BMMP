@@ -1,7 +1,9 @@
 import {
   BatteryCharging,
+  BookMarked,
   BookOpen,
   Building2,
+  ClipboardCheck,
   LayoutDashboard,
   ScrollText,
   Users,
@@ -65,10 +67,11 @@ export type NavBadges = Readonly<Partial<Record<AppRoute, number>>>;
  * The navigation destinations, in `SITE_ARCHITECTURE.md` §2.1's order. **Order
  * is display order.**
  *
- * ## Why four of §2.1's ten entries are commented out
+ * ## Why two of §2.1's ten entries are commented out
  *
- * `b1a-01-shell` builds the shell and the read-only surfaces; `/review`,
- * `/containers`, `/shipments` and `/settings/catalog` are built by later units
+ * `b1a-01-shell` builds the shell and the read-only surfaces; `/containers`
+ * and `/shipments` are built by later units (`b1a-03` restored `/review` and
+ * `/settings/catalog`)
  * and their pages do not exist yet. A nav item pointing at a route with no page
  * is a dead link, and "no dead links" is §2.1's own rule. So the entries sit
  * here, in order, commented, each naming the unit that restores it — the later
@@ -92,8 +95,13 @@ export const NAV_ITEMS: readonly NavItem[] = [
     group: "primary",
     matchPrefix: "/batteries",
   },
-  // 3 — Review · /review · ClipboardCheck · primary · badge "reviewOpenItems"
-  //     Restored by b1a-03, which builds `src/app/(app)/review/page.tsx`.
+  {
+    route: "/review",
+    navLabel: "Review",
+    icon: ClipboardCheck,
+    group: "primary",
+    badge: "reviewOpenItems",
+  },
   // 4 — Containers · /containers · Boxes · primary · badge "alertingContainers"
   //     Restored by b1a-04, which builds `src/app/(app)/containers/page.tsx`.
   // 5 — Shipments · /shipments · Truck · primary
@@ -123,8 +131,12 @@ export const NAV_ITEMS: readonly NavItem[] = [
     icon: Users,
     group: "settings",
   },
-  // 8c — Catalog · /settings/catalog · BookMarked · settings
-  //      Restored by b1a-03, which builds `src/app/(app)/settings/catalog/page.tsx`.
+  {
+    route: "/settings/catalog",
+    navLabel: "Catalog",
+    icon: BookMarked,
+    group: "settings",
+  },
 ];
 
 /** The heading above a group, or null where the group renders as a flat list. */
