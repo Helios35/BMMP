@@ -24,6 +24,10 @@
  * owns no transition: `BUSINESS_RULES.md` owns what triggers a move between
  * values.
  *
+ * **`catalog_entry.proposed` and `catalog_entry.status_changed` are D-45**, added
+ * at TAXONOMY.md v1.3 for the catalog proposal lifecycle — a proposal from a
+ * catalog miss, and P6 approving or rejecting it at `/settings/catalog`.
+ *
  * **Never invent a value.** If one is needed and is not here, it does not exist
  * yet — raise it to P6 (TAXONOMY.md §1.1).
  */
@@ -33,6 +37,8 @@ export const AUDIT_EVENT_TYPES = [
   "intake_photo.captured",
   "label_extraction.completed",
   "catalog_entry.matched",
+  "catalog_entry.proposed",
+  "catalog_entry.status_changed",
   "battery_record.routed_to_review",
   "battery_record.confirmed",
   "battery_record.status_changed",
@@ -73,6 +79,8 @@ export const AUDIT_EVENT_TYPE_LABELS: Readonly<Record<AuditEventType, string>> =
     "intake_photo.captured": "Photo captured",
     "label_extraction.completed": "Label read",
     "catalog_entry.matched": "Catalog matched",
+    "catalog_entry.proposed": "Catalog entry proposed",
+    "catalog_entry.status_changed": "Catalog entry status changed",
     "battery_record.routed_to_review": "Routed to review",
     "battery_record.confirmed": "Identification confirmed",
     "battery_record.status_changed": "Record status changed",

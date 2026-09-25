@@ -1,5 +1,5 @@
 # Taxonomy — BMMP
-**Version:** 1.2 · **Date:** 2026-08-11 · **Owner:** Nathan Ivy / Next Sketch LLC
+**Version:** 1.3 · **Date:** 2026-09-25 · **Owner:** Nathan Ivy / Next Sketch LLC
 **Answers:** How is everything in this product classified?
 **Reads from:** `_ANCHORS.md` · `PRD.md` · `BUSINESS_RULES.md` · `PROJECT_SETUP_BMMP.md`  ·  **Feeds:** `TECHNICAL_SPEC.md` · `ERD.md` · `UX_SPEC.md` · `SITE_ARCHITECTURE.md` · every builder brief
 
@@ -9,6 +9,10 @@
 ---
 
 ## Changelog
+
+**v1.3 · 2026-09-25 — two T-43 values for the catalog proposal lifecycle (`Decision Log.md` D-45)**
+
+- **T-43 gains `catalog_entry.proposed` and `catalog_entry.status_changed`**, following the existing `<entity>.status_changed` pattern. Authored by planning as D-45, transcribed by `b1a-03-review`. Without them a catalog proposal, its approval and its rejection either wrote nothing or wrote under a near neighbour, and a wrong row in an append-only log is worse than a missing one. A void of a queue item stays `battery_record.status_changed`; a re-match confirmation stays `battery_record.confirmed`. The other T-43 gaps listed in D-45 stay open.
 
 **v1.2 · 2026-08-11 — status reconciliation with `BUSINESS_RULES.md` v1.1**
 
@@ -1319,6 +1323,8 @@ Two citations in this document are deliberately **not** numbered, because what t
 | `intake_photo.captured` | Photo captured | A photo was captured and its data-use eligibility stamped (T-12). |
 | `label_extraction.completed` | Label read | The extraction pipeline returned per-field values and confidence bands. |
 | `catalog_entry.matched` | Catalog matched | A catalog entry was proposed for a record. |
+| `catalog_entry.proposed` | Catalog entry proposed | A person proposed a new catalog entry from a catalog miss; it waits as `proposed` (T-07) for P6 at `/settings/catalog` and is not available for matching (**Rule 2.20**; Flow F). **Not `catalog_entry.matched`**, which is the match step proposing an existing entry for a record. |
+| `catalog_entry.status_changed` | Catalog entry status changed | The entry moved between values of T-07 — P6 approving a proposal to `published` or rejecting it — with the stated reason (Flow F). An approval lists the records it raised on `/review` for a person to confirm; it changes none of them. |
 | `battery_record.routed_to_review` | Routed to review | A gated field below band placed the record in the review queue. |
 | `battery_record.confirmed` | Identification confirmed | A human confirmed identification, including chemistry. |
 | `battery_record.status_changed` | Record status changed | The record moved between values of T-22. |
