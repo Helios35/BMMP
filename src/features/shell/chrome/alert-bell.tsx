@@ -31,20 +31,16 @@ import { INTENT_ICON } from "@/components/status/intent-icons";
  * preference here, no "mark all read" and no delivery-channel toggle.
  * `alert.deliveredChannels` is read-only data and nothing renders from it.
  *
- * **T-48 constraint, live.** `alert.severity` is typed `string` and T-48 has no
- * module in `src/domain/taxonomy/`. The intent is resolved server-side through
- * `ALERT_SEVERITY_INTENTS[severity] ?? "neutral"` and an unrecognised severity
- * is **never guessed upward into `critical`** — inventing an urgency in a
- * compliance product is worse than showing none. `StatusBadge` cannot render a
- * severity (T-48 is not in `STATUS_SYSTEMS`), so the icon and the alert's own
- * title carry it.
+ * **T-48.** The intent is resolved server-side through `alertSeverityIntent`
+ * and an unrecognised severity is **never guessed upward into `critical`** —
+ * inventing an urgency in a compliance product is worse than showing none.
  *
  * Nothing here expresses a probability of ignition (Rules 1.25, 10.3).
  */
 
 export interface AlertBellItem {
   readonly id: string;
-  /** Resolved server-side from `ALERT_SEVERITY_INTENTS`; `neutral` when unrecognised. */
+  /** Resolved server-side by `alertSeverityIntent`; `neutral` when unrecognised. */
   readonly intent: StatusIntent;
   readonly title: string;
   readonly body: string;

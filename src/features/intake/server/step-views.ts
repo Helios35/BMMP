@@ -5,6 +5,7 @@ import type {
 import type { FieldSource } from "@/components/provenance/field-source-badge";
 import type { CommitGateInput } from "@/domain/intake/commit-gate";
 import { commitFieldStates } from "@/domain/intake/draft";
+import { placementRequired } from "@/domain/storage/placement";
 import type { ApplicationClass } from "@/domain/taxonomy/application-class";
 import { CHEMISTRIES, CHEMISTRY_LABELS } from "@/domain/taxonomy/chemistry";
 import {
@@ -404,8 +405,14 @@ export function commitGateInput(
       view.draft.condition.confirmedBy !== null,
     ownsCondition: true,
     containerChosen: view.draft.containerId !== null,
-    // Unplaced intake is permitted in B1a; the container is chosen, never demanded.
-    requiresContainer: false,
+    // D-41 — the same predicate confirmation.ts and read-intake.ts apply: a
+    // decided classification needs a container; an unresolved one commits
+    // unplaced and says so.
+    requiresContainer: placementRequired(
+      view.classificationPreview.kind === "decided"
+        ? view.classificationPreview.outcome.result
+        : null,
+    ),
     // D-42 — no record is logged without a stored photo, manual entry included.
     hasStoredPhoto: view.photos.length > 0,
     // EC-16 / Rule 3.10 — identification completes while classification

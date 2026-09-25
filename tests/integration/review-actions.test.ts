@@ -218,6 +218,13 @@ async function resolveFields(sessionId: string): Promise<void> {
     }),
   );
   ok(await intake.confirmCondition({ sessionId }));
+  // D-41 — a classified battery is placed when it is logged.
+  ok(
+    await intake.choosePlacement({
+      sessionId,
+      containerId: ID.CONTAINER.soundDrum,
+    }),
+  );
 }
 
 /** T-43 `alert.resolved` rows for one raise — who resolved it, and why (D-48). */
@@ -345,7 +352,9 @@ describe("P1 resolves a queued item on /review (§3.8a, Rule 2.23)", () => {
 
     expect(resolved.batteryRecordId).toBe(batteryRecordId);
     const record = await data.batteryRecords.get(HANDLER, batteryRecordId);
-    expect(record?.status).toBe("classified");
+    // Classified and placed in one commit (D-41), so it lands `stored`.
+    expect(record?.status).toBe("stored");
+    expect(record?.containerId).toBe(ID.CONTAINER.soundDrum);
     expect(record?.catalogEntryId).toBe(ID.CATALOG.vehicleTractionNmc);
     expect(record?.chemistryConfirmedBy).toBe(ID.USER.danaHandler);
     expect((await data.intakeSessions.get(HANDLER, sessionId))?.status).toBe(
@@ -458,6 +467,13 @@ describe("D-42 — no battery record commits without a stored photo", () => {
       }),
     );
     ok(await intake.confirmCondition({ sessionId }));
+    // D-41 — a classified battery is placed when it is logged.
+    ok(
+      await intake.choosePlacement({
+        sessionId,
+        containerId: ID.CONTAINER.soundDrum,
+      }),
+    );
     // Everything else the label would have carried is left empty by the
     // person, explicitly (§2.1.5), so the photo is the only thing outstanding.
     for (const fieldCode of [
@@ -568,6 +584,13 @@ describe("Flow F — a catalog miss, closed", () => {
       }),
     );
     ok(await intake.confirmCondition({ sessionId }));
+    // D-41 — a classified battery is placed when it is logged.
+    ok(
+      await intake.choosePlacement({
+        sessionId,
+        containerId: ID.CONTAINER.soundDrum,
+      }),
+    );
     await expect(intake.confirmIntake({ sessionId })).rejects.toThrow(
       RedirectSignal,
     );

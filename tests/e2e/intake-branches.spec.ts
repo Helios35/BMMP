@@ -179,6 +179,8 @@ test.describe("the branches off Flow A", () => {
     await confirmRow(page, "model");
     await continueToPlace(page);
     await confirmCondition(page, "none_observed", "sound");
+    // Classified, so placed when logged (D-41).
+    await chooseContainer(page, CONTAINER.soundDrum);
     const recordId = await commitIntake(page);
 
     // The record carries `human_entry` and renders it as *Entered by*.
@@ -194,7 +196,7 @@ test.describe("the branches off Flow A", () => {
       await expect(chemistryField).not.toContainText(forbidden);
     }
     await expect(page.locator("[data-page-header]").first()).toContainText(
-      BATTERY_RECORD_STATUS_LABELS.classified,
+      BATTERY_RECORD_STATUS_LABELS.stored,
     );
   });
 

@@ -1115,7 +1115,7 @@ Every empty state has exactly four parts: **what is true · why · the single mo
 **Where:** `/containers`, `/batteries/new` step 3, `/shipments/new` step 1.
 
 - `/containers` — P1/P2/P6: *"No containers yet. Create one to start a storage clock."* → **New container**. P3/P4/P5: the same first sentence, plus who can create one.
-- **Intake step 3 with no containers** — the container picker renders a `HardBlockNotice`-styled `Alert`: *"You need a container before you can log a battery — the storage clock starts when the battery goes into one."* P1/P6 get **Create a container** inline, which returns to step 3 with it selected. Other roles get the names of who can. **The intake draft is never discarded to go create a container.**
+- **Intake step 3 with no containers** — the container picker renders a `HardBlockNotice`-styled `Alert`: *"A battery whose classification is decided needs a container before you can log it — the storage clock starts when the battery goes into one."* A battery whose classification cannot be decided yet (E-13) is logged **unplaced**, and its record says so (D-41). P1/P6 get **Create a container** inline, which returns to step 3 with it selected. Other roles get the names of who can. **The intake draft is never discarded to go create a container.**
 - `/shipments/new` step 1 — the picker is replaced by an explanatory state, not an empty list.
 
 ---

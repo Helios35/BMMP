@@ -1,12 +1,10 @@
-import Link from "next/link";
 import type { ReactElement } from "react";
 
-import {
-  encodeListQuery,
-  type ListQuery,
-  type ListQuerySpec,
+import { RouteTabs } from "@/components/page/route-tabs";
+import type {
+  ListQuery,
+  ListQuerySpec,
 } from "@/components/record-table/list-url";
-import { cn } from "@/lib/utils";
 
 /**
  * The four sections of a battery record — `UX_SPEC.md` §3.7,
@@ -73,39 +71,14 @@ export function RecordTabs({
   readonly active: RecordTabId;
 }): ReactElement {
   return (
-    // The row scrolls rather than wrapping on a phone, and it scrolls inside its
-    // own container so the page body never scrolls horizontally (§4.3).
-    <nav aria-label="Battery record sections" className="overflow-x-auto">
-      <ul className="flex min-w-max items-end gap-1 border-b border-border">
-        {RECORD_TABS.map((tab) => {
-          const isCurrent = tab.id === active;
-          return (
-            <li key={tab.id}>
-              <Link
-                href={encodeListQuery(
-                  basePath,
-                  query,
-                  { tab: tab.id },
-                  RECORD_TAB_SPEC,
-                )}
-                aria-current={isCurrent ? "page" : undefined}
-                data-record-tab={tab.id}
-                data-tab-state={isCurrent ? "current" : "default"}
-                className={cn(
-                  "inline-flex min-h-11 items-center rounded-t-md px-4 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none",
-                  // The current tab carries weight and a rule as well as
-                  // `aria-current`: colour is never the only signal (§1.2 Rule 4).
-                  isCurrent
-                    ? "border-b-2 border-foreground text-body-strong"
-                    : "text-label hover:bg-muted/50",
-                )}
-              >
-                {tab.label}
-              </Link>
-            </li>
-          );
-        })}
-      </ul>
-    </nav>
+    <RouteTabs
+      tabs={RECORD_TABS}
+      basePath={basePath}
+      query={query}
+      spec={RECORD_TAB_SPEC}
+      active={active}
+      label="Battery record sections"
+      dataAttribute="data-record-tab"
+    />
   );
 }

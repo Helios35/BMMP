@@ -134,7 +134,15 @@ describe("the taxonomy", () => {
         // substring test on `i` or `a` matches ordinary prose: T-19's roman
         // numerals and T-31's single letters are external identifiers and are
         // the documented exception to §4.4 rule 7.
-        if (value.length >= 3) {
+        // T-48 `attention` reads "Needs attention", as the owner authored it
+        // (D-30) and kept it when `b1a-04-containers` reported the clash. The
+        // shape §4.5 forbids is the machine value shown in brackets; an English
+        // word the label shares is not that shape. Exempt by name, so no other
+        // system inherits the latitude.
+        const ownerKeptLabel =
+          system.labels === taxonomy.ALERT_SEVERITY_LABELS &&
+          value === "attention";
+        if (value.length >= 3 && !ownerKeptLabel) {
           expect(
             label.includes(value),
             `"${label}" leaks the stored value ${value}`,
@@ -259,6 +267,60 @@ describe("the taxonomy", () => {
         ).toBe(false);
       }
     }
+  });
+});
+
+describe("the storage clock's provenance (D-55, TAXONOMY.md v1.4)", () => {
+  it("has no value that resets, pauses, extends or re-dates a start (Rules 4.6, 4.9)", () => {
+    // The absence is the enforcement: there is nothing to record, so nothing
+    // can be recorded.
+    const forbidden =
+      /reset|restart|pause|hold|freeze|suspend|extend|extension|re_?dat|manual|edit/;
+    for (const value of [
+      ...taxonomy.ACCUMULATION_START_SOURCES,
+      ...taxonomy.CLOCK_START_BASES,
+    ]) {
+      expect(value, value).not.toMatch(forbidden);
+    }
+  });
+
+  it("names the same four events on the container and on the clock", () => {
+    expect([...taxonomy.CLOCK_START_BASES]).toEqual([
+      ...taxonomy.ACCUMULATION_START_SOURCES,
+    ]);
+  });
+
+  it("keeps the fixture values it was written to keep", () => {
+    expect(taxonomy.ACCUMULATION_START_SOURCES).toContain("first_placement");
+    expect(taxonomy.ACCUMULATION_START_SOURCES).toContain(
+      "inherited_on_receipt",
+    );
+    expect(taxonomy.STORAGE_CLOCK_SUBJECT_TYPES).toContain("container");
+  });
+
+  it("lets a battery-level clock start only on first placement (T-64)", () => {
+    for (const basis of taxonomy.CLOCK_START_BASES) {
+      const subjects = taxonomy.CLOCK_START_BASIS_SUBJECTS[basis];
+      expect(subjects).toContain("container");
+      expect(subjects.includes("battery_record")).toBe(
+        basis === "first_placement",
+      );
+    }
+  });
+
+  it("gives T-16 a placement and a remediation, appended after the original eight", () => {
+    expect(taxonomy.HANDLER_ACTIVITY_TYPES.slice(-2)).toEqual([
+      "place",
+      "remediate",
+    ]);
+  });
+
+  it("orders T-48 by urgency, and never lets an unknown severity outrank a known one", () => {
+    expect([...taxonomy.ALERT_SEVERITIES]).toEqual([
+      "critical",
+      "attention",
+      "informational",
+    ]);
   });
 });
 

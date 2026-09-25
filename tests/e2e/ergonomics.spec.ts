@@ -287,11 +287,12 @@ function expectNoHorizontalOverflow(
 /**
  * The routes this unit renders, by the role that reaches them.
  *
- * Routes units 03–05 own — `/review`, `/containers*`, `/shipments*`,
- * `/documents/[id]`, `/settings/catalog` — are absent because they do not exist
- * yet. **Each of those units extends this list when it builds them.**
+ * Routes units 03–05 own are added by the unit that builds them: unit 04 adds
+ * `/containers`, `/containers/[id]` and `/documents/[id]`. `/shipments*` is
+ * absent because it does not exist yet.
  */
-const { BATTERY, CATALOG, INTAKE_SESSION } = fixtureIds;
+const { BATTERY, CATALOG, CONTAINER, DOCUMENT_RENDER, INTAKE_SESSION } =
+  fixtureIds;
 
 const PUBLIC_ROUTES: readonly string[] = [
   "/sign-in",
@@ -312,6 +313,12 @@ const MANAGER_ROUTES: readonly string[] = [
   `/catalog/${CATALOG.vehicleTractionNmc}`,
   "/settings/organization",
   "/settings/users",
+  "/containers",
+  // The overdue drum renders the most: the pinned alert, the critical meter,
+  // and P2's remediation control.
+  `/containers/${CONTAINER.overdueDrum}`,
+  `/containers/${CONTAINER.soundDrum}?tab=label`,
+  `/documents/${DOCUMENT_RENDER.soundDrumLabel}`,
 ];
 
 /**
@@ -415,6 +422,8 @@ test.describe("44 × 44 px minimum interactive target", () => {
           "/",
           "/batteries",
           `/batteries/${BATTERY.vehicleTraction}`,
+          "/containers",
+          `/documents/${DOCUMENT_RENDER.soundDrumLabel}`,
         ]) {
           const result = await sweep(page, pathname);
           expect(
@@ -464,52 +473,63 @@ test.describe("44 × 44 px minimum interactive target", () => {
       ).toEqual([]);
       expectExemptionsAreInlineLinks("/audit", result);
     });
-
-    /**
-     * The sweep above cannot re-break — **and cannot pass by finding nothing.**
-     *
-     * The general sweep measures whatever is on the page, so it stays green if
-     * the trigger stops rendering at all: the tooltip disappears, the stated
-     * reason becomes unreachable, and nothing says a word. That is precisely
-     * how two of unit 01's defects survived a whole unit — an assertion that
-     * passed vacuously.
-     *
-     * So this asserts the trigger is **there**, on every row, and measures it
-     * directly. `/containers` inherits this exact path for P3, P4 and P5 in
-     * unit 04 (`SITE_ARCHITECTURE.md` §5.4), and that unit adds its route to
-     * this test rather than writing a second one.
-     */
-    test("the not-linked row reason is present, focusable and 44px", async ({
-      page,
-    }) => {
-      await page.setViewportSize({ width: 1280, height: 800 });
-      await page.goto("/audit");
-      await expect(page.locator("#page-title")).toBeVisible();
-
-      const triggers = page.locator('[data-row-reason-trigger="true"]');
-      const count = await triggers.count();
-      expect(
-        count,
-        "/audit renders no row-reason trigger at all — every row on this route is non-navigable and each one must state why (§5.4)",
-      ).toBeGreaterThan(0);
-
-      for (let index = 0; index < count; index += 1) {
-        const trigger = triggers.nth(index);
-        const box = await trigger.boundingBox();
-        expect(
-          box,
-          `/audit row ${index}: the trigger is not rendered`,
-        ).not.toBeNull();
-        expect(
-          box?.height ?? 0,
-          `/audit row ${index}: the row-reason trigger is ${box?.height ?? 0}px tall. It is focusable and hoverable, which makes it a target, and §1.5's 44px floor applies on desktop too. The threshold is not lowered.`,
-        ).toBeGreaterThanOrEqual(MINIMUM_TARGET_PX);
-        // In the tab order on purpose: `aria-disabled` semantics aside, a reason
-        // a keyboard user cannot reach is a reason nobody stated.
-        await expect(trigger).toHaveAttribute("tabindex", "0");
-      }
-    });
   });
+
+  /**
+   * The not-linked row reason cannot re-break — **and cannot pass by finding
+   * nothing.**
+   *
+   * The general sweep measures whatever is on the page, so it stays green if
+   * the trigger stops rendering at all: the tooltip disappears, the stated
+   * reason becomes unreachable, and nothing says a word. That is precisely how
+   * two of unit 01's defects survived a whole unit — an assertion that passed
+   * vacuously.
+   *
+   * So this asserts the trigger is **there**, on every row, and measures it
+   * directly, on each route that renders non-navigable rows: `/audit` for
+   * everyone (there is no `/audit/[id]`), and `/containers` for P3, P4 and P5
+   * (`SITE_ARCHITECTURE.md` §5.4) — added by unit 04 here rather than in a
+   * second test.
+   */
+  for (const { route, persona } of [
+    { route: "/audit", persona: "p2" },
+    { route: "/containers", persona: "p5" },
+  ] as const) {
+    test.describe(`the not-linked rows on ${route}`, () => {
+      test.use({ storageState: storageStateFor(persona) });
+
+      test("the not-linked row reason is present, focusable and 44px", async ({
+        page,
+      }) => {
+        await page.setViewportSize({ width: 1280, height: 800 });
+        await page.goto(route);
+        await expect(page.locator("#page-title")).toBeVisible();
+
+        const triggers = page.locator('[data-row-reason-trigger="true"]');
+        const count = await triggers.count();
+        expect(
+          count,
+          `${route} renders no row-reason trigger at all — every row on this route is non-navigable for this role and each one must state why (§5.4)`,
+        ).toBeGreaterThan(0);
+
+        for (let index = 0; index < count; index += 1) {
+          const trigger = triggers.nth(index);
+          const box = await trigger.boundingBox();
+          expect(
+            box,
+            `${route} row ${index}: the trigger is not rendered`,
+          ).not.toBeNull();
+          expect(
+            box?.height ?? 0,
+            `${route} row ${index}: the row-reason trigger is ${box?.height ?? 0}px tall. It is focusable and hoverable, which makes it a target, and §1.5's 44px floor applies on desktop too. The threshold is not lowered.`,
+          ).toBeGreaterThanOrEqual(MINIMUM_TARGET_PX);
+          // In the tab order on purpose: `aria-disabled` semantics aside, a
+          // reason a keyboard user cannot reach is a reason nobody stated.
+          await expect(trigger).toHaveAttribute("tabindex", "0");
+        }
+      });
+    });
+  }
 });
 
 test.describe("200% zoom does not break a layout", () => {

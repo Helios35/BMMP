@@ -530,13 +530,13 @@ describe("a whole intake, start to redirect", () => {
       limit: 5,
     });
     expect(decisions.items[0]?.wasteClassification).toBe("light_category");
-    // TODO(T-16) — no activity type describes a placement, so no storage
-    // event is written; the record's container and its status row carry it.
+    // T-16 `place` (D-55) — the placement is a storage event now, carrying
+    // the start this battery holds from here on (Rule 4.9).
     const events = await data.storageEvents.list(HANDLER, {
       batteryRecordId,
       limit: 5,
     });
-    expect(events.items).toHaveLength(0);
+    expect(events.items.map((event) => event.activityType)).toEqual(["place"]);
     const landed = await data.batteryRecords.get(HANDLER, batteryRecordId);
     expect(landed?.containerId).toBe(ID.CONTAINER.soundDrum);
     expect(landed?.status).toBe("stored");
@@ -578,7 +578,7 @@ describe("a whole intake, start to redirect", () => {
     expect(classified?.actorType).toBe("system");
   });
 
-  it("takes the manual path when nothing matches: hand-entered chemistry, no container, classified", async () => {
+  it("takes the manual path when nothing matches: hand-entered chemistry, classified, and placed (D-41)", async () => {
     const { sessionId, batteryRecordId } = ok(
       await actions.startIntakeSession({}),
     );
@@ -627,16 +627,28 @@ describe("a whole intake, start to redirect", () => {
     );
     ok(await actions.confirmCondition({ sessionId }));
 
+    // D-41 — the classification is decided, so the battery needs a container.
+    const refused = await actions.confirmIntake({ sessionId });
+    expect(refused.ok).toBe(false);
+    if (refused.ok) return;
+    expect(refused.error.message).toMatch(/Choose a container/);
+
+    ok(
+      await actions.choosePlacement({
+        sessionId,
+        containerId: ID.CONTAINER.soundDrum,
+      }),
+    );
     await expect(actions.confirmIntake({ sessionId })).rejects.toThrow(
       RedirectSignal,
     );
     const record = await data.batteryRecords.get(HANDLER, batteryRecordId);
-    expect(record?.status).toBe("classified");
+    expect(record?.status).toBe("stored");
     expect(record?.chemistry).toBe("li_lfp");
     expect(record?.chemistrySource).toBe("human_entry");
     expect(record?.catalogEntryId).toBeNull();
     expect(record?.assessedCondition).toBe("cosmetic_wear_only");
-    expect(record?.containerId).toBeNull();
+    expect(record?.containerId).toBe(ID.CONTAINER.soundDrum);
   });
 
   it("refuses a corrected value that fails shape validation, naming the field (Rule 2.12)", async () => {
@@ -948,16 +960,23 @@ describe("Enter details manually — the way on when the read cannot happen (E-4
       }),
     );
     ok(await actions.confirmCondition({ sessionId }));
+    // D-41 — classified, so placed.
+    ok(
+      await actions.choosePlacement({
+        sessionId,
+        containerId: ID.CONTAINER.soundDrum,
+      }),
+    );
     await expect(actions.confirmIntake({ sessionId })).rejects.toThrow(
       RedirectSignal,
     );
 
     const record = await data.batteryRecords.get(HANDLER, batteryRecordId);
-    expect(record?.status).toBe("classified");
+    expect(record?.status).toBe("stored");
     expect(record?.partNumber).toBe("HB-12");
     expect(record?.chemistry).toBe("li_lfp");
     expect(record?.chemistrySource).toBe("human_entry");
-    expect(record?.containerId).toBeNull();
+    expect(record?.containerId).toBe(ID.CONTAINER.soundDrum);
     expect((await data.intakeSessions.get(HANDLER, sessionId))?.status).toBe(
       "completed",
     );

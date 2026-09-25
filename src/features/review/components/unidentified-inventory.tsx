@@ -48,11 +48,14 @@ import {
   NO_CONTAINER_GROUP,
   NO_CONTAINER_GROUP_NOTE,
   OPEN_CONTAINER,
+  RECORD_STORAGE_EVENT,
   rollUpLabel,
   SEE_CLOCK_ALERTS,
   UNIDENTIFIED_WHY,
   unidentifiedHeadline,
 } from "../review-copy";
+import { STORAGE_EVENT_DIALOG } from "@/features/containers/container-tabs";
+
 import { REVIEW_ITEM_PARAM, REVIEW_ROUTE } from "../review-hrefs";
 import type {
   InventoryContainer,
@@ -233,15 +236,36 @@ function InventoryGroupSection({
       }
       action={
         container !== null && canOpenContainer ? (
-          <Button asChild size="lg" className="min-h-11 rounded-md text-label">
-            <Link
-              href={`/containers/${container.id}`}
-              data-open-container={container.id}
+          <div className="flex flex-wrap gap-2">
+            <Button
+              asChild
+              size="lg"
+              className="min-h-11 rounded-md text-label"
             >
-              <PackageOpen aria-hidden="true" />
-              {OPEN_CONTAINER}
-            </Link>
-          </Button>
+              <Link
+                href={`/containers/${container.id}`}
+                data-open-container={container.id}
+              >
+                <PackageOpen aria-hidden="true" />
+                {OPEN_CONTAINER}
+              </Link>
+            </Button>
+            {/* §3.8b — a real, primary-weight action: the container's own
+                storage-event dialog, opened on arrival. */}
+            <Button
+              asChild
+              variant="outline"
+              size="lg"
+              className="min-h-11 rounded-md text-label"
+            >
+              <Link
+                href={`/containers/${container.id}?dialog=${STORAGE_EVENT_DIALOG}`}
+                data-record-storage-event-link={container.id}
+              >
+                {RECORD_STORAGE_EVENT}
+              </Link>
+            </Button>
+          </div>
         ) : undefined
       }
       dataAttributes={{

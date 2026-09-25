@@ -23,6 +23,8 @@ import type { DamageAssessmentStatus } from "@/domain/taxonomy/damage-assessment
 import type { DdrFlag } from "@/domain/taxonomy/ddr-flag";
 import { isTaxonomyValue } from "@/domain/taxonomy/lookup";
 import { STORAGE_CLOCK_ALERT_BANDS } from "@/domain/taxonomy/storage-clock-alert-band";
+import type { StorageClockStatus } from "@/domain/taxonomy/storage-clock-status";
+import type { ClockStartBasis } from "@/domain/taxonomy/clock-start-basis";
 import type { WasteClassification } from "@/domain/taxonomy/waste-classification";
 
 /**
@@ -71,6 +73,23 @@ export function requiredContainerType(
   return `${family}_sound`;
 }
 
+/**
+ * D-41 — **a record with a classification decision needs a container to
+ * commit.**
+ *
+ * The storage clock and the segregation check (Rule 4.28) both hang off the
+ * container, so a classified battery with no container is a battery the
+ * product has stopped tracking. A record whose classification is unresolved —
+ * no decision at all (E-13), or one that could only say `undetermined`
+ * (Rule 3.10) — still commits **unplaced**: it cannot be placed correctly yet,
+ * and forcing a container would force a wrong one.
+ */
+export function placementRequired(
+  classification: WasteClassification | null,
+): boolean {
+  return classification !== null && classification !== "undetermined";
+}
+
 /* ------------------------------------------------------------- admission */
 
 /**
@@ -89,6 +108,7 @@ export type PlacementAdmission =
         | "container_overdue"
         | "segregation_class_mismatch"
         | "container_not_open"
+        | "container_cycle_ended"
         | "classification_undetermined";
       readonly message: string;
     };
@@ -102,6 +122,11 @@ export type PlacementAdmission =
  * container that is not open is not taking anything, and a segregation
  * mismatch is the placement itself being wrong (Rule 4.28). The reasons carry
  * type labels from the taxonomy, never an inline name.
+ *
+ * **A container whose clock has stopped takes nothing.** It reached empty and
+ * its accumulation cycle ended (Rule 4.7); a container row covers one cycle
+ * (`ERD.md` §6.1), and a second clock on the same row would give it a start
+ * date later than the one it already carries — a restart by another name.
  */
 export function admitToContainer(
   container: {
@@ -109,6 +134,7 @@ export function admitToContainer(
     readonly containerType: ContainerType;
   },
   required: ContainerType | null,
+  clock: { readonly status: StorageClockStatus } | null = null,
 ): PlacementAdmission {
   if (required === null) {
     return {
@@ -131,6 +157,14 @@ export function admitToContainer(
       ok: false,
       reason: "container_not_open",
       message: `This container is ${CONTAINER_STATUS_LABELS[container.status]} and is not accepting items.`,
+    };
+  }
+  if (clock?.status === "stopped") {
+    return {
+      ok: false,
+      reason: "container_cycle_ended",
+      message:
+        "This container was emptied and its accumulation cycle has ended. Use a new container.",
     };
   }
   if (container.containerType !== required) {
@@ -160,6 +194,12 @@ export interface ClockStartInput {
    * start date is the first placement's, not this one's.
    */
   readonly existingClock: { readonly clockStartAt: IsoTimestamp } | null;
+  /**
+   * T-64 — what set the start. `first_placement` unless a move carried an
+   * earlier date in (Rules 4.10–4.12), in which case `placedAt` is that
+   * carried date, not the instant of the move.
+   */
+  readonly basis?: ClockStartBasis;
 }
 
 export interface ClockStart {
@@ -319,11 +359,16 @@ export function startStorageClock(
     outcome: `max_duration_days=${payload.maxDurationDays}`,
   };
 
+  const inherited =
+    input.basis !== undefined && input.basis !== "first_placement";
   const reasoning = joinsExistingClock
     ? `This record joins the container's running clock, which started on ${startDate} at the site. ` +
       `Under the rule version in force it is due at the end of ${lastDayInside}.`
-    : `The clock starts on ${startDate}, the date of the first placement at the site, ` +
-      `and is due at the end of ${lastDayInside} under the rule version in force on that date.`;
+    : inherited
+      ? `The clock's start is ${startDate}, the earliest accumulation start among the container's contents, ` +
+        `and it is due at the end of ${lastDayInside} under the rule version in force on that date.`
+      : `The clock starts on ${startDate}, the date of the first placement at the site, ` +
+        `and is due at the end of ${lastDayInside} under the rule version in force on that date.`;
 
   return ruleOutcome<ClockStart>({
     result: {

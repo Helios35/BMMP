@@ -5,6 +5,10 @@ import { expect, type Locator, type Page } from "@playwright/test";
 import type { DamageFindingType } from "@/domain/taxonomy/damage-finding-type";
 import type { LabelFieldCode } from "@/domain/taxonomy/label-field-code";
 
+import { fixtureIds } from "./roles";
+
+const { CONTAINER } = fixtureIds;
+
 /**
  * Driving `/batteries/new` the way a person does, for the intake specs.
  *
@@ -318,7 +322,11 @@ export interface LoggedRecord {
 /**
  * The clean label, start to finish: confirm the two hard-gated rows on step 2
  * (model, then chemistry from the catalog match), record *none observed* on
- * step 3, optionally place, and commit.
+ * step 3, place, and commit.
+ *
+ * **Placed by default, in the sound drum** — the clean label classifies, and a
+ * classified battery is placed when it is logged (D-41). A spec that needs its
+ * own container passes one.
  *
  * Specs that need a record of their own — the write paths, the audit thread —
  * start here rather than editing a fixture row another spec asserts on.
@@ -327,6 +335,7 @@ export async function logCleanBattery(
   page: Page,
   options: { readonly containerId?: string } = {},
 ): Promise<LoggedRecord> {
+  const containerId = options.containerId ?? CONTAINER.soundDrum;
   const sessionId = await openReview(page, "label-clean.png");
 
   await confirmRow(page, "model");
@@ -335,9 +344,7 @@ export async function logCleanBattery(
   await continueToPlace(page);
 
   await confirmCondition(page, "none_observed", "sound");
-  if (options.containerId !== undefined) {
-    await chooseContainer(page, options.containerId);
-  }
+  await chooseContainer(page, containerId);
   const recordId = await commitIntake(page);
 
   const recordNumber = (

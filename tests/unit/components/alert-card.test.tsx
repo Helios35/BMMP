@@ -108,11 +108,13 @@ describe("AlertCard — default", () => {
   });
 
   it("falls back to a neutral intent on a severity this build does not know", () => {
-    // `alert.severity` has no TAXONOMY.md system yet — reported in this unit's
-    // build-notes. An unrecognised value renders rather than crashing, and is
-    // never coerced to `critical`, which would invent an urgency.
+    // T-48 types the column, but a row can still carry a value retired later or
+    // written by a newer deployment (TAXONOMY.md §5.8) — the cast is that row.
+    // It renders rather than crashing, and is never coerced to `critical`,
+    // which would invent an urgency.
+    const fromANewerDeployment = "chartreuse" as unknown as Alert["severity"];
     const { container } = render(
-      <AlertCard alert={{ ...REVIEW_QUEUE, severity: "chartreuse" }} />,
+      <AlertCard alert={{ ...REVIEW_QUEUE, severity: fromANewerDeployment }} />,
     );
     expect(
       container.querySelector("[data-alert-id]")?.getAttribute("data-intent"),

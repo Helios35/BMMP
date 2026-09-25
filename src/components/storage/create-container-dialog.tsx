@@ -18,6 +18,13 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import type { ActionResult } from "@/lib/action-result";
 import { cn } from "@/lib/utils";
 
@@ -38,11 +45,24 @@ import { cn } from "@/lib/utils";
 export interface CreateContainerDialogProps {
   readonly onCreate: (input: {
     readonly storageLocation: string;
+    /** Set when {@link CreateContainerDialogProps.typeOptions} asked for one. */
+    readonly containerType?: string;
   }) => Promise<ActionResult<{ readonly id: string }>>;
   /** Called after the server confirms, with the new container's id. */
   readonly onCreated: (id: string) => void | Promise<void>;
   /** The type the server will assign, for the reader's information. */
   readonly requiredTypeLabel: string | null;
+  /**
+   * T-23's options, in its own order, where the reader chooses the type —
+   * `/containers`' **New container** (§3.9). Absent on intake, where the
+   * server assigns the one type the record needs.
+   */
+  readonly typeOptions?: readonly {
+    readonly value: string;
+    readonly label: string;
+  }[];
+  /** Default *"Create a container"* (E-2). */
+  readonly triggerLabel?: string;
   readonly className?: string;
 }
 
@@ -50,15 +70,23 @@ export function CreateContainerDialog({
   onCreate,
   onCreated,
   requiredTypeLabel,
+  typeOptions,
+  triggerLabel = "Create a container",
   className,
 }: CreateContainerDialogProps): ReactElement {
   const inputId = useId();
+  const typeId = useId();
   const [isOpen, setIsOpen] = useState(false);
   const [storageLocation, setStorageLocation] = useState("");
+  const [containerType, setContainerType] = useState("");
   const [isPending, setIsPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const canSubmit = storageLocation.trim().length > 0 && !isPending;
+  const choosesType = typeOptions !== undefined;
+  const canSubmit =
+    storageLocation.trim().length > 0 &&
+    (!choosesType || containerType !== "") &&
+    !isPending;
 
   async function submit(): Promise<void> {
     if (!canSubmit) return;
@@ -67,6 +95,7 @@ export function CreateContainerDialog({
     try {
       const result = await onCreate({
         storageLocation: storageLocation.trim(),
+        ...(choosesType ? { containerType } : {}),
       });
       if (!result.ok) {
         setError(result.error.message);
@@ -74,6 +103,7 @@ export function CreateContainerDialog({
       }
       setIsOpen(false);
       setStorageLocation("");
+      setContainerType("");
       await onCreated(result.data.id);
     } finally {
       setIsPending(false);
@@ -90,7 +120,7 @@ export function CreateContainerDialog({
           data-create-container="true"
           className={cn(ACTION_BUTTON_CLASS, className)}
         >
-          Create a container
+          {triggerLabel}
         </Button>
       </DialogTrigger>
       {/* Capped to the viewport and scrolling, so the footer is reachable
@@ -101,7 +131,7 @@ export function CreateContainerDialog({
         data-create-container-dialog="true"
       >
         <DialogHeader>
-          <DialogTitle className="text-h2">Create a container</DialogTitle>
+          <DialogTitle className="text-h2">{triggerLabel}</DialogTitle>
           <DialogDescription className="text-body">
             {requiredTypeLabel === null
               ? "A new, open container at this site. The storage clock starts when the first battery goes into it."
@@ -116,6 +146,38 @@ export function CreateContainerDialog({
             void submit();
           }}
         >
+          {typeOptions === undefined ? null : (
+            <div className="flex flex-col gap-2">
+              <Label htmlFor={typeId} className="text-label text-foreground">
+                What it will hold
+              </Label>
+              <Select value={containerType} onValueChange={setContainerType}>
+                <SelectTrigger
+                  id={typeId}
+                  data-create-container-type="true"
+                  className="min-h-11 w-full rounded-md text-body"
+                >
+                  <SelectValue placeholder="Choose a segregation class" />
+                </SelectTrigger>
+                <SelectContent>
+                  {typeOptions.map((option) => (
+                    <SelectItem
+                      key={option.value}
+                      value={option.value}
+                      className="min-h-11"
+                    >
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="max-w-[72ch] text-caption text-muted-foreground">
+                A container holds one class, and it cannot change once the
+                container holds anything.
+              </p>
+            </div>
+          )}
+
           <div className="flex flex-col gap-2">
             <Label htmlFor={inputId} className="text-label text-foreground">
               Storage location

@@ -294,6 +294,53 @@
       scroll-behavior: auto !important;
     }
   }
+
+  /*
+   * UX_SPEC.md §2.8 — the print stylesheet. Letter by default, no app chrome,
+   * no navigation, no dark mode, black on white, hairline rules. Only the
+   * element a `DocumentViewer` marks `data-print-document` prints, and a void,
+   * supersession or draft marking prints with it because it lives inside that
+   * element — never in an on-screen overlay (§3.14).
+   */
+  @media print {
+    @page {
+      size: letter;
+      margin: 0.5in;
+    }
+
+    :root,
+    .dark {
+      --background: oklch(1 0 0);
+      --foreground: oklch(0 0 0);
+      --border: oklch(0 0 0);
+      --muted: oklch(1 0 0);
+      --muted-foreground: oklch(0 0 0);
+    }
+
+    body * {
+      visibility: hidden;
+    }
+
+    [data-print-document],
+    [data-print-document] * {
+      visibility: visible;
+    }
+
+    [data-print-document] {
+      position: absolute;
+      inset: 0 auto auto 0;
+      width: 100%;
+      max-width: none;
+      aspect-ratio: auto;
+      zoom: 1 !important;
+      border: 0;
+      padding: 0;
+    }
+
+    [data-print-hide] {
+      display: none !important;
+    }
+  }
 }
 
 /* ---------------------------------------------------------------------------

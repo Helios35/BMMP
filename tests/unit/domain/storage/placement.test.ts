@@ -19,8 +19,9 @@ import {
   requiredContainerType,
   startStorageClock,
 } from "@/domain/storage/placement";
+import { fixtureAccumulationRule } from "./fixture-rule";
 import * as fixtures from "@/data/mock/fixtures";
-import { CLOCK, JURISDICTION, RULE_VERSION } from "@/data/mock/fixtures/ids";
+import { CLOCK } from "@/data/mock/fixtures/ids";
 import type { JsonObject } from "@/types/common";
 
 /**
@@ -40,49 +41,6 @@ function clockById(id: string) {
   const found = fixtures.storageClocks.find((clock) => clock.id === id);
   if (found === undefined) throw new Error(`No fixture storage clock ${id}`);
   return found;
-}
-
-/** The fixture accumulation rule, resolved the way `resolveRules` would resolve it. */
-function fixtureAccumulationRule(): ResolvedRule {
-  const row = fixtures.ruleVersions.find(
-    (candidate) => candidate.id === RULE_VERSION.waAccumulationPeriod2026,
-  );
-  const rule = fixtures.jurisdictionRules.find(
-    (candidate) => candidate.id === row?.jurisdictionRuleId,
-  );
-  const jurisdiction = fixtures.jurisdictions.find(
-    (candidate) => candidate.id === JURISDICTION.washington,
-  );
-  if (!row || !rule || !jurisdiction) throw new Error("fixture rule missing");
-  const version: RuleVersionCandidate = {
-    ruleVersionId: row.id,
-    jurisdictionRuleId: rule.id,
-    jurisdictionId: rule.jurisdictionId,
-    ruleKey: rule.ruleKey,
-    domain: rule.domain,
-    title: rule.title,
-    versionLabel: row.versionLabel,
-    effectiveOn: row.effectiveOn,
-    expiresOn: row.expiresOn,
-    citation: row.citation,
-    citationUrl: row.citationUrl,
-    payload: row.payload,
-    payloadSchemaKey: row.payloadSchemaKey,
-    appliesToApplicationClasses: rule.appliesToApplicationClasses,
-    publishedAt: row.publishedAt,
-    isRuleActive: rule.isActive,
-  };
-  return {
-    ruleKey: rule.ruleKey,
-    version,
-    jurisdiction: {
-      id: jurisdiction.id,
-      code: jurisdiction.code,
-      name: jurisdiction.name,
-      level: jurisdiction.level,
-    },
-    level: jurisdiction.level,
-  };
 }
 
 const RULE = fixtureAccumulationRule();

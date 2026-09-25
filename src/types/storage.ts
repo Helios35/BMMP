@@ -11,13 +11,17 @@ import type {
   Timestamped,
   Uuid,
 } from "@/types/common";
+import type { AccumulationStartSource } from "@/domain/taxonomy/accumulation-start-source";
+import type { AlertSeverity } from "@/domain/taxonomy/alert-severity";
 import type { AlertType } from "@/domain/taxonomy/alert-type";
+import type { ClockStartBasis } from "@/domain/taxonomy/clock-start-basis";
 import type { ContainerStatus } from "@/domain/taxonomy/container-status";
 import type { ContainerType } from "@/domain/taxonomy/container-type";
 import type { HandlerActivityType } from "@/domain/taxonomy/handler-activity-type";
 import type { LotStatus } from "@/domain/taxonomy/lot-status";
 import type { StorageClockAlertBand } from "@/domain/taxonomy/storage-clock-alert-band";
 import type { StorageClockStatus } from "@/domain/taxonomy/storage-clock-status";
+import type { StorageClockSubjectType } from "@/domain/taxonomy/storage-clock-subject-type";
 import type { AppliedRuleVersion } from "@/domain/rules/outcome";
 
 /**
@@ -67,12 +71,11 @@ export interface Container extends TenantScoped, Timestamped, Attributed {
    */
   readonly accumulationStartedAt: IsoTimestamp | null;
   /**
-   * How the start date was established.
-   *
-   * `ERD.md` §6.1 says the values are in `TAXONOMY.md`; no system defines them —
-   * reported in this unit's build-notes.
+   * T-62. How the start date was established. **Null until the first
+   * placement**, and it changes only when the start date changes — naming the
+   * event that moved it earlier. No value exists for a reset or a re-date.
    */
-  readonly accumulationStartSource: string | null;
+  readonly accumulationStartSource: AccumulationStartSource | null;
   /** Falls back to `organization.primaryAddress`. */
   readonly siteAddress: PostalAddress | null;
   /** IANA zone, defaulted from the organization. **Clock day boundaries are evaluated here** (Rule 4.29). */
@@ -134,23 +137,16 @@ export interface Lot extends TenantScoped, Timestamped, Attributed {
  */
 export interface StorageClock extends TenantScoped, Timestamped {
   readonly id: Uuid;
-  /**
-   * Which subject this clock runs on; matches whichever id below is non-null.
-   *
-   * `ERD.md` §6.3 says the values are in `TAXONOMY.md`; no system defines them —
-   * reported in this unit's build-notes.
-   */
-  readonly subjectType: string;
+  /** T-63. Which subject this clock runs on; matches whichever id below is non-null. */
+  readonly subjectType: StorageClockSubjectType;
   readonly batteryRecordId: Uuid | null;
   readonly containerId: Uuid | null;
   readonly clockStartAt: IsoTimestamp;
   /**
-   * What started it.
-   *
-   * `ERD.md` §6.3 gives no `TAXONOMY.md` citation for this column — reported in
-   * this unit's build-notes.
+   * T-64. What set the start. A start only ever moves earlier, and the basis
+   * names the event that moved it (Rules 4.9–4.12).
    */
-  readonly clockStartBasis: string;
+  readonly clockStartBasis: ClockStartBasis;
   /** Copied from the container at start, so a later site edit cannot move a running clock. */
   readonly timeZone: TimeZone;
   /** **Copied from the resolved rule version at start. Not a constant in code.** */
@@ -220,17 +216,13 @@ export interface Alert extends TenantScoped, Timestamped {
   /** T-44. */
   readonly alertType: AlertType;
   /**
-   * **Never expresses a probability of ignition** (Rules 1.25, 10.3; T-44).
-   *
-   * T-48 governs this column and is written in `TAXONOMY.md` (D-30), but no
-   * module and no union has landed. T-48's display label for the stored value
-   * `attention` is "Needs attention", and `TAXONOMY.md` §4.5 forbids a label
-   * that contains its own stored value; bending the label and bending the rule
-   * are both P6's call. **The field stays `string` until that call is made** —
-   * reported in this unit's build-notes. An unrecognised severity renders as
-   * `neutral` and is never guessed upward.
+   * T-48. Set by the code that raises the alert, from the condition that raised
+   * it, and **frozen at insert** — a worsening condition raises a new alert.
+   * **Never expresses a probability of ignition** (Rules 1.25, 10.3; T-44). An
+   * unrecognised stored value renders as `neutral` and is never guessed upward
+   * (`TAXONOMY.md` §5.8).
    */
-  readonly severity: string;
+  readonly severity: AlertSeverity;
   /** Plain language, rendered from the alert's own data — never a stored regulatory phrase. */
   readonly title: string;
   /** States the condition and the required handling, **never a chance of anything**. */

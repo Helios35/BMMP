@@ -29,8 +29,10 @@ import {
   evaluationTrace,
   governingRuleVersionId,
 } from "@/domain/rules/outcome";
+import { CARRIED_START_PAYLOAD_KEY } from "@/domain/storage/accumulation";
 import {
   admitToContainer,
+  placementRequired,
   requiredContainerType,
   startStorageClock,
   type ClockStart,
@@ -140,19 +142,6 @@ export type ConfirmationBuild =
       readonly message: string;
       readonly outstanding: readonly OutstandingItem[];
     };
-
-// TODO(T-16) — no activity type describes a placement. The fixtures file one
-// as `repackage` ("moving material between containers or into transport
-// packaging"), which a first placement is not, and a storage_event under a
-// near-neighbour value is a wrong record in a table that is never edited.
-// Until T-16 gains a placement value the commit writes no storage_event: the
-// placement is carried by the container's accumulation start, the clock row
-// it starts or joins, and the record's own status row (T-43
-// `battery_record.status_changed`). Raised in the build-notes.
-
-/** The `storage_clock.subject_type` and `clock_start_basis` the fixtures carry — no `TAXONOMY.md` system governs either column. */
-const CLOCK_SUBJECT_CONTAINER = "container";
-const CLOCK_START_FIRST_PLACEMENT = "first_placement";
 
 /** T-59 — the only method a person's inspection on step 3 can be. */
 const VISUAL_INSPECTION = "visual_inspection";
@@ -367,8 +356,8 @@ export function buildIntakeConfirmation(
 
   // One list, computed here and in read-intake.ts with the same inputs
   // (commit-gate.ts: a drifted checklist lets a card and a server disagree).
-  // - Placement is chosen, never demanded, in B1a (build-notes b1a-02 §4);
-  //   the E-2 copy that says otherwise is raised there, not resolved here.
+  // - D-41: placement is required once a classification is decided, and is
+  //   checked below, after the classification runs.
   // - EC-16 / Rule 3.10: identification completes while classification
   //   blocks. An unresolved classification (no jurisdiction profile, no rule
   //   version in force) never refuses the commit: the record commits
@@ -542,6 +531,27 @@ export function buildIntakeConfirmation(
 
   // --- placement ---------------------------------------------------------------
 
+  // D-41 — once a classification is decided, the battery is placed when it is
+  // logged. The same predicate read-intake.ts hands the checklist, so the card
+  // and the server never disagree.
+  if (
+    draft.containerId === null &&
+    placementRequired(
+      decided.kind === "unresolved" ? null : decided.outcome.result,
+    )
+  ) {
+    const choose: OutstandingItem = {
+      kind: "choose_container",
+      label: "Choose a container",
+    };
+    return {
+      ok: false,
+      code: "VALIDATION",
+      message: commitOutstanding([choose]),
+      outstanding: [choose],
+    };
+  }
+
   let storageClock: CreateStorageClock | null = null;
   let joinStorageClockId: Uuid | null = null;
   let containerAccumulationStartedAt: IsoTimestamp | null = null;
@@ -568,7 +578,15 @@ export function buildIntakeConfirmation(
         assessmentStatus: determination.assessmentStatus,
       },
     );
-    const admission = admitToContainer(container, required);
+    // A start with no running clock is an ended cycle (Rule 4.7): it takes
+    // nothing, exactly as the picker showed and the adapter will refuse.
+    const admission = admitToContainer(
+      container,
+      required,
+      input.runningClock === null && container.accumulationStartedAt !== null
+        ? { status: "stopped" }
+        : null,
+    );
     if (!admission.ok) {
       return {
         ok: false,
@@ -609,11 +627,13 @@ export function buildIntakeConfirmation(
       } else {
         placementRuleVersionId = governingRuleVersionId(outcome);
         storageClock = {
-          subjectType: CLOCK_SUBJECT_CONTAINER,
+          // T-63: the container-marking method (Rule 4.2). T-64: the first
+          // placement started it (Rule 4.4).
+          subjectType: "container",
           batteryRecordId: null,
           containerId: container.id,
           clockStartAt: outcome.result.clockStartAt,
-          clockStartBasis: CLOCK_START_FIRST_PLACEMENT,
+          clockStartBasis: "first_placement",
           timeZone: outcome.result.timeZone,
           maxDurationDays: outcome.result.maxDurationDays,
           governingRuleVersionId: placementRuleVersionId,
@@ -792,8 +812,25 @@ export function buildIntakeConfirmation(
     classificationDecision,
     storageClock,
     joinStorageClockId,
-    // TODO(T-16) — see the placement note above.
-    storageEvent: null,
+    // T-16 `place` (D-55). Its payload records the start this battery carries
+    // from now on — its own first placement (Rule 4.9) — so a later move reads
+    // it rather than re-deriving it. The adapter sets the clock, container and
+    // record ids inside the commit.
+    storageEvent:
+      container === null
+        ? null
+        : {
+            activityType: "place",
+            storageClockId: null,
+            containerId: container.id,
+            batteryRecordId: record.id,
+            lotId: container.lotId,
+            occurredAt: at,
+            recordedAt: at,
+            recordedBy: ctx.userId,
+            payload: { [CARRIED_START_PAYLOAD_KEY]: at },
+            governingRuleVersionId: placementRuleVersionId,
+          },
     containerAccumulationStartedAt,
     auditEvents,
   };

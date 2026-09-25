@@ -1,8 +1,9 @@
 import {
   BatteryCharging,
-  BookOpen,
+  Boxes,
   Camera,
   LayoutDashboard,
+  TriangleAlert,
   type LucideIcon,
 } from "lucide-react";
 
@@ -71,18 +72,23 @@ const BATTERIES: MobileTabSlot = {
   requires: "read",
 };
 
-/**
- * Standing in for §2.2's Containers slot until `b1a-04` builds `/containers`.
- *
- * §2.2 fills slots 2 and 4 with the two lists a role works out of. With
- * Containers deferred, Catalog is the next destination §2.1 gives every role,
- * so the bar keeps four slots rather than shrinking to three.
- */
-const CATALOG: MobileTabSlot = {
-  route: "/catalog",
+const CONTAINERS: MobileTabSlot = {
+  route: "/containers",
   query: "",
-  label: "Catalog",
-  icon: BookOpen,
+  label: "Containers",
+  icon: Boxes,
+  requires: "read",
+};
+
+/**
+ * §2.2's raised centre for P2 — the containers carrying an open alert, the
+ * link the dashboard's storage-clock alert sends (Flow C2).
+ */
+const ALERTING_CONTAINERS: MobileTabSlot = {
+  route: "/containers",
+  query: "?filter=alerting",
+  label: "Alerting",
+  icon: TriangleAlert,
   requires: "read",
 };
 
@@ -100,52 +106,49 @@ const LOG_A_BATTERY: MobileTabSlot = {
   requires: "write",
 };
 
-/** Slots 1, 2 and 4 for every role in this unit. */
-const READ_DESTINATIONS: readonly MobileTabSlot[] = [HOME, BATTERIES, CATALOG];
+/** §2.2's slots 1, 2 and 4 for P1, P6, P3, P4 and P5. */
+const BATTERIES_THEN_CONTAINERS: readonly MobileTabSlot[] = [
+  HOME,
+  BATTERIES,
+  CONTAINERS,
+];
 
 /**
  * Per role, from §2.2.
  *
- * ## What is deferred, and why the centre is empty rather than substituted
- *
- * §2.2 gives the centre slot as: `/batteries/new` for P1 and P6,
- * `/containers?filter=alerting` for P2, and `/shipments` for P3, P4 and P5. Two
- * of those three routes are built by later units.
- *
- * The obvious interim — fall back to `/batteries` — puts Batteries on the bar
- * twice for P2, whose §2.2 slot 4 is already Batteries. So the deferred centres
- * are `null` instead, each naming the unit that restores it. Nothing is
- * invented and nothing is duplicated.
+ * P2 works out of her containers first, so her slot 2 is Containers and slot
+ * 4 Batteries, and her raised centre is the alerting filter. The centre for
+ * P3, P4 and P5 is `/shipments`, which `b1a-05` builds; until then it is
+ * `null` rather than substituted — a raised primary §2.2 never put there would
+ * be the strongest placement in the product.
  */
 export const MOBILE_TAB_SLOTS: Readonly<Record<RoleCode, MobileTabSlots>> = {
   compliance_handler: {
-    destinations: READ_DESTINATIONS,
+    destinations: BATTERIES_THEN_CONTAINERS,
     centre: LOG_A_BATTERY,
   },
   facility_manager: {
-    destinations: READ_DESTINATIONS,
-    // §2.2: `/containers?filter=alerting`, label "Alerting", icon TriangleAlert,
-    // requires "read". Restored by b1a-04 with `/containers`.
-    centre: null,
+    destinations: [HOME, CONTAINERS, BATTERIES],
+    centre: ALERTING_CONTAINERS,
   },
   producer_compliance_officer: {
-    destinations: READ_DESTINATIONS,
+    destinations: BATTERIES_THEN_CONTAINERS,
     // §2.2: `/shipments`, label "Shipments", icon Truck, requires "read".
     // Restored by b1a-05 with `/shipments`.
     centre: null,
   },
   mobility_supplier_technician: {
-    destinations: READ_DESTINATIONS,
+    destinations: BATTERIES_THEN_CONTAINERS,
     // §2.2: `/shipments`. Restored by b1a-05.
     centre: null,
   },
   auditor: {
-    destinations: READ_DESTINATIONS,
+    destinations: BATTERIES_THEN_CONTAINERS,
     // §2.2: `/shipments`. Restored by b1a-05.
     centre: null,
   },
   platform_admin: {
-    destinations: READ_DESTINATIONS,
+    destinations: BATTERIES_THEN_CONTAINERS,
     centre: LOG_A_BATTERY,
   },
 };
