@@ -193,10 +193,12 @@ function auditEvent(
 }
 
 /**
- * The whole, valid, **unplaced** commit: every hard-gated field confirmed by a
- * person, chemistry from a catalog match, a sound assessment that agrees with
- * its outcome, a decision, a decode and two audit events. Each test overrides
- * one thing.
+ * The whole commit, **unplaced**: every hard-gated field confirmed by a person,
+ * chemistry from a catalog match, a sound assessment that agrees with its
+ * outcome, a decision, a decode and two audit events. Each test overrides one
+ * thing. A decision without a container is refused since D-41, so a test that
+ * expects a commit to land places it with {@link placedInto}; the refusals
+ * this shape is used for are all checked before placement.
  */
 function confirmation(
   overrides: Partial<IntakeConfirmation> = {},
@@ -271,8 +273,20 @@ function placedInto(
   return confirmation({
     containerId,
     joinStorageClockId: clockId,
-    // TODO(T-16) — no activity type describes a placement; none is written.
-    storageEvent: null,
+    // T-16 `place` (D-55), as the intake builds it: the adapter fills in the
+    // clock, container and record ids.
+    storageEvent: {
+      activityType: "place",
+      storageClockId: null,
+      containerId,
+      batteryRecordId: RECORD,
+      lotId: null,
+      occurredAt: AT,
+      recordedAt: AT,
+      recordedBy: ID.USER.danaHandler,
+      payload: { carriedAccumulationStartAt: AT },
+      governingRuleVersionId: ID.RULE_VERSION.waAccumulationPeriod2026,
+    },
     ...overrides,
   });
 }
@@ -471,13 +485,12 @@ describe("a whole, valid commit (§11.1 step 6)", () => {
     expect(decodes.items[0]?.id).toBe(updated.dateCodeDecodeId);
     expect(decodes.items[0]?.intakeSessionId).toBe(SESSION);
 
-    // TODO(T-16) — no activity type describes a placement, so no storage
-    // event is written; the placement is the record's container.
+    // T-16 `place` (D-55) — one placement event, on the joined clock.
     const events = await mockAdapter.storageEvents.list(HANDLER, {
       ...PAGE,
       batteryRecordId: RECORD,
     });
-    expect(events.items).toHaveLength(0);
+    expect(events.items.map((event) => event.activityType)).toEqual(["place"]);
     const placed = await mockAdapter.batteryRecords.get(HANDLER, RECORD);
     expect(placed?.containerId).toBe(ID.CONTAINER.soundDrum);
     // Joined, not restarted: the clock is the container's running one
@@ -532,7 +545,7 @@ describe("a whole, valid commit (§11.1 step 6)", () => {
 
     await mockAdapter.intakeSessions.commitConfirmation(
       HANDLER,
-      confirmation(),
+      placedInto(ID.CONTAINER.soundDrum, ID.CLOCK.soundDrum),
     );
 
     // The same rows landed anyway, and a reader with audit rights sees them
@@ -633,18 +646,30 @@ describe("a whole, valid commit (§11.1 step 6)", () => {
     expect(after?.currentNetMassKg).toBe(MASS_KG);
   });
 
-  it("leaves an unplaced commit `classified` when a decision is present", async () => {
-    const updated = await mockAdapter.intakeSessions.commitConfirmation(
+  it("refuses a classified battery with no container, and writes nothing (D-41)", async () => {
+    // The one placement path holds the rule, not only the form.
+    await expectRefusedAndUntouched(confirmation(), ValidationError);
+    await expect(
+      mockAdapter.intakeSessions.commitConfirmation(HANDLER, confirmation()),
+    ).rejects.toThrow(/Choose a container/);
+  });
+
+  it("writes the `place` event with the start the battery carries (T-16, Rule 4.9)", async () => {
+    await mockAdapter.intakeSessions.commitConfirmation(
       HANDLER,
-      confirmation(),
+      placedInto(ID.CONTAINER.soundDrum, ID.CLOCK.soundDrum),
     );
-    expect(updated.status).toBe("classified");
-    expect(updated.containerId).toBeNull();
     const events = await mockAdapter.storageEvents.list(HANDLER, {
       ...PAGE,
       batteryRecordId: RECORD,
     });
-    expect(events.items).toHaveLength(0);
+    expect(events.items).toHaveLength(1);
+    expect(events.items[0]).toMatchObject({
+      activityType: "place",
+      containerId: ID.CONTAINER.soundDrum,
+      storageClockId: ID.CLOCK.soundDrum,
+      payload: { carriedAccumulationStartAt: AT },
+    });
   });
 
   it("leaves an unplaced commit `confirmed` when classification could not run (Rule 3.10, E-13)", async () => {

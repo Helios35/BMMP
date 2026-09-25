@@ -34,6 +34,7 @@ import type {
   AlertQuery,
   AlertRepository,
   ContainerQuery,
+  ContainerRepository,
   CreateAlert,
   CreateContainer,
   CreateLot,
@@ -148,7 +149,10 @@ import type {
 } from "@/domain/rules/resolve";
 import { resolveRules } from "@/domain/rules/resolve";
 import { validateIntakeGateConfiguration } from "@/domain/intake/thresholds";
-import { requiredContainerType } from "@/domain/storage/placement";
+import {
+  placementRequired,
+  requiredContainerType,
+} from "@/domain/storage/placement";
 import { intakeLandingStatus } from "@/domain/intake/landing-status";
 import type { BatteryRecordStatus } from "@/domain/taxonomy/battery-record-status";
 import {
@@ -178,6 +182,12 @@ import { byNewest, eq, matchesSearch } from "./table";
 import { formatRecordNumber, nextId, nextSequenceNumber } from "./ids";
 import { applyMockRuntimeFromEnv } from "./runtime-from-env";
 import { mockIdentity } from "./identity";
+import { buildAuditEvent } from "./audit-row";
+import {
+  changeStatus,
+  moveContents,
+  recordStorageEvent,
+} from "./storage-writes";
 
 export { resetMockStore, mockStore } from "./store";
 export { MOCK_DEV_PASSWORD } from "./identity";
@@ -1173,6 +1183,25 @@ const intakeSessions: IntakeRepository = {
       });
     }
 
+    // D-41 — a record with a classification decision needs a container to
+    // commit. An unresolved one (no decision, or one that could only say
+    // `undetermined`) still commits unplaced, and its record says so. This is
+    // the one placement path, so the rule is held here, not only in the form.
+    if (
+      input.containerId === null &&
+      placementRequired(
+        input.classificationDecision?.wasteClassification ?? null,
+      )
+    ) {
+      throw new ValidationError({
+        userMessage:
+          "Choose a container. A battery whose classification is decided is placed when it is logged — the storage clock starts when it goes into one.",
+        correlationId: ctx.correlationId,
+        field: "containerId",
+        context: { decision: "D-41" },
+      });
+    }
+
     // Placement admission — the container's own two dimensions must match the
     // record's (Rule 4.28), and an overdue container accepts no new items
     // (Rule 4.16). Checked before anything is written.
@@ -1226,6 +1255,32 @@ const intakeSessions: IntakeRepository = {
             containerType: container.containerType,
             required,
           },
+        });
+      }
+      // Rule 4.7 — a container that reached empty ended its cycle; a second
+      // clock on the same row would carry a later start (ERD.md §6.1). And a
+      // running clock is joined, never duplicated.
+      const clocks = store()
+        .storageClocks.all()
+        .filter(
+          (clock) =>
+            clock.organizationId === ctx.organizationId &&
+            clock.containerId === container?.id,
+        );
+      const running = clocks.find((clock) => clock.stoppedAt === null);
+      if (running === undefined && clocks.length > 0) {
+        throw new ValidationError({
+          userMessage: `Container ${container.containerCode} was emptied and its accumulation cycle has ended. Use a new container.`,
+          correlationId: ctx.correlationId,
+          field: "containerId",
+          context: { rule: "4.7", containerId: container.id },
+        });
+      }
+      if (running !== undefined && input.joinStorageClockId !== running.id) {
+        throw new ConflictError({
+          userMessage: `Container ${container.containerCode} already has a running storage clock, and this battery joins it. Nothing was changed — try again.`,
+          correlationId: ctx.correlationId,
+          context: { rule: "4.4", storageClockId: running.id },
         });
       }
       if (input.joinStorageClockId !== null) {
@@ -1486,7 +1541,7 @@ const dateCodeDecodes = tenantAppendOnlyRepository<
 // Storage
 // ---------------------------------------------------------------------------
 
-const containers = tenantRepository<
+const containersBase = tenantRepository<
   Container,
   CreateContainer,
   UpdateContainer,
@@ -1548,6 +1603,18 @@ const containers = tenantRepository<
     } satisfies Container;
   },
 });
+
+/**
+ * The container repository, plus the three writes wider than CRUD — a move, a
+ * recorded storage event and a status change — each one operation, all or
+ * nothing (`./storage-writes.ts`).
+ */
+const containers: ContainerRepository = {
+  ...containersBase,
+  moveContents,
+  recordStorageEvent,
+  changeStatus,
+};
 
 const lots = tenantRepository<Lot, CreateLot, UpdateLot, LotQuery>(
   store().lots,
@@ -2199,22 +2266,6 @@ const AUDIT_EVENT_SORT_KEYS = {
 
 const byNewestAuditEvent = (a: TenantAuditEvent, b: TenantAuditEvent): number =>
   byNewest(a.occurredAt, b.occurredAt);
-
-/**
- * The row, built once, so the policy-checked door and the `security definer`
- * door cannot allocate a sequence number or a tenant differently.
- */
-const buildAuditEvent = (
-  ctx: RequestContext,
-  input: CreateAuditEvent,
-  id: Uuid,
-): TenantAuditEvent => ({
-  ...input,
-  id,
-  sequenceNo: store().auditEvents.all().length + 1,
-  organizationId: ctx.organizationId,
-  createdAt: now(),
-});
 
 const auditEventsBase = tenantAppendOnlyRepository<
   TenantAuditEvent,

@@ -19,6 +19,7 @@ import {
 import { resolveIntakeStep } from "@/domain/intake/steps";
 import {
   admitToContainer,
+  placementRequired,
   requiredContainerType,
   startStorageClock,
   type ClockStart,
@@ -484,7 +485,11 @@ export async function readIntakeStepView(
   const choices: ContainerChoiceView[] = containers.map((container) => ({
     container,
     clock: clockByContainer.get(container.id) ?? null,
-    admission: admitToContainer(container, requiredType),
+    admission: admitToContainer(
+      container,
+      requiredType,
+      endedCycle(container, clockByContainer.has(container.id)),
+    ),
   }));
   const chosen =
     choices.find((choice) => choice.container.id === draft.containerId) ?? null;
@@ -546,10 +551,14 @@ export async function readIntakeStepView(
       // both of them confirm condition (Rule 6.2).
       ownsCondition: true,
       containerChosen: draft.containerId !== null,
-      // The same inputs confirmation.ts hands the same function, so the card
-      // and the server never disagree (commit-gate.ts). Placement is chosen,
-      // never demanded, in B1a (build-notes b1a-02 §4).
-      requiresContainer: false,
+      // D-41 — the same predicate confirmation.ts applies, so the card and the
+      // server never disagree (commit-gate.ts): a decided classification needs
+      // a container; an unresolved one commits unplaced and says so.
+      requiresContainer: placementRequired(
+        classificationPreview.kind === "decided"
+          ? classificationPreview.outcome.result
+          : null,
+      ),
       isOffline: false,
       // D-42 — the same input the builder is given, from the same photos.
       hasStoredPhoto: photos.length > 0,
@@ -564,6 +573,21 @@ export async function readIntakeStepView(
       fullName: viewer?.fullName ?? viewer?.email ?? null,
     },
   };
+}
+
+/**
+ * A container whose cycle has ended, as the picker can tell without reading
+ * stopped clocks: a start date is only ever set by a placement, which starts a
+ * clock, and a clock only stops when the container reaches empty (Rule 4.7).
+ * So a start with no running clock is an ended cycle — and it takes nothing.
+ */
+function endedCycle(
+  container: { readonly accumulationStartedAt: string | null },
+  hasRunningClock: boolean,
+): { readonly status: "stopped" } | null {
+  return container.accumulationStartedAt !== null && !hasRunningClock
+    ? { status: "stopped" }
+    : null;
 }
 
 // --- the resume banner --------------------------------------------------------------------

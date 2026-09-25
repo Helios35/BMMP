@@ -122,7 +122,12 @@ export const supabaseAdapter: DataAdapter = {
   labelExtractions: unimplemented("labelExtractions", APPEND_ONLY),
   dateCodeDecodes: unimplemented("dateCodeDecodes", APPEND_ONLY),
 
-  containers: unimplemented("containers", CRUD),
+  containers: unimplemented("containers", [
+    ...CRUD,
+    "moveContents",
+    "recordStorageEvent",
+    "changeStatus",
+  ]),
   lots: unimplemented("lots", CRUD),
   storageClocks: unimplemented("storageClocks", CRUD),
   storageEvents: unimplemented("storageEvents", APPEND_ONLY),
