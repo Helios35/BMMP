@@ -1,6 +1,6 @@
 /**
  * The classification systems in the product — `docs/TAXONOMY.md`, T-01 through
- * T-61. T-48 is the one that is not here, and the comment beside it says why.
+ * T-64.
  *
  * One module per system, each exporting the value list constant, the union type
  * derived from it, and the label lookup (TAXONOMY.md §5.3). Shared read helpers
@@ -108,11 +108,8 @@ export * from "./classification-decision-status";
 export * from "./damage-assessment-status";
 // T-47 · Terms of Service acceptance status
 export * from "./tos-acceptance-status";
-// T-48 · Alert severity — **no module.** Its label for `attention` is "Needs
-// attention", and §4.5 forbids a label that contains its own stored value.
-// Bending the label and bending the rule are both P6's call — reported in this
-// unit's build-notes rather than settled here.
-//
+// T-48 · Alert severity
+export * from "./alert-severity";
 // T-49 · Assessed condition
 export * from "./assessed-condition";
 // T-50 · Intake photo type
@@ -139,3 +136,9 @@ export * from "./damage-assessment-method";
 export * from "./audit-actor-type";
 // T-61 · Catalog entry source type
 export * from "./catalog-entry-source-type";
+// T-62 · Accumulation start source
+export * from "./accumulation-start-source";
+// T-63 · Storage clock subject type
+export * from "./storage-clock-subject-type";
+// T-64 · Clock start basis
+export * from "./clock-start-basis";

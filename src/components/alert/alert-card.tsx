@@ -5,8 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { isPinnedAlert } from "@/domain/alerts/urgency";
 import {
-  ALERT_SEVERITY_INTENTS,
+  alertSeverityIntent,
   type StatusIntent,
 } from "@/components/status/status-intent";
 import { INTENT_ICON } from "@/components/status/intent-icons";
@@ -14,10 +15,7 @@ import {
   INTENT_BORDER_CLASSES,
   INTENT_TEXT_CLASSES,
 } from "@/components/status/intent-classes";
-import {
-  ALERT_TYPE_LABELS,
-  type AlertType,
-} from "@/domain/taxonomy/alert-type";
+import { ALERT_TYPE_LABELS } from "@/domain/taxonomy/alert-type";
 import type { Alert } from "@/types/storage";
 import { LeadingIcon } from "@/components/page/leading-icon";
 
@@ -39,9 +37,6 @@ import { LeadingIcon } from "@/components/page/leading-icon";
  * the condition and the required handling, never a chance of anything
  * (Rules 1.25, 10.3).
  */
-
-/** Alert types that pin to the top and cannot be dismissed by anyone. */
-const PINNED_ALERT_TYPES: readonly AlertType[] = ["storage_clock"];
 
 export interface AlertCardAction {
   readonly label: string;
@@ -75,11 +70,11 @@ export function AlertCard({
   deniedNote,
   className,
 }: AlertCardProps) {
-  const intent: StatusIntent =
-    ALERT_SEVERITY_INTENTS[alert.severity] ?? "neutral";
+  const intent: StatusIntent = alertSeverityIntent(alert.severity);
   const Icon = INTENT_ICON[intent];
-  const isPinned =
-    PINNED_ALERT_TYPES.includes(alert.alertType) && alert.resolvedAt === null;
+  // An open overdue storage clock — T-48's one pinned case, read from the
+  // same module the bell and the dashboard order by.
+  const isPinned = isPinnedAlert(alert);
 
   return (
     <Card

@@ -1,5 +1,5 @@
 # Taxonomy — BMMP
-**Version:** 1.3 · **Date:** 2026-09-25 · **Owner:** Nathan Ivy / Next Sketch LLC
+**Version:** 1.4 · **Date:** 2026-09-25 · **Owner:** Nathan Ivy / Next Sketch LLC
 **Answers:** How is everything in this product classified?
 **Reads from:** `_ANCHORS.md` · `PRD.md` · `BUSINESS_RULES.md` · `PROJECT_SETUP_BMMP.md`  ·  **Feeds:** `TECHNICAL_SPEC.md` · `ERD.md` · `UX_SPEC.md` · `SITE_ARCHITECTURE.md` · every builder brief
 
@@ -9,6 +9,12 @@
 ---
 
 ## Changelog
+
+**v1.4 · 2026-09-25 — the storage clock's provenance (`Decision Log.md` D-55)**
+
+- **Three systems added: T-62 `container.accumulation_start_source`, T-63 `storage_clock.subject_type`, T-64 `storage_clock.clock_start_basis`.** `ERD.md` §6.1 and §6.3 gave all three columns "values in `TAXONOMY.md`" and no system governed them. Authored by the owner in `TAXONOMY_T-62-to-T-64_storage-clock-systems_2026-09-25.md`, transcribed by `b1a-04-containers`. Every value maps to a rule in `BUSINESS_RULES.md` §4, and **no value exists for resetting, pausing, extending or hand-editing a start date**, because Rules 4.6 and 4.9 make those impossible. The fixture values already in the repository — `first_placement`, `inherited_on_receipt`, `container` — are kept.
+- **T-16 gains `place` and `remediate`.** A placement had no activity type (unit 02 could only file it under `repackage`), and Rule 4.17's remediation was an audited event with nowhere to record it.
+- The index moves from 61 systems to 64.
 
 **v1.3 · 2026-09-25 — the review queue and the catalog proposal lifecycle (`Decision Log.md` D-45, D-48, D-53)**
 
@@ -49,7 +55,7 @@ BMMP follows a battery through the end of its life: identify it → assess its c
 - **Never invent a value.** If a value you need is not here, it does not exist yet. Stop and raise it — additions go through P6 and get appended to the relevant system, not improvised in a branch.
 - **Never invent a mapping.** §5 (Label-to-Database Mapping) is binding. A display label is never derived from a stored value at runtime by string manipulation, and a stored value is never derived from a label.
 - **Never rename a stored value.** Renaming is a deprecation plus an addition, logged in §6. See §5.4.
-- Each system carries a stable ID (`T-01` … `T-61`). Cite systems by ID. **IDs never move and are never reused.**
+- Each system carries a stable ID (`T-01` … `T-64`). Cite systems by ID. **IDs never move and are never reused.**
 
 ### 1.2 What is taxonomy and what is data — the load-bearing distinction
 
@@ -194,6 +200,10 @@ Two citations in this document are deliberately **not** numbered, because what t
 | T-59 | Damage assessment method | `damage_assessment.assessment_method` | single | B1a |
 | T-60 | Audit actor type | `audit_event.actor_type` | single | B1a |
 | T-61 | Catalog entry source type | `catalog_entry.source_type` | single | B1a |
+| **J. Containers and the storage clock — added at v1.4** ||||
+| T-62 | Accumulation start source | `container.accumulation_start_source` | single, nullable | B1a |
+| T-63 | Storage clock subject type | `storage_clock.subject_type` | single | B1a |
+| T-64 | Clock start basis | `storage_clock.clock_start_basis` | single | B1a |
 
 ---
 
@@ -598,12 +608,18 @@ Two citations in this document are deliberately **not** numbered, because what t
 | `inspect` | Inspect | Visual or thermal inspection, recorded to the inspection log. |
 | `shred` | Shred | Size reduction by shredding. |
 | `self_recycle` | Recycle on site | Recycling the organisation's own accumulated material on site. |
+| `place` | Place | Putting a battery into a container — at intake or on a move. The first `place` into an empty container sets its start date (Rule 4.4). |
+| `remediate` | Record remediation | A P2-entered record of what was done with an overdue container's contents, and why (Rule 4.17). Does not change the start date. |
 
 **Rules**
 
 - **Single-select per storage event.** An activity session that involves two activities writes two events.
 - **The vocabulary is taxonomy; which activities are permitted is `jurisdiction_rule` data.** `shred` and `self_recycle` are prohibited to handlers in the common case — but the permitted set is a data lookup, never a hard-coded deny-list in TypeScript. Governed by **Rules 3.21 and 1.23**. `self_recycle` is further constrained by **Rule 3.23**: a shipment's destination must be a distinct receiving party, and a same-corporate-group destination is flagged for the handler to confirm the receiving party's own permitted status (**EC-22**).
 - **The UI must make a prohibited activity unreachable, not merely warned about.** **Rule 3.21** is explicit: there is no screen, action, status or field through which a handler can record having performed one, and the system does not warn about them — it does not offer them. An agent that ships an "are you sure?" prompt here has implemented the wrong thing. Enforcement is at the data layer too: an import or API call attempting one is blocked, cited from the governing rule version, and audited (**Rules 3.22; EC-21**).
+- **`place` and `remediate` were added at v1.4** (D-55):
+  - `remediate` is **P2 or P6** (`SITE_ARCHITECTURE.md` §5.5) and requires a free-text statement of what was done and why.
+  - Moving between containers, consolidating and splitting stay `repackage`, followed by `place` for each receiving container.
+  - Neither value is a prohibited activity under Rule 3.21.
 - **Assigned by P1 or P2**, recorded against the container or lot acted on. Every event writes an `audit_event` (**Rule 12.1**).
 - **Not terminal.** Events are append-only; an event recorded in error is reversed by a correcting event, never deleted.
 
@@ -1798,6 +1814,66 @@ Severity is set by the code that raises the alert, from the condition that raise
 - **`handler_proposed` is not a lesser entry once approved** — approval is P6 reviewing the proposal against the linked intake photo and label crop. The value records provenance, not quality.
 - **Approving an entry never silently re-matches a committed record.** Every record committed unmatched against the same identifying fields is **raised on `/review` for a person to confirm** (Flow F, step 4).
 - **Source type never substitutes for confirmation.** However authoritative the entry, chemistry, model and condition still require human confirmation (**Rule 2.15**).
+
+---
+
+### T-62 · Accumulation start source
+
+**Stored on:** `container.accumulation_start_source` · **Cardinality:** single-select, nullable · **Phase:** B1a
+
+**Purpose:** Records how a container's accumulation start date was set, so an auditor can see why the date on the label is the date it is.
+
+| Stored value | Display label | Definition | Rule |
+|---|---|---|---|
+| `first_placement` | First battery placed | The container was empty and a battery was placed in it. The start date is that placement. | 4.4 |
+| `inherited_on_receipt` | Earlier date received | A battery with an earlier start date was moved in. The container took that earlier date. | 4.9, 4.10 |
+| `inherited_on_consolidation` | Earliest date on consolidation | Containers were combined. The result took the earliest start date among all contents. | 4.11 |
+| `inherited_on_split` | Earliest date on split | A container was split. Each result took the earliest start date among its own contents. | 4.12 |
+
+**Rules**
+
+- **Null means the container has never held a battery.** It is set by the first placement, never at creation.
+- **A value changes only when the start date changes**, and the new value names the event that changed it.
+- **No value exists for resetting, extending or hand-editing a start date.** Rules 4.6 and 4.9 make those impossible, so there is nothing to record.
+
+---
+
+### T-63 · Storage clock subject type
+
+**Stored on:** `storage_clock.subject_type` · **Cardinality:** single-select · **Phase:** B1a
+
+**Purpose:** States what a clock is running on. Rule 4.2 allows two demonstration methods.
+
+| Stored value | Display label | Definition | Rule |
+|---|---|---|---|
+| `container` | Container | The clock runs on the container (container-marking method). `container_id` is set. | 4.2 |
+| `battery_record` | Individual battery | The clock runs on one battery (inventory method). `battery_record_id` is set. | 4.2 |
+
+**Rules**
+
+- **Must match the non-null foreign key.** `container` ↔ `container_id`; `battery_record` ↔ `battery_record_id`. Anything else is a defect, not a state.
+- **Changing a site's method (Rule 4.3) does not restart or re-type a running clock.**
+
+---
+
+### T-64 · Clock start basis
+
+**Stored on:** `storage_clock.clock_start_basis` · **Cardinality:** single-select · **Phase:** B1a
+
+**Purpose:** Records the event that set the clock's start. Same events as T-62, stored separately because a battery-level clock has no container history of its own.
+
+| Stored value | Display label | Definition | Valid for subject |
+|---|---|---|---|
+| `first_placement` | First battery placed | The first placement started the clock. | `container`, `battery_record` |
+| `inherited_on_receipt` | Earlier date received | Receipt of an earlier-dated battery moved the start earlier. | `container` |
+| `inherited_on_consolidation` | Earliest date on consolidation | Consolidation set the earliest start. | `container` |
+| `inherited_on_split` | Earliest date on split | A split set the earliest start among the result's contents. | `container` |
+
+**Rules**
+
+- **A battery's start date travels with it** (Rule 4.9). A `battery_record` clock is only ever `first_placement`; moving the battery never starts a new one.
+- **The clock never pauses** (Rule 4.6). No value exists for pause, hold, extension or restart.
+- A start moved earlier re-computes `due_at` and may make the subject overdue immediately (Rule 4.10).
 
 ---
 

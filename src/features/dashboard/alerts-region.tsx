@@ -37,11 +37,10 @@ import { DashboardRegion, describeRegionFailure } from "./dashboard-regions";
  * permission: it is what makes Rule 4.14 true without this screen re-deriving
  * who should see what.
  *
- * **The order comes from `sortAlertsForBell` and is not rewritten here.** Pinned
- * first, then newest — one ordering, read by the bell and by this region, so the
- * two can never disagree about what is at the top. §3.4's fuller ordering needs
- * a T-48 severity rank, T-48 has no module, and a rank constant written here
- * would be the second T-48 lookup `TAXONOMY.md` §5.7 rejects.
+ * **The order comes from `sortAlertsForBell` and is not rewritten here** —
+ * T-48's ordering: pinned, then `critical`, `attention`, `informational`, then
+ * newest. One ordering, read by the bell and by this region, so the two can
+ * never disagree about what is at the top.
  *
  * **An overdue storage clock pins above everything and is dismissible by no
  * role, including P6** (E-6, Rules 4.15, 4.16). `AlertCard` renders the pin and

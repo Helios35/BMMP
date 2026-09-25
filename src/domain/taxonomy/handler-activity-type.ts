@@ -11,6 +11,12 @@
  * with — there is no screen, action, status or field through which it can be
  * recorded (Rules 3.21, 3.22).
  *
+ * `place` and `remediate` arrived at `TAXONOMY.md` v1.4 (D-55). **Neither is a
+ * prohibited activity under Rule 3.21.** A move between containers, a
+ * consolidation and a split stay `repackage`, followed by `place` for the
+ * receiving container; `remediate` is P2 or P6 and carries a stated reason
+ * (Rule 4.17).
+ *
  * Definitions for every value are in `docs/TAXONOMY.md` T-16, which is the
  * single source of truth. This module owns the stored value, the value order —
  * which is the display order (TAXONOMY.md §5.7) — and the display label, and
@@ -30,6 +36,8 @@ export const HANDLER_ACTIVITY_TYPES = [
   "inspect",
   "shred",
   "self_recycle",
+  "place",
+  "remediate",
 ] as const;
 
 export type HandlerActivityType = (typeof HANDLER_ACTIVITY_TYPES)[number];
@@ -55,4 +63,6 @@ export const HANDLER_ACTIVITY_TYPE_LABELS: Readonly<
   inspect: "Inspect",
   shred: "Shred",
   self_recycle: "Recycle on site",
+  place: "Place",
+  remediate: "Record remediation",
 };

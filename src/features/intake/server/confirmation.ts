@@ -150,10 +150,6 @@ export type ConfirmationBuild =
 // it starts or joins, and the record's own status row (T-43
 // `battery_record.status_changed`). Raised in the build-notes.
 
-/** The `storage_clock.subject_type` and `clock_start_basis` the fixtures carry — no `TAXONOMY.md` system governs either column. */
-const CLOCK_SUBJECT_CONTAINER = "container";
-const CLOCK_START_FIRST_PLACEMENT = "first_placement";
-
 /** T-59 — the only method a person's inspection on step 3 can be. */
 const VISUAL_INSPECTION = "visual_inspection";
 
@@ -609,11 +605,13 @@ export function buildIntakeConfirmation(
       } else {
         placementRuleVersionId = governingRuleVersionId(outcome);
         storageClock = {
-          subjectType: CLOCK_SUBJECT_CONTAINER,
+          // T-63: the container-marking method (Rule 4.2). T-64: the first
+          // placement started it (Rule 4.4).
+          subjectType: "container",
           batteryRecordId: null,
           containerId: container.id,
           clockStartAt: outcome.result.clockStartAt,
-          clockStartBasis: CLOCK_START_FIRST_PLACEMENT,
+          clockStartBasis: "first_placement",
           timeZone: outcome.result.timeZone,
           maxDurationDays: outcome.result.maxDurationDays,
           governingRuleVersionId: placementRuleVersionId,

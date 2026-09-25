@@ -4,7 +4,7 @@ import { data } from "@/data";
 import type { RequestContext } from "@/data/contracts";
 import type { Alert } from "@/types/storage";
 import {
-  ALERT_SEVERITY_INTENTS,
+  alertSeverityIntent,
   type StatusIntent,
 } from "@/components/status/status-intent";
 import {
@@ -118,11 +118,9 @@ async function readAlertsForBell(
     });
 
     const items = sortAlertsForBell(page.items).map((alert) => {
-      // T-48 has no module and `alert.severity` is `string`. An unrecognised
-      // severity resolves to `neutral` and is never guessed upward into
-      // `critical` (`TAXONOMY.md` §5.8).
-      const intent: StatusIntent =
-        ALERT_SEVERITY_INTENTS[alert.severity] ?? "neutral";
+      // T-48. An unrecognised severity resolves to `neutral` and is never
+      // guessed upward into `critical` (`TAXONOMY.md` §5.8).
+      const intent: StatusIntent = alertSeverityIntent(alert.severity);
 
       return {
         id: alert.id,

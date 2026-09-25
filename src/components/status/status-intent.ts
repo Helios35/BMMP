@@ -24,6 +24,11 @@ import {
   TRANSPORT_MODE_LABELS,
   WASTE_CLASSIFICATION_LABELS,
 } from "@/domain/taxonomy";
+import {
+  ALERT_SEVERITIES,
+  type AlertSeverity,
+} from "@/domain/taxonomy/alert-severity";
+import { isTaxonomyValue } from "@/domain/taxonomy/lookup";
 
 /**
  * The five status intents, and the single map from a stored status value to one
@@ -309,14 +314,8 @@ export const STATUS_INTENTS: Readonly<Record<StatusSystem, IntentMap>> = {
 /**
  * The intents for `alert.severity` — T-48, three values, three intents (D-30).
  *
- * T-48 has no module in `src/domain/taxonomy` and `alert.severity` is still
- * typed `string`; both are reported in this unit's build-notes. The keys below
- * are T-48's stored values and are the only three the system defines.
- *
- * **An unrecognised severity resolves to `neutral` and is surfaced rather than
- * guessed**, exactly as an unrecognised status is. It is never guessed upward
- * into `critical`: inventing an urgency in a compliance product is worse than
- * showing none.
+ * Keyed on T-48's own union, so a fourth severity is a type error here rather
+ * than a colour someone guessed.
  *
  * `ok` and `pending` are deliberately unmapped — an alert is never a success
  * state, and an alert waiting on something is `attention` with a body that says
@@ -324,11 +323,27 @@ export const STATUS_INTENTS: Readonly<Record<StatusSystem, IntentMap>> = {
  *
  * A severity never expresses a probability of ignition (Rules 1.25, 10.3).
  */
-export const ALERT_SEVERITY_INTENTS: IntentMap = {
+export const ALERT_SEVERITY_INTENTS: Readonly<
+  Record<AlertSeverity, StatusIntent>
+> = {
   critical: "critical",
   attention: "attention",
   informational: "neutral",
 };
+
+/**
+ * The intent for a stored severity — read through T-48, never indexed blind.
+ *
+ * **An unrecognised severity resolves to `neutral` and is surfaced rather than
+ * guessed**, exactly as an unrecognised status is (`TAXONOMY.md` §5.8). It is
+ * never guessed upward into `critical`: inventing an urgency in a compliance
+ * product is worse than showing none.
+ */
+export function alertSeverityIntent(severity: string): StatusIntent {
+  return isTaxonomyValue(ALERT_SEVERITIES, severity)
+    ? ALERT_SEVERITY_INTENTS[severity]
+    : "neutral";
+}
 
 /**
  * The intent for one stored value, or `null` when the value is not one this
