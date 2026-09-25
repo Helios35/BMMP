@@ -98,9 +98,21 @@ test.describe("the branches off Flow A", () => {
       0,
     );
 
-    // Save and leave. The record is already `pending_review` from the gate;
-    // the save keeps it there and the record page says so.
+    // Save and leave — onto the queue, with this item open where it now waits
+    // (Flow A-a(2)). The record is already `pending_review` from the gate; the
+    // save keeps it there and the record page says so.
     await banner.locator("[data-save-to-queue]").click();
+    await page.waitForURL(
+      (url) =>
+        url.pathname === "/review" &&
+        url.searchParams.get("item") === sessionId,
+    );
+    await expect(
+      page.locator(
+        `[data-queue-item-pane="intake"][data-session-id="${sessionId}"]`,
+      ),
+    ).toBeVisible();
+    await page.locator("[data-queue-item-nav] [data-open-record]").click();
     await page.waitForURL(
       (url) =>
         /^\/batteries\/[^/]+$/.test(url.pathname) &&
