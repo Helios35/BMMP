@@ -223,6 +223,7 @@ function input(overrides: Partial<ConfirmationInput> = {}): ConfirmationInput {
     organization,
     dateCodeExtractionId: null,
     damagePhotoId: null,
+    hasStoredPhoto: true,
     today: TODAY,
     at: AT,
     attribution: NO_ATTRIBUTION,

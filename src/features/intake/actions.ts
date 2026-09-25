@@ -1,7 +1,5 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
-import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import type { z } from "zod";
 
@@ -37,21 +35,12 @@ import {
   resolveIntakeStep,
   stepIndex,
 } from "@/domain/intake/steps";
-import { civilDateInZone } from "@/domain/storage/clock-display";
 import { requiredContainerType } from "@/domain/storage/placement";
 import { CHEMISTRIES, type Chemistry } from "@/domain/taxonomy/chemistry";
 import type { IntakeStep } from "@/domain/taxonomy/intake-step";
 import { isTaxonomyValue } from "@/domain/taxonomy/lookup";
 import type { ReviewReasonCode } from "@/domain/taxonomy/review-reason-code";
-import { requireIntakeGate } from "@/features/consent/read-intake-gate";
-import {
-  actionFailed,
-  actionFailedFrom,
-  actionSucceeded,
-  type ActionResult,
-} from "@/lib/action-result";
-import { requireWrite } from "@/lib/auth/guard";
-import { recordNotFound } from "@/lib/auth/record-denial";
+import type { ActionResult } from "@/lib/action-result";
 import {
   ConflictError,
   DataIntegrityError,
@@ -87,7 +76,6 @@ import {
   enterChemistrySchema,
   enterFieldValueSchema,
   enterManufacturedOnSchema,
-  firstIssue,
   proposeCatalogEntrySchema,
   rejectFieldSchema,
   runLabelExtractionSchema,
@@ -100,16 +88,12 @@ import {
   startIntakeSessionSchema,
   voidIntakeSessionSchema,
 } from "./schemas";
-import {
-  sessionThread,
-  userEvent,
-  type RequestAttribution,
-} from "./server/audit";
+import { userEvent, type RequestAttribution } from "./server/audit";
 import {
   previewClassification,
   resolveIntakeRules,
 } from "./server/classification-preview";
-import { buildIntakeConfirmation } from "./server/confirmation";
+import { commitIntake, voidIntake } from "./server/commit";
 import {
   readGateConfiguration,
   runIntakePipeline,
@@ -118,9 +102,9 @@ import {
 import {
   determinationFor,
   draftForSession,
-  latestRunRows,
   loadOpenIntake,
 } from "./server/read-intake";
+import { sessionAction } from "./server/session-action";
 
 /**
  * The intake Server Actions — `TECHNICAL_SPEC.md` §7.1; `UX_SPEC.md` §2.1,
@@ -152,43 +136,16 @@ function now(): IsoTimestamp {
   return new Date().toISOString();
 }
 
-/** The caller's request, as the audit row records it. Read once per action. */
-async function requestAttribution(): Promise<RequestAttribution> {
-  const headerList = await headers();
-  const forwarded = headerList.get("x-forwarded-for");
-  const firstAddress = forwarded?.split(",")[0]?.trim();
-  return {
-    requestId: headerList.get("x-request-id"),
-    ipAddress:
-      firstAddress === undefined || firstAddress === "" ? null : firstAddress,
-    userAgent: headerList.get("user-agent"),
-  };
-}
-
 function actor(ctx: RequestContext, at: IsoTimestamp): DraftActor {
   return { userId: ctx.userId, at };
 }
 
 /**
- * Steps 1–3 and 5 of every action, once.
- *
- * `run` is step 4. A thrown `AppError` becomes the returned failure with its
- * code, field and correlation id intact; a `NotFoundError` on the session is
- * also recorded as a denial, because an identifier that resolves to nothing
- * is an attempt (§5.3(5), E-15) — and it reads the same whether the row is
- * absent or another tenant's (Rule 1.2).
- *
- * **One intake, one thread.** Once the parsed input names a session that
- * resolves in this tenant, the handler runs — and every failure envelope
- * and denial row after that point is built — as the session's thread
- * (`sessionThread`), so `/audit` reads the start, each photo, the read, the
- * confirmations, the commit and any refusal under `intake_session.
- * correlation_id`. A session that does not resolve keeps the request's own
- * id, and so does the `NotFound` denial it records: there was no session to
- * thread it on. `startIntakeSession` is the one action with no session yet;
- * it stores the request's id on the session it opens.
+ * Steps 1–3 and 5 of every action on this route — `./server/session-action.ts`,
+ * guarded on `/batteries/new`. `startIntakeSession` is the one action with no
+ * session yet; it stores the request's id on the session it opens.
  */
-async function intakeAction<TInput, TData>(
+function intakeAction<TInput, TData>(
   attempted: string,
   schema: z.ZodType<TInput>,
   input: unknown,
@@ -198,44 +155,7 @@ async function intakeAction<TInput, TData>(
     attribution: RequestAttribution,
   ) => Promise<TData>,
 ): Promise<ActionResult<TData>> {
-  const guard = await requireWrite(INTAKE_ROUTE, attempted);
-  if (!guard.ok) return guard;
-  const { ctx } = guard;
-
-  const blocked = await requireIntakeGate(ctx);
-  if (blocked !== null) return blocked;
-
-  const parsed = schema.safeParse(input);
-  if (!parsed.success) {
-    const issue = firstIssue(parsed.error);
-    return actionFailed<TData>({
-      code: "VALIDATION",
-      message: issue.message,
-      ...(issue.field === undefined ? {} : { field: issue.field }),
-      correlationId: ctx.correlationId,
-    });
-  }
-
-  // The request's own context until the session is known; the session's
-  // thread from then on. Declared outside the `try` so the `catch` answers
-  // with whichever id the failure happened under.
-  let bound: RequestContext = ctx;
-  const sessionId = (parsed.data as { sessionId?: unknown }).sessionId;
-  try {
-    if (typeof sessionId === "string") {
-      const session = await data.intakeSessions.get(ctx, sessionId);
-      if (session !== null) bound = sessionThread(ctx, session);
-    }
-    const attribution = await requestAttribution();
-    const result = await run(bound, parsed.data, attribution);
-    revalidatePath(INTAKE_ROUTE);
-    return actionSucceeded(result);
-  } catch (error) {
-    if (error instanceof NotFoundError && typeof sessionId === "string") {
-      await recordNotFound(bound, "intake_session", sessionId);
-    }
-    return actionFailedFrom<TData>(error, bound.correlationId);
-  }
+  return sessionAction(INTAKE_ROUTE, attempted, schema, input, run);
 }
 
 /** The session, its record and its draft, for an action that edits the draft. */
@@ -926,31 +846,17 @@ export async function voidIntakeSession(
     voidIntakeSessionSchema,
     input,
     async (ctx, parsed, attribution) => {
-      const { session, record } = await loadOpenIntake(ctx, parsed.sessionId);
-      const at = now();
-      await data.batteryRecords.update(ctx, record.id, { status: "voided" });
-      await data.intakeSessions.update(ctx, session.id, {
-        status: "abandoned",
-        abandonedAt: at,
-        reviewedBy: ctx.userId,
-        reviewedAt: at,
-        reviewOutcome: "voided",
-      });
-      await data.auditEvents.write(
+      const voided = await voidIntake(
         ctx,
-        userEvent(ctx, {
-          eventType: "battery_record.status_changed",
-          entityTable: "battery_record",
-          entityId: record.id,
-          at,
-          beforeState: { status: record.status },
-          afterState: { status: "voided" },
-          changedFields: ["status"],
-          reason: parsed.reason,
-          attribution,
-        }),
+        parsed.sessionId,
+        parsed.reason,
+        attribution,
+        now(),
       );
-      return { sessionId: session.id, batteryRecordId: record.id };
+      return {
+        sessionId: voided.sessionId,
+        batteryRecordId: voided.batteryRecordId,
+      };
     },
   );
 }
@@ -1250,8 +1156,9 @@ export async function proposeCatalogEntry(
     "proposeCatalogEntry",
     proposeCatalogEntrySchema,
     input,
-    async (ctx, parsed) => {
+    async (ctx, parsed, attribution) => {
       const { session } = await loadOpenIntake(ctx, parsed.sessionId);
+      const at = now();
       const entry = await data.catalogEntries.create(ctx, {
         organizationId: ctx.organizationId,
         manufacturerName: parsed.manufacturerName,
@@ -1278,11 +1185,30 @@ export async function proposeCatalogEntry(
         sourceType: "handler_proposed",
         sourceUrl: null,
         status: "proposed",
+        // Flow F step 3 — P6 reviews the proposal against this intake's
+        // photo and label crop.
+        proposedFromIntakeSessionId: session.id,
       });
-      // TODO(T-43): a catalog proposal is an audited act (Rule 12.1) and
-      // AUDIT_EVENT_TYPES carries no `catalog_entry.proposed` value —
-      // `catalog_entry.matched` is the match step's, not a proposal's.
-      // TAXONOMY.md §1.1 forbids inventing one.
+      // T-43 `catalog_entry.proposed` (D-45) — a person's proposal from a
+      // catalog miss, not the match step's `catalog_entry.matched`.
+      await data.auditEvents.write(
+        ctx,
+        userEvent(ctx, {
+          eventType: "catalog_entry.proposed",
+          entityTable: "catalog_entry",
+          entityId: entry.id,
+          at,
+          afterState: {
+            status: entry.status,
+            manufacturerName: entry.manufacturerName,
+            modelName: entry.modelName,
+            partNumber: entry.partNumber,
+            chemistry: entry.chemistry,
+            intakeSessionId: session.id,
+          },
+          attribution,
+        }),
+      );
       return { sessionId: session.id, catalogEntryId: entry.id };
     },
   );
@@ -1356,12 +1282,11 @@ export async function advanceToStep(
 /**
  * Confirm and log the battery — `TECHNICAL_SPEC.md` §11.1 step 6.
  *
- * Everything is recomputed from the draft on the server and written as one
- * `IntakeConfirmation`; the adapter refuses without the three attributable
- * confirmations at any confidence band (Rules 2.15, 2.21). On success the
- * caller is sent to the record, outside the `try`, exactly as `signIn`
- * redirects — a `catch` that turned the redirect into a failure would leave
- * the person on a form that has already succeeded.
+ * The work is `commitIntake` (`./server/commit.ts`), the one commit both this
+ * route and `/review` use; D-42 is enforced there. On success the caller is
+ * sent to the record, outside the `try`, exactly as `signIn` redirects — a
+ * `catch` that turned the redirect into a failure would leave the person on a
+ * form that has already succeeded.
  */
 export async function confirmIntake(
   input: unknown,
@@ -1370,111 +1295,8 @@ export async function confirmIntake(
     "confirmIntake",
     confirmIntakeSchema,
     input,
-    async (ctx, parsed, attribution) => {
-      const { session, record, draft, extractions } = await openDraft(
-        ctx,
-        parsed.sessionId,
-      );
-      const at = now();
-
-      const [organization, containersPage, photosPage] = await Promise.all([
-        data.organizations.get(ctx, ctx.organizationId),
-        data.containers.list(ctx, { limit: 100 }),
-        data.intakePhotos.list(ctx, { intakeSessionId: session.id, limit: 50 }),
-      ]);
-      if (organization === null) {
-        throw new DataIntegrityError({
-          userMessage: INTAKE_HAS_NO_RECORD,
-          correlationId: ctx.correlationId,
-        });
-      }
-
-      const catalogEntry =
-        draft.selectedCatalogEntryId === null
-          ? null
-          : await data.catalogEntries.get(ctx, draft.selectedCatalogEntryId);
-      if (draft.selectedCatalogEntryId !== null && catalogEntry === null) {
-        throw new ConflictError({
-          userMessage: CATALOG_ENTRY_NOT_AVAILABLE,
-          correlationId: ctx.correlationId,
-        });
-      }
-
-      const container =
-        draft.containerId === null
-          ? null
-          : (containersPage.items.find((row) => row.id === draft.containerId) ??
-            null);
-      if (draft.containerId !== null && container === null) {
-        throw new NotFoundError({
-          userMessage: CONTAINER_NOT_FOUND,
-          correlationId: ctx.correlationId,
-          context: { containerId: draft.containerId },
-        });
-      }
-      const runningClock =
-        container === null
-          ? null
-          : ((
-              await data.storageClocks.list(ctx, {
-                containerId: container.id,
-                isRunning: true,
-                limit: 5,
-              })
-            ).items[0] ?? null);
-
-      const rules = await resolveIntakeRules(ctx, {
-        organization,
-        containers: containersPage.items,
-        container,
-        intakeStartedAt: session.startedAt,
-        applicationClass:
-          catalogEntry?.applicationClass ?? record.applicationClass,
-      });
-
-      const dateCodeRow = latestRunRows(
-        extractions,
-        draft.extractionRunId,
-      ).find((row) => row.fieldCode === "date_code");
-      const damagePhoto = photosPage.items.find(
-        (photo) => photo.photoType === "damage",
-      );
-
-      const built = buildIntakeConfirmation({
-        ctx,
-        session,
-        record,
-        draft,
-        catalogEntry,
-        container,
-        runningClock,
-        rules,
-        organization,
-        dateCodeExtractionId: dateCodeRow?.id ?? null,
-        damagePhotoId: damagePhoto?.id ?? null,
-        today: civilDateInZone(at, rules.site.timeZone),
-        at,
-        attribution,
-      });
-      if (!built.ok) {
-        throw new ValidationError({
-          userMessage: built.message,
-          correlationId: ctx.correlationId,
-          context: { outstanding: built.outstanding.map((item) => item.kind) },
-        });
-      }
-
-      const committed = await data.intakeSessions.commitConfirmation(
-        ctx,
-        built.confirmation,
-      );
-      revalidatePath("/batteries");
-      revalidatePath(`/batteries/${committed.id}`);
-      return {
-        batteryRecordId: committed.id,
-        containerId: built.containerId,
-      };
-    },
+    (ctx, parsed, attribution) =>
+      commitIntake(ctx, parsed.sessionId, attribution, now()),
   );
 
   if (!result.ok) return result;

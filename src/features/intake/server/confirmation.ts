@@ -117,6 +117,8 @@ export interface ConfirmationInput {
   readonly dateCodeExtractionId: Uuid | null;
   /** The session's damage photo, when one was captured (T-50 `damage`). */
   readonly damagePhotoId: Uuid | null;
+  /** At least one `intake_photo` is stored on the session (D-42). */
+  readonly hasStoredPhoto: boolean;
   /** The request day in the site's zone, for the decode's future check (EC-11). */
   readonly today: IsoDate;
   readonly at: IsoTimestamp;
@@ -372,6 +374,7 @@ export function buildIntakeConfirmation(
   //   version in force) never refuses the commit: the record commits
   //   unplaced, with no decision row, and the record page states the missing
   //   input and who supplies it (E-13).
+  // - D-42: no record commits without a stored photo, on any path.
   const outstanding = outstandingCommitItems({
     fields,
     conditionConfirmed,
@@ -379,6 +382,7 @@ export function buildIntakeConfirmation(
     containerChosen: draft.containerId !== null,
     requiresContainer: false,
     isOffline: false,
+    hasStoredPhoto: input.hasStoredPhoto,
     classificationBlocked: false,
   });
 

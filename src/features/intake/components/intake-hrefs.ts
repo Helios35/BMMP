@@ -16,6 +16,12 @@ import type { IntakeStep } from "@/domain/taxonomy/intake-step";
 
 export const INTAKE_ROUTE = "/batteries/new";
 
+/**
+ * `POST /api/intake/photos` (`TECHNICAL_SPEC.md` §7.2) — where every intake
+ * photo is sent, from `/batteries/new` and from a queue item on `/review`.
+ */
+export const INTAKE_PHOTO_UPLOAD_URL = "/api/intake/photos";
+
 /** The `?step=` value for a flow step. `complete` is not a screen and has none. */
 export function intakeStepParam(step: IntakeStep): number {
   return stepIndex(step);

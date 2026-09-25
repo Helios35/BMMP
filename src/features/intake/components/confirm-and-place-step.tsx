@@ -30,8 +30,11 @@ import type { StorageClock } from "@/types/storage";
 
 import { NEW_CLOCK_ON_PLACEMENT } from "../copy";
 import { bindPlacementActions } from "./bind-actions";
-import { ConditionForm } from "./condition-form";
-import { ContainerPicker, type ContainerPickerRow } from "./container-picker";
+import { ConditionForm } from "@/components/condition/condition-form";
+import {
+  ContainerPicker,
+  type ContainerPickerRow,
+} from "@/components/storage/container-picker";
 import { intakeStepHref } from "./intake-hrefs";
 import type { UploadTransport } from "./photo-capture-step";
 import { SourceDeviceForm } from "./source-device-form";
@@ -184,6 +187,10 @@ export function ConfirmAndPlaceStep({
         scrollTo("[data-classification-outcome]");
         return;
       case "offline":
+        return;
+      case "photo_required":
+        // D-42 — the camera is on step 1, and returning there loses nothing.
+        router.push(intakeStepHref(sessionId, "capture"));
         return;
       default:
         // A label field still outstanding lives on the review step.

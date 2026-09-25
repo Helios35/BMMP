@@ -551,6 +551,8 @@ export async function readIntakeStepView(
       // never demanded, in B1a (build-notes b1a-02 §4).
       requiresContainer: false,
       isOffline: false,
+      // D-42 — the same input the builder is given, from the same photos.
+      hasStoredPhoto: photos.length > 0,
       // EC-16 / Rule 3.10 — identification completes while classification
       // blocks: an unresolved classification never stands between a person
       // and logging the battery in their hands. The E-13 notice on this step
