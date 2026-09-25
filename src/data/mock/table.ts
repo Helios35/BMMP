@@ -157,13 +157,16 @@ export class TenantTable<T extends TenantRow> {
    * attribution still comes from whatever the caller built out of `ctx` — the
    * elevated privilege is on the write, never on who the write claims to be.
    *
-   * It exists for `audit_event` and for nothing else. §9.5 gives that table's
-   * INSERT to no tenant role at all, because Postgres writes those rows from a
-   * trigger and never from a user statement (Rules 12.3, 12.4) — so the caller
-   * who was just denied, whose denial has to be recorded, is precisely the
-   * caller who holds no INSERT (Rules 1.16, 12.6). **A repository reaching for
-   * this to get around a `PermissionError` on some other table has misread the
-   * denial: record it and let it stand.**
+   * It exists for the two tables Postgres writes from a trigger and never from
+   * a user statement. **`audit_event`**: §9.5 gives its INSERT to no tenant
+   * role at all (Rules 12.3, 12.4) — so the caller who was just denied, whose
+   * denial has to be recorded, is precisely the caller who holds no INSERT
+   * (Rules 1.16, 12.6). **`alert`**: raised by the evaluation job and by
+   * triggers, not typed by a user (`ERD.md` §6.5) — which is how
+   * `./storage-writes.ts` raises a storage-clock alert when a move makes a
+   * container overdue on receipt. **A repository reaching for this to get
+   * around a `PermissionError` on some other table has misread the denial:
+   * record it and let it stand.**
    */
   async insertAsDefiner(ctx: RequestContext, row: T): Promise<T> {
     await this.begin(ctx, "insert", null);
