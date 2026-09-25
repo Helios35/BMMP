@@ -281,6 +281,8 @@ export function ExtractionReviewCard(
                 gate={props.gate}
                 actions={actions}
                 onResolveNow={onResolveNow}
+                // On `/review` the item is already on the queue (§3.8a).
+                showSaveToQueue={props.mode !== "review"}
               />
 
               {props.bulkConfirmAvailable ? (

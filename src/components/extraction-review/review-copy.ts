@@ -196,6 +196,8 @@ export const CANNOT_SHIP_NOTE =
   "You can log this battery now. It can't go on a shipping paper until this product is in the catalog.";
 export const CATALOG_ENTER_MANUALLY = "Enter details manually";
 export const CATALOG_PROPOSE = "Propose a new catalog entry";
+/** E-5, verbatim — shown once the proposal is queued for P6. The proposal never blocks the handler. */
+export const CATALOG_PROPOSAL_SENT = "Sent to your admin. You can carry on.";
 export const CATALOG_SELECTING = "Applying the match…";
 export const CATALOG_TOP_CANDIDATE = "Closest match";
 

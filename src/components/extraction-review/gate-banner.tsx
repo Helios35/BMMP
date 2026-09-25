@@ -44,12 +44,19 @@ export interface GateBannerProps {
   readonly actions: Pick<ExtractionReviewActions, "saveToQueue">;
   /** Scrolls to the first flagged row. The card owns the rows, so it supplies the scroll. */
   readonly onResolveNow: () => void;
+  /**
+   * **Save to review queue** is the way off `/batteries/new` (D-20). On
+   * `/review` the item is already on the queue, so the card passes `false` in
+   * `review` mode and the banner offers only **Resolve now**.
+   */
+  readonly showSaveToQueue?: boolean;
 }
 
 export function GateBanner({
   gate,
   actions,
   onResolveNow,
+  showSaveToQueue = true,
 }: GateBannerProps): ReactElement | null {
   const save = useActionCall();
 
@@ -97,15 +104,17 @@ export function GateBanner({
           >
             {RESOLVE_NOW}
           </ReviewButton>
-          <ReviewButton
-            variant="ghost"
-            data-save-to-queue="true"
-            pending={save.pending}
-            pendingLabel={SAVING_TO_QUEUE}
-            onPress={() => void save.run(() => actions.saveToQueue())}
-          >
-            {SAVE_TO_QUEUE}
-          </ReviewButton>
+          {showSaveToQueue ? (
+            <ReviewButton
+              variant="ghost"
+              data-save-to-queue="true"
+              pending={save.pending}
+              pendingLabel={SAVING_TO_QUEUE}
+              onPress={() => void save.run(() => actions.saveToQueue())}
+            >
+              {SAVE_TO_QUEUE}
+            </ReviewButton>
+          ) : null}
         </div>
         {save.error === null ? null : (
           <InlineActionError

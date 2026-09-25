@@ -22,6 +22,11 @@ export { NoReadState } from "./no-read-state";
 export { RejectReadDialog } from "./reject-read-dialog";
 export { VoidItemDialog } from "./void-item-dialog";
 export {
+  ReasonDialog,
+  type ReasonDialogAttributes,
+  type ReasonDialogCopy,
+} from "./reason-dialog";
+export {
   ReviewButton,
   ReviewDisabledContext,
   InlineActionError,
