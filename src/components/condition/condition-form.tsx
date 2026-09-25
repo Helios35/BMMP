@@ -24,7 +24,10 @@ import {
 import type { ActionResult } from "@/lib/action-result";
 import { cn } from "@/lib/utils";
 
-import { xhrUploadTransport, type UploadTransport } from "./photo-capture-step";
+import {
+  xhrUploadTransport,
+  type UploadTransport,
+} from "@/components/capture/upload-transport";
 
 /**
  * `ConditionForm` — step 3's assessed condition (`UX_SPEC.md` §3.9;
