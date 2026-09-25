@@ -22,6 +22,7 @@ import { resolveUserNames } from "@/features/battery-record/user-names";
 import { ConfirmAndPlaceStep } from "@/features/intake/components/confirm-and-place-step";
 import { ExtractionReviewStep } from "@/features/intake/components/extraction-review-step";
 import {
+  INTAKE_PHOTO_UPLOAD_URL,
   INTAKE_ROUTE,
   intakeStepHref,
   parseIntakeStepParam,
@@ -96,7 +97,7 @@ export const metadata: Metadata = {
   title: APP_ROUTE_NAMES[INTAKE_ROUTE],
 };
 
-const UPLOAD_URL = "/api/intake/photos";
+const UPLOAD_URL = INTAKE_PHOTO_UPLOAD_URL;
 
 function firstParam(value: string | string[] | undefined): string | null {
   const single = Array.isArray(value) ? value[0] : value;

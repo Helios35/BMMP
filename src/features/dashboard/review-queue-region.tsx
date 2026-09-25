@@ -4,10 +4,12 @@ import type { ReactElement } from "react";
 import { INTENT_ICON, INTENT_TEXT_CLASSES } from "@/components";
 import { Button } from "@/components/ui/button";
 import { SectionCard } from "@/components/page";
-import { data } from "@/data";
 import type { RequestContext } from "@/data/contracts";
-import { canReadRoute, canWriteRoute } from "@/domain/access/route-capability";
-import type { RoleCode } from "@/domain/taxonomy/role";
+import {
+  reviewQueueFraming,
+  type ReviewQueueFraming,
+} from "@/domain/review/queue";
+import { readReviewQueueCount } from "@/features/review/server/queue";
 import { LeadingIcon } from "@/components/page/leading-icon";
 
 import { REVIEW_QUEUE } from "./cross-route-links";
@@ -46,15 +48,14 @@ const REGION_FAILURE =
 const NOTHING_TO_REVIEW =
   "Nothing to review. Every reading has been confirmed.";
 
-export const REVIEW_QUEUE_FRAMINGS = ["confirming", "unidentified"] as const;
-
-export type ReviewQueueFraming = (typeof REVIEW_QUEUE_FRAMINGS)[number];
-
-export function reviewQueueFraming(role: RoleCode): ReviewQueueFraming | null {
-  if (canWriteRoute(role, REVIEW_QUEUE.route)) return "confirming";
-  if (canReadRoute(role, REVIEW_QUEUE.route)) return "unidentified";
-  return null;
-}
+// The framing is the review queue's own rule, so it lives beside the queue's
+// membership in `src/domain/review/queue.ts`; re-exported for the dashboard's
+// existing callers.
+export {
+  REVIEW_QUEUE_FRAMINGS,
+  reviewQueueFraming,
+  type ReviewQueueFraming,
+} from "@/domain/review/queue";
 
 /**
  * The card's sentence.
@@ -90,12 +91,9 @@ export async function ReviewQueueRegion({
 
   let count: number;
   try {
-    // `Page.total` is the count; one row is enough to read it.
-    const page = await data.intakeSessions.list(ctx, {
-      isReviewRequired: true,
-      limit: 1,
-    });
-    count = page.total;
+    // The one derivation the nav badge and `/review` also read — never a
+    // count of its own (`features/review/server/queue.ts`).
+    count = (await readReviewQueueCount(ctx)) ?? 0;
   } catch (cause) {
     console.error(
       `[dashboard] review queue could not be loaded (correlationId=${ctx.correlationId})`,

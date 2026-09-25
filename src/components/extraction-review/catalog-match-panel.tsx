@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, type ReactElement } from "react";
+import { useId, useState, type ReactElement } from "react";
 import { BookOpen, CircleAlert, SearchX } from "lucide-react";
 
 import {
@@ -24,6 +24,7 @@ import {
   CATALOG_PANEL_NOTE,
   CATALOG_PANEL_TITLE,
   CATALOG_PROPOSE,
+  CATALOG_PROPOSAL_SENT,
   CATALOG_RETRY,
   CATALOG_SELECTING,
   CATALOG_TOP_CANDIDATE,
@@ -93,6 +94,7 @@ export function CatalogMatchPanel({
   const enter = useActionCall();
   const propose = useActionCall();
   const retry = useActionCall();
+  const [proposalSent, setProposalSent] = useState(false);
   const inert = disabled.reason !== null;
 
   const error =
@@ -209,15 +211,33 @@ export function CatalogMatchPanel({
             >
               {CATALOG_ENTER_MANUALLY}
             </ReviewButton>
-            <ReviewButton
-              variant="outline"
-              data-catalog-action="propose"
-              pending={propose.pending}
-              pendingLabel="Sending the proposal…"
-              onPress={() => void propose.run(() => actions.proposeEntry())}
-            >
-              {CATALOG_PROPOSE}
-            </ReviewButton>
+            {proposalSent ? (
+              // E-5, verbatim — the proposal never blocks the handler, and it
+              // is not offered twice from the same card.
+              <p
+                role="status"
+                data-proposal-sent="true"
+                className="flex min-h-11 items-center text-body"
+              >
+                {CATALOG_PROPOSAL_SENT}
+              </p>
+            ) : (
+              <ReviewButton
+                variant="outline"
+                data-catalog-action="propose"
+                pending={propose.pending}
+                pendingLabel="Sending the proposal…"
+                onPress={() =>
+                  void propose
+                    .run(() => actions.proposeEntry())
+                    .then((result) => {
+                      if (result?.ok === true) setProposalSent(true);
+                    })
+                }
+              >
+                {CATALOG_PROPOSE}
+              </ReviewButton>
+            )}
           </div>
         </div>
       ) : null}

@@ -8,7 +8,7 @@ import {
   waitFor,
 } from "@testing-library/react";
 
-import { ConditionForm } from "@/features/intake/components/condition-form";
+import { ConditionForm } from "@/components/condition/condition-form";
 import type { DamageFindingType } from "@/domain/taxonomy/damage-finding-type";
 import { actionSucceeded, type ActionResult } from "@/lib/action-result";
 

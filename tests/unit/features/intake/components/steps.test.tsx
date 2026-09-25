@@ -785,6 +785,7 @@ function placeProps(
       ownsCondition: true,
       containerChosen: true,
       requiresContainer: false,
+      hasStoredPhoto: true,
       classificationBlocked: false,
     },
     ...overrides,
@@ -861,6 +862,7 @@ describe("ConfirmAndPlaceStep — step 3", () => {
             ownsCondition: true,
             containerChosen: true,
             requiresContainer: false,
+            hasStoredPhoto: true,
             classificationBlocked: false,
           },
         })}

@@ -6,7 +6,7 @@ import {
   CatalogMatchPanel,
   CANNOT_SHIP_NOTE,
 } from "@/components/extraction-review";
-import { CANDIDATES, FORBIDDEN_WORDS, okActions } from "./fixtures";
+import { CANDIDATES, failed, FORBIDDEN_WORDS, okActions } from "./fixtures";
 
 /**
  * `CatalogMatchPanel` in isolation, in every state `UX_SPEC.md` §2.13
@@ -152,6 +152,47 @@ describe("CatalogMatchPanel — loading, error, empty", () => {
     expect(actions.searchCatalog).toHaveBeenCalledTimes(1);
     expect(actions.enterManually).toHaveBeenCalledTimes(1);
     expect(actions.proposeEntry).toHaveBeenCalledTimes(1);
+  });
+
+  it("empty: once the proposal lands, says E-5's sentence in place of the button — never offered twice", async () => {
+    const { container, actions } = renderPanel({
+      state: "empty",
+      candidates: [],
+      cannotShipNote: true,
+    });
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole("button", { name: "Propose a new catalog entry" }),
+      );
+    });
+    expect(actions.proposeEntry).toHaveBeenCalledTimes(1);
+    expect(container.querySelector("[data-proposal-sent]")?.textContent).toBe(
+      "Sent to your admin. You can carry on.",
+    );
+    expect(
+      screen.queryByRole("button", { name: "Propose a new catalog entry" }),
+    ).toBeNull();
+  });
+
+  it("empty: a refused proposal keeps the button and says why", async () => {
+    const actions = okActions();
+    actions.proposeEntry.mockResolvedValueOnce(failed("Enter both first."));
+    const { container } = renderPanel({
+      state: "empty",
+      candidates: [],
+      cannotShipNote: true,
+      actions,
+    });
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole("button", { name: "Propose a new catalog entry" }),
+      );
+    });
+    expect(container.querySelector("[data-proposal-sent]")).toBeNull();
+    expect(
+      screen.getByRole("button", { name: "Propose a new catalog entry" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Enter both first.")).toBeInTheDocument();
   });
 
   it("empty: omits the cannot-ship line when the route says the record can ship", () => {

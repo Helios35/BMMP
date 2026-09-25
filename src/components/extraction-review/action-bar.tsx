@@ -95,10 +95,14 @@ export function ReviewActionBar({
       </div>
 
       {gated ? (
-        <OutstandingChecklist
-          outstanding={outstanding}
-          onItem={onOutstandingItem}
-        />
+        // Pinned on a phone, so a long checklist scrolls inside the bar
+        // rather than covering the rows it points at; inline from `md`.
+        <div className="max-h-[40dvh] overflow-y-auto md:max-h-none md:overflow-visible">
+          <OutstandingChecklist
+            outstanding={outstanding}
+            onItem={onOutstandingItem}
+          />
+        </div>
       ) : null}
     </div>
   );

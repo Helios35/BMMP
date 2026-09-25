@@ -25,7 +25,7 @@ import type {
   ClockPreview,
   SummaryField,
 } from "@/features/intake/components/confirm-and-place-step";
-import type { ContainerPickerRow } from "@/features/intake/components/container-picker";
+import type { ContainerPickerRow } from "@/components/storage/container-picker";
 import type {
   ReviewCardView,
   ReviewPlaceholderImage,
@@ -406,6 +406,8 @@ export function commitGateInput(
     containerChosen: view.draft.containerId !== null,
     // Unplaced intake is permitted in B1a; the container is chosen, never demanded.
     requiresContainer: false,
+    // D-42 — no record is logged without a stored photo, manual entry included.
+    hasStoredPhoto: view.photos.length > 0,
     // EC-16 / Rule 3.10 — identification completes while classification
     // blocks; the server gate in confirmation.ts passes the same, and the
     // two must never drift (commit-gate.ts). E-13 states the missing input.

@@ -43,7 +43,8 @@ export type OutstandingItemKind =
   | "confirm_condition"
   | "choose_container"
   | "offline"
-  | "classification_blocked";
+  | "classification_blocked"
+  | "photo_required";
 
 export interface OutstandingItem {
   readonly kind: OutstandingItemKind;
@@ -62,6 +63,15 @@ export interface CommitGateInput {
   /** The flow was entered with placement expected. Unplaced intake is allowed when this is false. */
   readonly requiresContainer: boolean;
   readonly isOffline: boolean;
+  /**
+   * At least one `intake_photo` is stored on the session — **D-42: no battery
+   * record commits without one, manual entry included.** The photo and the
+   * confirmed facts are captured as a pair (D-2), and the manual path is an
+   * alternative to extraction, never to photography (E-4). Required rather
+   * than optional so no caller can forget it and have the absence read as a
+   * photo.
+   */
+  readonly hasStoredPhoto: boolean;
   /**
    * The classification preview could not be completed for a reason other than
    * an unconfirmed chemistry (E-13). Optional because the review step has no
@@ -106,6 +116,15 @@ function requiredItem(fieldCode: LabelFieldCode): OutstandingItem {
     label: `${LABEL_FIELD_CODE_LABELS[fieldCode]} is required`,
   };
 }
+
+/**
+ * D-42, worded once: the card, step 3 and the server's refusal all read it
+ * from here. No field code — the photo is taken on step 1, not on a row.
+ */
+export const PHOTO_REQUIRED_ITEM: OutstandingItem = {
+  kind: "photo_required",
+  label: "Add a photo of the battery. No record is logged without one",
+};
 
 const OFFLINE_ITEM: OutstandingItem = {
   kind: "offline",
@@ -190,6 +209,8 @@ export function outstandingCommitItems(
   if (input.requiresContainer && !input.containerChosen) {
     items.push({ kind: "choose_container", label: "Choose a container" });
   }
+
+  if (!input.hasStoredPhoto) items.push(PHOTO_REQUIRED_ITEM);
 
   if (input.classificationBlocked === true) {
     items.push({

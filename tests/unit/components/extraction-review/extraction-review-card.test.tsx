@@ -700,6 +700,25 @@ describe("ExtractionReviewCard — the gate banner (§2.1.4(5))", () => {
     expect(actions.saveToQueue).toHaveBeenCalledTimes(1);
   });
 
+  it("§3.8a — on /review the item is already queued: Resolve now is offered, Save to review queue is not", () => {
+    const { container, actions } = renderCard({
+      mode: "review",
+      gate: {
+        isReviewRequired: true,
+        fieldsBelowThreshold: 1,
+        reasonCodes: ["field_confidence_below_threshold"],
+      },
+    });
+    const banner = container.querySelector("[data-gate-banner]");
+    expect(banner).not.toBeNull();
+    expect(banner?.querySelector("[data-resolve-now]")).not.toBeNull();
+    expect(banner?.querySelector("[data-save-to-queue]")).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: "Save to review queue" }),
+    ).toBeNull();
+    expect(actions.saveToQueue).not.toHaveBeenCalled();
+  });
+
   it("renders no banner when the gate passed", () => {
     const { container } = renderCard();
     expect(container.querySelector("[data-gate-banner]")).toBeNull();

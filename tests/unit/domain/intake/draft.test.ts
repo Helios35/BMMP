@@ -587,6 +587,7 @@ describe("commitFieldStates and hardGatedFieldsConfirmed", () => {
         containerChosen: true,
         requiresContainer: true,
         isOffline: false,
+        hasStoredPhoto: true,
       }),
     ).toEqual([]);
 
@@ -598,6 +599,7 @@ describe("commitFieldStates and hardGatedFieldsConfirmed", () => {
       containerChosen: false,
       requiresContainer: true,
       isOffline: false,
+      hasStoredPhoto: true,
     });
     expect(items.map((item) => item.kind)).toEqual([
       "confirm_hard_gated",

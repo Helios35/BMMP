@@ -17,6 +17,7 @@ import {
   APP_ROUTE_NAMES,
   type AppRoute,
 } from "@/domain/access/routes";
+import { isOpenRematchRaise } from "@/domain/review/queue";
 import { ALERT_TYPE_LABELS } from "@/domain/taxonomy/alert-type";
 import { ROLE_LABELS } from "@/domain/taxonomy/role";
 import { requireRoute } from "@/lib/auth/guard";
@@ -38,6 +39,8 @@ import {
   NAV_COLLAPSE_COOKIE,
 } from "@/features/shell/nav-collapse";
 import { NAV_ITEMS } from "@/features/shell/navigation/nav-items";
+import { reviewItemHref } from "@/features/review/review-hrefs";
+import { readReviewQueueCount } from "@/features/review/server/queue";
 
 /**
  * The authenticated shell — `SITE_ARCHITECTURE.md` §2.
@@ -80,13 +83,19 @@ const ALERT_BELL_LIMIT = 5;
  * A row whose target this role cannot reach renders informationally with no link
  * — never a dead link and never a redirect (§5.3(7), Rule 1.26).
  *
- * Only `/batteries/[id]` exists in this unit. `b1a-03` adds the `/review` target
- * for `review_queue`, `b1a-04` the `/containers/[id]` target for
+ * A `review_queue` alert opens its item on `/review` (§3.8a: *"a dashboard
+ * alert deep-links to it"*) — the intake session it names, or, for a Flow F
+ * raise, the raise itself. `b1a-04` adds the `/containers/[id]` target for
  * `container_capacity` and `storage_clock`, and `b1a-05` the `/shipments/[id]`
  * target. Until each page exists, its alerts render as text: an alert linking to
  * a 404 is worse than an alert that does not link.
  */
 function alertHref(alert: Alert, role: Parameters<typeof canReadRoute>[0]) {
+  if (alert.alertType === "review_queue" && canReadRoute(role, "/review")) {
+    return reviewItemHref(
+      alert.intakeSessionId ?? (isOpenRematchRaise(alert) ? alert.id : null),
+    );
+  }
   if (alert.batteryRecordId !== null && canReadRoute(role, "/batteries/[id]")) {
     return `/batteries/${alert.batteryRecordId}`;
   }
@@ -134,6 +143,26 @@ async function readAlertsForBell(
     // Nothing is swallowed: the failure is logged and the bell says so.
     console.error("[shell] alerts could not be loaded", error);
     return { items: [], total: 0, state: "error" };
+  }
+}
+
+/**
+ * The `reviewOpenItems` badge — the same derivation `/review` and the dashboard
+ * card read (`features/review/server/queue.ts`).
+ *
+ * **A badge that failed to load is absent, never 0** (`nav-items.ts`): "nothing
+ * waits" and "we could not count" are different facts. `null` also for a role
+ * that holds nothing on `/review`, which renders no item to badge.
+ */
+async function readReviewBadge(ctx: RequestContext): Promise<number | null> {
+  try {
+    return await readReviewQueueCount(ctx);
+  } catch (error) {
+    console.error(
+      `[shell] review queue count could not be read (correlationId=${ctx.correlationId})`,
+      error,
+    );
+    return null;
   }
 }
 
@@ -186,7 +215,10 @@ export default async function AppLayout({
     canWriteRoute(ctx.role, candidate),
   );
 
-  const alerts = await readAlertsForBell(ctx, asOf);
+  const [alerts, reviewBadge] = await Promise.all([
+    readAlertsForBell(ctx, asOf),
+    readReviewBadge(ctx),
+  ]);
   const retryHref = (await requestPathAndQuery()) ?? "/";
 
   const displayName = identity.fullName ?? identity.email;
@@ -197,10 +229,9 @@ export default async function AppLayout({
       role={ctx.role}
       visibleRoutes={visibleRoutes}
       writableRoutes={writableRoutes}
-      // No badge feeds a rendered nav item in this unit: `/review` and
-      // `/containers` are the only two §2.1 gives counts to and neither page
-      // exists yet. `b1a-03` and `b1a-04` add the read beside this one.
-      badges={{}}
+      // §2.1 gives counts to `/review` and `/containers`; `b1a-04` adds the
+      // second beside this one. Absent — never 0 — when the read failed.
+      badges={reviewBadge === null ? {} : { "/review": reviewBadge }}
       defaultCollapsed={isNavCollapsed(
         cookieStore.get(NAV_COLLAPSE_COOKIE)?.value,
       )}

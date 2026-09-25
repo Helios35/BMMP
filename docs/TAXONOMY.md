@@ -1,5 +1,5 @@
 # Taxonomy — BMMP
-**Version:** 1.2 · **Date:** 2026-08-11 · **Owner:** Nathan Ivy / Next Sketch LLC
+**Version:** 1.3 · **Date:** 2026-09-25 · **Owner:** Nathan Ivy / Next Sketch LLC
 **Answers:** How is everything in this product classified?
 **Reads from:** `_ANCHORS.md` · `PRD.md` · `BUSINESS_RULES.md` · `PROJECT_SETUP_BMMP.md`  ·  **Feeds:** `TECHNICAL_SPEC.md` · `ERD.md` · `UX_SPEC.md` · `SITE_ARCHITECTURE.md` · every builder brief
 
@@ -9,6 +9,12 @@
 ---
 
 ## Changelog
+
+**v1.3 · 2026-09-25 — the review queue and the catalog proposal lifecycle (`Decision Log.md` D-45, D-48, D-53)**
+
+- **T-43 gains `catalog_entry.proposed` and `catalog_entry.status_changed`**, following the existing `<entity>.status_changed` pattern. Authored by planning as D-45, transcribed by `b1a-03-review`. Without them a catalog proposal, its approval and its rejection either wrote nothing or wrote under a near neighbour, and a wrong row in an append-only log is worse than a missing one. A void of a queue item stays `battery_record.status_changed`; a re-match confirmation stays `battery_record.confirmed`. The other T-43 gaps listed in D-45 stay open.
+- **T-43 gains `alert.resolved`** (D-48): a person resolving an open alert, with the reason — written on both exits of a Flow F re-match raise, so keeping a record as identified is audited rather than silent.
+- **T-52 `session_abandoned` reworded** (D-53): an explicitly abandoned session is closed (T-08 `abandoned`) and is **not** on the queue, which Rule 2.23 requires — a closed session has no exit a person can take. The stored value is unchanged; a session left mid-flow stays open and queued.
 
 **v1.2 · 2026-08-11 — status reconciliation with `BUSINESS_RULES.md` v1.1**
 
@@ -1319,6 +1325,8 @@ Two citations in this document are deliberately **not** numbered, because what t
 | `intake_photo.captured` | Photo captured | A photo was captured and its data-use eligibility stamped (T-12). |
 | `label_extraction.completed` | Label read | The extraction pipeline returned per-field values and confidence bands. |
 | `catalog_entry.matched` | Catalog matched | A catalog entry was proposed for a record. |
+| `catalog_entry.proposed` | Catalog entry proposed | A person proposed a new catalog entry from a catalog miss; it waits as `proposed` (T-07) for P6 at `/settings/catalog` and is not available for matching (**Rule 2.20**; Flow F). **Not `catalog_entry.matched`**, which is the match step proposing an existing entry for a record. |
+| `catalog_entry.status_changed` | Catalog entry status changed | The entry moved between values of T-07 — P6 approving a proposal to `published` or rejecting it — with the stated reason (Flow F). An approval lists the records it raised on `/review` for a person to confirm; it changes none of them. |
 | `battery_record.routed_to_review` | Routed to review | A gated field below band placed the record in the review queue. |
 | `battery_record.confirmed` | Identification confirmed | A human confirmed identification, including chemistry. |
 | `battery_record.status_changed` | Record status changed | The record moved between values of T-22. |
@@ -1328,6 +1336,7 @@ Two citations in this document are deliberately **not** numbered, because what t
 | `container.status_changed` | Container status changed | The container moved between values of T-24. |
 | `storage_event.recorded` | Storage event recorded | A handling activity was recorded against stored material. |
 | `storage_clock.status_changed` | Storage clock changed | A clock started, entered a band, expired or stopped. |
+| `alert.resolved` | Alert resolved | A person resolved an open alert, with the stated reason. For a Flow F re-match raise, written on both of its exits — the match confirmed, or the record kept as identified (D-48). An alert is never deleted; resolving it is its one closing act (Rule 12.9). |
 | `shipment.status_changed` | Shipment status changed | The shipment moved between values of T-28. |
 | `document_render.issued` | Document issued | A document was rendered and issued. |
 | `document_render.superseded` | Document superseded | An issued document was replaced. |
@@ -1585,7 +1594,7 @@ Severity is set by the code that raises the alert, from the condition that raise
 | `no_fields_extracted` | Label unreadable | Extraction returned no readable field. **A distinct state from low confidence** and it must not share its treatment (`UX_SPEC.md` **E-4**). |
 | `field_validation_failed` | Value failed validation | An extracted value failed its expected shape and was presented as unread, with the raw text retained (**Rule 2.12**). |
 | `extraction_failed` | Extraction did not complete | The provider errored, timed out or returned a malformed response. **The confidence gate is never relaxed to clear a backlog** (**D-25**; **EC-14**). |
-| `session_abandoned` | Left unfinished | The handler left the flow. The session persists with its extraction and appears on the queue. **Work is never lost and never silently committed.** |
+| `session_abandoned` | Left unfinished | The handler explicitly abandoned the session (T-08 `abandoned`). The session, its photos and its extraction are retained, and no battery record is created. **It is not on the queue**: a closed session has no exit a person can take (Rule 2.23; D-53). A session merely left mid-flow — tab closed, phone locked — stays open and stays on the queue under its gate reasons (Flow A-a(3)). **Work is never lost and never silently committed.** |
 
 **Rules**
 

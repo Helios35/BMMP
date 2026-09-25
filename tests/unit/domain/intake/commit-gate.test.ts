@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   canContinueFromReview,
   outstandingCommitItems,
+  PHOTO_REQUIRED_ITEM,
   type CommitFieldState,
   type CommitGateInput,
 } from "@/domain/intake/commit-gate";
@@ -53,6 +54,7 @@ function input(patch: Partial<CommitGateInput> = {}): CommitGateInput {
     containerChosen: true,
     requiresContainer: true,
     isOffline: false,
+    hasStoredPhoto: true,
     ...patch,
   };
 }
@@ -231,6 +233,24 @@ describe("outstandingCommitItems", () => {
     expect(outstandingCommitItems(input({ isOffline: true }))).toEqual([
       { kind: "offline", label: "Reconnect to log this battery" },
     ]);
+  });
+
+  it("D-42 — a session with no stored photo cannot commit, and the reason says so", () => {
+    expect(outstandingCommitItems(input({ hasStoredPhoto: false }))).toEqual([
+      PHOTO_REQUIRED_ITEM,
+    ]);
+    expect(PHOTO_REQUIRED_ITEM.label).toMatch(/photo/i);
+  });
+
+  it("D-42 — a stored photo clears it, on the manual path as on any other", () => {
+    expect(outstandingCommitItems(input({ hasStoredPhoto: true }))).toEqual([]);
+  });
+
+  it("D-42 — the photo is required even when every field is confirmed and nothing else is outstanding", () => {
+    const items = outstandingCommitItems(
+      input({ hasStoredPhoto: false, conditionConfirmed: true }),
+    );
+    expect(items.map((item) => item.kind)).toEqual(["photo_required"]);
   });
 
   it("§2.1.4(6) — every item names its field through T-09's labels, never inline", () => {

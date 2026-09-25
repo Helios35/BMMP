@@ -26,6 +26,7 @@ import {
   setStateOfCharge,
   voidIntakeSession,
 } from "@/features/intake/actions";
+import { reviewItemHref } from "@/features/review/review-hrefs";
 import { actionFailed, type ActionResult } from "@/lib/action-result";
 import type { DraftSourceDevice, DraftStateOfCharge } from "@/types/intake";
 
@@ -40,8 +41,9 @@ import { intakeStepHref } from "./intake-hrefs";
  * {@link ExtractionReviewActions} object (design §8.1). This module is where
  * that object is built for `/batteries/new` — each member is the matching
  * action from `../actions`, called with the session id closed over, and
- * nothing else. `/review` (unit 03) builds its own object against the same
- * actions with a different `navigate`.
+ * nothing else. `/review` builds its object from this one
+ * (`features/review/components/bind-queue-actions.ts`) and overrides only the
+ * members whose destination or guard differs there.
  *
  * ## Two rules every closure keeps
  *
@@ -111,14 +113,8 @@ const PROPOSAL_NEEDS_IDENTITY =
 export function bindReviewActions(
   bindings: ReviewActionBindings,
 ): ExtractionReviewActions {
-  const {
-    sessionId,
-    batteryRecordId,
-    correlationId,
-    navigate,
-    refresh,
-    enterManually,
-  } = bindings;
+  const { sessionId, correlationId, navigate, refresh, enterManually } =
+    bindings;
 
   /** Run a draft write and re-read the step when it landed. */
   async function write<T>(
@@ -164,12 +160,12 @@ export function bindReviewActions(
 
     rejectRead: backToCapture,
 
-    // §2.1.4 — save and leave. `/review` is unit 03's; until it exists the
-    // record page is where a pending-review record is read.
+    // §2.1.4 — save and leave, onto the queue with this item open: the
+    // person sees it where it now waits (Flow A-a(2)).
     saveToQueue: () =>
       leave(
         () => saveToReviewQueue({ sessionId }),
-        () => `/batteries/${batteryRecordId}`,
+        () => reviewItemHref(sessionId),
       ),
 
     voidItem: (reason: string) =>

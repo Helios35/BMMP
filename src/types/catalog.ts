@@ -86,4 +86,18 @@ export interface CatalogEntry extends Timestamped, Attributed {
   /** P6 for global entries. */
   readonly verifiedBy: Uuid | null;
   readonly verifiedAt: IsoTimestamp | null;
+  /**
+   * The intake a handler proposed this entry from (Rule 2.20; E-5), so P6 can
+   * review the proposal **against the linked `intake_photo` and label crop**
+   * (Flow F step 3; `UX_SPEC.md` §3.19).
+   *
+   * **`ERD.md` §5.2 has no column for this, and `/settings/catalog` needs
+   * one**: without it a proposal cannot be shown beside the photo it came
+   * from, and the only other record of the link is an audit row, which is
+   * evidence and not a relation. Reported in `b1a-03`'s build-notes as an ERD
+   * finding. Optional so no fixture row has to change — the precedent is
+   * `IntakeSession.draft` — and absent reads as `null`: a platform-curated or
+   * manufacturer entry was never proposed from an intake.
+   */
+  readonly proposedFromIntakeSessionId?: Uuid | null;
 }

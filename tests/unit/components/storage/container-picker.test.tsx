@@ -6,7 +6,7 @@ import {
   ContainerPicker,
   ZERO_CONTAINERS_COPY,
   type ContainerPickerRow,
-} from "@/features/intake/components/container-picker";
+} from "@/components/storage/container-picker";
 import { admitToContainer } from "@/domain/storage/placement";
 import { CONTAINER_TYPE_LABELS } from "@/domain/taxonomy/container-type";
 import { actionSucceeded } from "@/lib/action-result";
