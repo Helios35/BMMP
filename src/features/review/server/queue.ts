@@ -20,8 +20,10 @@ import type { Alert } from "@/types/storage";
  * {@link readReviewQueue} or {@link readReviewQueueCount}, and the count each
  * shows is `reviewQueueCount` over the same membership — so a badge, a card
  * and a page cannot disagree about how many items wait. `grep` for
- * `isQueuedIntakeSession` or `isOpenRematchRaise` outside `src/domain` finds
- * this file and nothing else.
+ * `readReviewQueue` finds the three consumers and this file; no other module
+ * lists the queue. (`isOpenRematchRaise` is also asked of one alert elsewhere
+ * — to validate a raise before acting on it, and to link an alert to its item
+ * — which reads one row and counts nothing.)
  *
  * The adapter narrows with the query; the domain predicates are applied to
  * every row as well, so what counts as queued is decided by the rule and not
