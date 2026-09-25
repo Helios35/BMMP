@@ -72,6 +72,10 @@ const PERSONAS = {
     email: "s.reyes@northbeam-underwriting.example",
     label: "P5 · Auditor, Cascade",
   },
+  p6: {
+    email: "admin@nextsketch.example",
+    label: "P6 · Platform Admin, Cascade support grant",
+  },
   p1Olympic: {
     email: "tom.ashby@olympic-mobility.example",
     label: "P1 · Compliance Handler, Olympic — no Terms of Service in force",
@@ -96,12 +100,14 @@ const PENDING_INVITE_TOKEN = "inv-pending-handler-7c1f4a9d20b6e358";
  * UUID copied into this file would be a second copy of a fixture; a record
  * number is what the screen already shows.
  *
- * A spec resolves in one of two ways. `from` is a list route whose row
+ * A spec resolves in one of three ways. `from` is a list route whose row
  * matching `match` carries the anchor. `fromResolved` names an earlier entry —
  * a record page — on which an anchor matching `selector` and `match` is read,
  * which is how an intake session's URL is found: the **Resume intake** link
- * on the record, as the person who would tap it (`as`). Entries resolve in
- * the order written, so a second hop follows the record it hops from.
+ * on the record, as the person who would tap it (`as`). `on` is a route whose
+ * first anchor matching `selector` carries the href — a queue item on
+ * `/review`, found by the record number it shows. Entries resolve in the
+ * order written, so a second hop follows the record it hops from.
  */
 const RESOLVE = {
   vehiclePack: {
@@ -141,6 +147,12 @@ const RESOLVE = {
     selector: 'a[data-resume-intake="true"]',
     match: "Resume intake",
     label: "the spread record's open intake session, at its review step",
+  },
+  spreadReview: {
+    on: "/review",
+    as: "p1",
+    selector: '[data-queue-item][data-record-number="BR-0005"]',
+    label: "the spread record's item on the review queue",
   },
   catalogEntry: {
     from: "/catalog",
@@ -327,6 +339,46 @@ const SCREENS = [
     note: "A persistent, non-dismissible block above every tab.",
   },
 
+  // --- review ------------------------------------------------------------
+  {
+    id: "review-queue",
+    group: "Review",
+    route: "/review",
+    title: "Review queue — P1's work queue",
+    path: "/review",
+    as: "p1",
+    note: "Two panes from lg: the queue oldest first with why each item is here, and the oldest item open in the same card as step 2, with condition, placement and Confirm and commit. Below lg, the list alone.",
+  },
+  {
+    id: "review-queue-item",
+    group: "Review",
+    route: "/review",
+    title: "Review queue — an item open (?item=)",
+    path: (r) => r.spreadReview,
+    as: "p1",
+    note: "The spread record's item selected by URL — full-screen with Previous and Next on a phone.",
+  },
+  {
+    id: "review-unidentified",
+    group: "Review",
+    route: "/review",
+    title: "Review queue — P2's unidentified inventory",
+    path: "/review",
+    as: "p2",
+    note: "A different screen, not a disabled copy: the neutral alert saying what it is for, grouped by container with roll-up rows, clock tier and segregation class. No card, no Confirm, no Void, no banner (E-8b).",
+  },
+  {
+    id: "review-unidentified-filtered",
+    group: "Review",
+    route: "/review",
+    title: "Review queue — P2, filters exclude everything",
+    // The sheet runs against a server it just built, so every queued item is
+    // a fixture weeks old and this span excludes them all.
+    path: "/review?age=under_a_day",
+    as: "p2",
+    note: "E-15's filtered empty, never the all-identified copy.",
+  },
+
   // --- catalog -----------------------------------------------------------
   {
     id: "catalog-list",
@@ -374,6 +426,16 @@ const SCREENS = [
     path: "/settings/users",
     as: "p2",
     note: "A table inside a section, plus two summary sections.",
+  },
+
+  {
+    id: "settings-catalog",
+    group: "Settings",
+    route: "/settings/catalog",
+    title: "Catalog administration",
+    path: "/settings/catalog",
+    as: "p6",
+    note: "P6 only. Proposals beside the photo and crop they came from, each approved or rejected with a reason; all entries below.",
   },
 
   // --- audit -------------------------------------------------------------
@@ -591,6 +653,16 @@ async function signIn(page, baseUrl, persona) {
  * so the value a person recognises is not always the one carrying the anchor.
  */
 async function resolveHref(page, baseUrl, spec, resolved) {
+  if (spec.on !== undefined) {
+    await page.goto(`${baseUrl}${spec.on}`);
+    const href = await page.locator(spec.selector).first().getAttribute("href");
+    if (href === null) {
+      throw new Error(
+        `Could not resolve ${spec.label}: nothing matching on ${spec.on}`,
+      );
+    }
+    return href;
+  }
   if (spec.fromResolved !== undefined) {
     const from = resolved[spec.fromResolved];
     if (from === undefined) {
