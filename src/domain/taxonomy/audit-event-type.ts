@@ -27,6 +27,8 @@
  * **`catalog_entry.proposed` and `catalog_entry.status_changed` are D-45**, added
  * at TAXONOMY.md v1.3 for the catalog proposal lifecycle — a proposal from a
  * catalog miss, and P6 approving or rejecting it at `/settings/catalog`.
+ * **`alert.resolved` is D-48**: a person resolving an open alert with a stated
+ * reason, written on both exits of a Flow F re-match raise.
  *
  * **Never invent a value.** If one is needed and is not here, it does not exist
  * yet — raise it to P6 (TAXONOMY.md §1.1).
@@ -48,6 +50,7 @@ export const AUDIT_EVENT_TYPES = [
   "container.status_changed",
   "storage_event.recorded",
   "storage_clock.status_changed",
+  "alert.resolved",
   "shipment.status_changed",
   "document_render.issued",
   "document_render.superseded",
@@ -90,6 +93,7 @@ export const AUDIT_EVENT_TYPE_LABELS: Readonly<Record<AuditEventType, string>> =
     "container.status_changed": "Container status changed",
     "storage_event.recorded": "Storage event recorded",
     "storage_clock.status_changed": "Storage clock changed",
+    "alert.resolved": "Alert resolved",
     "shipment.status_changed": "Shipment status changed",
     "document_render.issued": "Document issued",
     "document_render.superseded": "Document superseded",

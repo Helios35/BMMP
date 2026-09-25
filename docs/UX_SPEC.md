@@ -1018,7 +1018,7 @@ Then: the generated basic description per line; emergency response information f
 | **On success** | Entry becomes searchable at `/catalog`; matching unmatched records are raised on `/review` for human confirmation — **never silently re-matched** (Flow F). |
 | **On failure** | Validation inline; the proposal stays queued. |
 
-**What's on it.** Two lists: **Proposals** (from intake catalog misses, with the proposing user, the linked `intake_photo` and label crop side by side with the proposed fields) and **All entries** (editable). Approve / Reject with a required reason. Rejected proposals return to `/review` as manual-entry items.
+**What's on it.** Two lists: **Proposals** (from intake catalog misses, with the proposing user, the linked `intake_photo` and label crop side by side with the proposed fields) and **All entries** (editable). Approve / Reject with a required reason. A rejected proposal changes no record: the battery it was proposed from is already logged on the manual path (E-5) and keeps its identification (D-49).
 
 **shadcn:** Table, Card, Form, Input, Select, Dialog, AlertDialog, Badge, Button, Tabs.
 

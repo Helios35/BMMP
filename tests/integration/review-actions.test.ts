@@ -220,6 +220,16 @@ async function resolveFields(sessionId: string): Promise<void> {
   ok(await intake.confirmCondition({ sessionId }));
 }
 
+/** T-43 `alert.resolved` rows for one raise — who resolved it, and why (D-48). */
+function resolutionsOf(raiseId: string) {
+  return mockStore()
+    .auditEvents.all()
+    .filter(
+      (row) => row.eventType === "alert.resolved" && row.entityId === raiseId,
+    )
+    .map((row) => ({ reason: row.reason, actorUserId: row.actorUserId }));
+}
+
 function denials(correlationId: string) {
   return mockStore()
     .auditEvents.all()
@@ -672,6 +682,10 @@ describe("Flow F — a catalog miss, closed", () => {
           row.reason === "catalog_rematch",
       );
     expect(confirmed).toHaveLength(1);
+    // D-48 — the raise's own resolution is a row too, beside the record's.
+    expect(resolutionsOf(raise.id)).toEqual([
+      { reason: "rematch_confirmed", actorUserId: ID.USER.danaHandler },
+    ]);
     expect((await readReviewQueue(HANDLER)).rematches).toHaveLength(0);
   });
 
@@ -693,6 +707,7 @@ describe("Flow F — a catalog miss, closed", () => {
       reason: "",
     });
     expect(refused.ok).toBe(false);
+    expect(resolutionsOf(raise.id)).toEqual([]);
 
     ok(
       await review.declineRematch({
@@ -707,6 +722,13 @@ describe("Flow F — a catalog miss, closed", () => {
     expect(resolved?.resolutionReason).toBe(
       "Same model string, different cell supplier",
     );
+    // D-48 — keeping the identification is audited, never silent (Rule 12.1).
+    expect(resolutionsOf(raise.id)).toEqual([
+      {
+        reason: "Same model string, different cell supplier",
+        actorUserId: ID.USER.danaHandler,
+      },
+    ]);
     expect((await readReviewQueue(HANDLER)).rematches).toHaveLength(0);
   });
 

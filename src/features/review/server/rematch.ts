@@ -6,6 +6,7 @@ import {
   type RematchTrigger,
 } from "@/domain/review/queue";
 import { applyCatalogRematch } from "@/features/battery-record/server/rematch";
+import { userEvent } from "@/features/intake/server/audit";
 import { NotFoundError } from "@/lib/errors";
 import type { BatteryRecord } from "@/types/battery-record";
 import type { CatalogEntry } from "@/types/catalog";
@@ -31,6 +32,9 @@ import { REMATCH_NOT_OPEN } from "../review-copy";
  * - **Keep the record as it is identified**, with a stated reason — a
  *   handler's rejection of a match always wins over the match (EC-10). The
  *   record is untouched and the raise is resolved with the reason.
+ *
+ * **Either way the raise's resolution is audited** as T-43 `alert.resolved`
+ * with the reason (D-48), beside whatever the record's own path wrote.
  */
 
 export interface OpenRematch {
@@ -91,12 +95,7 @@ export async function confirmRematchRaise(
     { recordId: record.id, catalogEntryId: trigger.catalogEntryId },
     at,
   );
-  await data.alerts.update(ctx, raise.id, {
-    acknowledgedAt: at,
-    acknowledgedBy: ctx.userId,
-    resolvedAt: at,
-    resolutionReason: RESOLVED_BY_CONFIRMATION,
-  });
+  await resolveRaise(ctx, raise, RESOLVED_BY_CONFIRMATION, at);
   return {
     batteryRecordId: outcome.record.id,
     recordNumber: outcome.record.recordNumber,
@@ -110,18 +109,42 @@ export async function declineRematchRaise(
   at: IsoTimestamp,
 ): Promise<{ readonly batteryRecordId: Uuid; readonly recordNumber: string }> {
   const { raise, record } = await loadOpenRematch(ctx, raiseId);
-  await data.alerts.update(ctx, raise.id, {
+  await resolveRaise(ctx, raise, reason, at);
+  return { batteryRecordId: record.id, recordNumber: record.recordNumber };
+}
+
+/**
+ * Close the raise and audit it — T-43 `alert.resolved`, with the reason
+ * (D-48). The alert is never deleted; resolving it is its one closing act
+ * (Rule 12.9), and it is a person's act (Rule 12.1).
+ */
+async function resolveRaise(
+  ctx: RequestContext,
+  raise: Alert,
+  reason: string,
+  at: IsoTimestamp,
+): Promise<void> {
+  const resolved = await data.alerts.update(ctx, raise.id, {
     acknowledgedAt: at,
     acknowledgedBy: ctx.userId,
     resolvedAt: at,
     resolutionReason: reason,
   });
-  // TODO(T-43): keeping a record's identification against an approved entry
-  // is a person's act (Rule 12.1), and T-43 has no value for resolving a raise
-  // — `battery_record.confirmed` would claim an identification was confirmed
-  // now, and `battery_record.status_changed` a status that did not move.
-  // D-45 leaves this gap open; proposed value `alert.resolved`. The reason is
-  // kept on `alert.resolution_reason` meanwhile, and nothing is written under
-  // a neighbour. Raised in the build-notes.
-  return { batteryRecordId: record.id, recordNumber: record.recordNumber };
+  await data.auditEvents.write(
+    ctx,
+    userEvent(ctx, {
+      eventType: "alert.resolved",
+      entityTable: "alert",
+      entityId: raise.id,
+      at,
+      beforeState: { resolvedAt: raise.resolvedAt },
+      afterState: {
+        resolvedAt: resolved.resolvedAt,
+        batteryRecordId: raise.batteryRecordId,
+        triggerSnapshot: raise.triggerSnapshot,
+      },
+      changedFields: ["resolvedAt", "resolutionReason", "acknowledgedAt"],
+      reason,
+    }),
+  );
 }
