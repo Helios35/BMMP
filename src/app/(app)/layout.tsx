@@ -96,11 +96,34 @@ function alertHref(alert: Alert, role: Parameters<typeof canReadRoute>[0]) {
       alert.intakeSessionId ?? (isOpenRematchRaise(alert) ? alert.id : null),
     );
   }
+  // A container's alert opens the container, for the roles that may; the
+  // others reach the alerting list, which every member reads (§5.4).
+  if (alert.containerId !== null) {
+    if (canReadRoute(role, "/containers/[id]")) {
+      return `/containers/${alert.containerId}`;
+    }
+    if (canReadRoute(role, "/containers")) {
+      return "/containers?filter=alerting";
+    }
+  }
   if (alert.batteryRecordId !== null && canReadRoute(role, "/batteries/[id]")) {
     return `/batteries/${alert.batteryRecordId}`;
   }
   return null;
 }
+
+/**
+ * The open alerts, read **once** for the bell and for the Containers badge.
+ *
+ * §2.1 gives `/containers` a count — the containers carrying an open alert,
+ * the same rows `/containers?filter=alerting` lists. Deriving it from the
+ * bell's own read keeps the shell at one alert read per request rather than
+ * two; the bell then keeps its routing (T-44 audience) in memory, exactly as
+ * the query filtered it before. The scan is bounded, so a tenant with more
+ * open alerts than it reads undercounts the badge rather than slowing every
+ * page — reported in the build-notes.
+ */
+const OPEN_ALERT_SCAN = 200;
 
 async function readAlertsForBell(
   ctx: RequestContext,
@@ -109,38 +132,55 @@ async function readAlertsForBell(
   readonly items: readonly AlertBellItem[];
   readonly total: number;
   readonly state: "ready" | "error";
+  /** Distinct containers with an open alert; null when the read failed. */
+  readonly alertingContainers: number | null;
 }> {
   try {
     const page = await data.alerts.list(ctx, {
       isOpen: true,
-      audienceRole: ctx.role,
-      limit: ALERT_BELL_LIMIT,
+      limit: OPEN_ALERT_SCAN,
     });
+    const routed = page.items.filter((alert) =>
+      alert.audienceRoles.includes(ctx.role),
+    );
 
-    const items = sortAlertsForBell(page.items).map((alert) => {
-      // T-48. An unrecognised severity resolves to `neutral` and is never
-      // guessed upward into `critical` (`TAXONOMY.md` §5.8).
-      const intent: StatusIntent = alertSeverityIntent(alert.severity);
+    const items = sortAlertsForBell(routed)
+      .slice(0, ALERT_BELL_LIMIT)
+      .map((alert) => {
+        // T-48. An unrecognised severity resolves to `neutral` and is never
+        // guessed upward into `critical` (`TAXONOMY.md` §5.8).
+        const intent: StatusIntent = alertSeverityIntent(alert.severity);
 
-      return {
-        id: alert.id,
-        intent,
-        title: alert.title,
-        body: alert.body,
-        typeLabel: ALERT_TYPE_LABELS[alert.alertType],
-        raisedAt: alert.raisedAt,
-        raisedAtLabel: relativeTimeLabel(alert.raisedAt, asOf),
-        href: alertHref(alert, ctx.role),
-      } satisfies AlertBellItem;
-    });
+        return {
+          id: alert.id,
+          intent,
+          title: alert.title,
+          body: alert.body,
+          typeLabel: ALERT_TYPE_LABELS[alert.alertType],
+          raisedAt: alert.raisedAt,
+          raisedAtLabel: relativeTimeLabel(alert.raisedAt, asOf),
+          href: alertHref(alert, ctx.role),
+        } satisfies AlertBellItem;
+      });
 
-    // `Page.total`, not `items.length` — an alert whose severity this build does
-    // not recognise is still counted.
-    return { items, total: page.total, state: "ready" };
+    const alertingContainers = new Set(
+      page.items
+        .map((alert) => alert.containerId)
+        .filter((id): id is string => id !== null),
+    ).size;
+
+    // Every routed alert is counted — one whose severity this build does not
+    // recognise included.
+    return {
+      items,
+      total: routed.length,
+      state: "ready",
+      alertingContainers,
+    };
   } catch (error) {
     // Nothing is swallowed: the failure is logged and the bell says so.
     console.error("[shell] alerts could not be loaded", error);
-    return { items: [], total: 0, state: "error" };
+    return { items: [], total: 0, state: "error", alertingContainers: null };
   }
 }
 
@@ -227,9 +267,14 @@ export default async function AppLayout({
       role={ctx.role}
       visibleRoutes={visibleRoutes}
       writableRoutes={writableRoutes}
-      // §2.1 gives counts to `/review` and `/containers`; `b1a-04` adds the
-      // second beside this one. Absent — never 0 — when the read failed.
-      badges={reviewBadge === null ? {} : { "/review": reviewBadge }}
+      // §2.1 gives counts to `/review` and `/containers`. Absent — never 0 —
+      // when the read behind one failed.
+      badges={{
+        ...(reviewBadge === null ? {} : { "/review": reviewBadge }),
+        ...(alerts.alertingContainers === null
+          ? {}
+          : { "/containers": alerts.alertingContainers }),
+      }}
       defaultCollapsed={isNavCollapsed(
         cookieStore.get(NAV_COLLAPSE_COOKIE)?.value,
       )}

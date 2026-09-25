@@ -104,7 +104,8 @@ const PENDING_INVITE_TOKEN = "inv-pending-handler-7c1f4a9d20b6e358";
  * matching `match` carries the anchor. `fromResolved` names an earlier entry —
  * a record page — on which an anchor matching `selector` and `match` is read,
  * which is how an intake session's URL is found: the **Resume intake** link
- * on the record, as the person who would tap it (`as`). `on` is a route whose
+ * on the record, as the person who would tap it (`as`) — with an optional
+ * `path` that reaches the tab the anchor sits on. `on` is a route whose
  * first anchor matching `selector` carries the href — a queue item on
  * `/review`, found by the record number it shows. Entries resolve in the
  * order written, so a second hop follows the record it hops from.
@@ -159,6 +160,26 @@ const RESOLVE = {
     as: "p2",
     match: "NV-TP400",
     label: "the vehicle traction catalog entry",
+  },
+  soundDrum: {
+    from: "/containers",
+    as: "p2",
+    match: "C-0001",
+    label: "the sound drum holding the vehicle and the mobility pack",
+  },
+  overdueDrum: {
+    from: "/containers",
+    as: "p2",
+    match: "C-0003",
+    label: "the drum past its accumulation period",
+  },
+  soundDrumLabel: {
+    fromResolved: "soundDrum",
+    path: (href) => `${href}?tab=label`,
+    as: "p2",
+    selector: 'a[data-open-label="true"]',
+    match: "Open the label",
+    label: "the sound drum's printed label",
   },
 };
 
@@ -377,6 +398,82 @@ const SCREENS = [
     path: "/review?age=under_a_day",
     as: "p2",
     note: "E-15's filtered empty, never the all-identified copy.",
+  },
+
+  // --- containers --------------------------------------------------------
+  {
+    id: "containers-list",
+    group: "Containers",
+    route: "/containers",
+    title: "Containers — populated list",
+    path: "/containers",
+    as: "p2",
+    note: "A clock meter and a fill meter on every row; New container in the toolbar; no quantity limit invented.",
+  },
+  {
+    id: "containers-alerting",
+    group: "Containers",
+    route: "/containers",
+    title: "Containers — ?filter=alerting",
+    path: "/containers?filter=alerting",
+    as: "p2",
+    note: "The deep link the dashboard and /review send, narrowed by the alert rows themselves.",
+  },
+  {
+    id: "containers-auditor",
+    group: "Containers",
+    route: "/containers",
+    title: "Containers — E-8a, auditor",
+    path: "/containers",
+    as: "p5",
+    note: "Rows are not links and say who can open them (§5.4); New container disabled with its reason.",
+  },
+  {
+    id: "container-overdue",
+    group: "Containers",
+    route: "/containers/[id]",
+    title: "Container — overdue, as the facility manager",
+    path: (r) => r.overdueDrum,
+    as: "p2",
+    note: "The pinned alert, the critical meter, and P2's remediation. No re-date control for any role.",
+  },
+  {
+    id: "container-contents",
+    group: "Containers",
+    route: "/containers/[id]",
+    title: "Container — contents, as the handler",
+    path: (r) => r.soundDrum,
+    as: "p1",
+    note: "Ship this container, and Move / Split / Consolidate over the contents.",
+  },
+  {
+    id: "container-label",
+    group: "Containers",
+    route: "/containers/[id]",
+    title: "Container — Label tab",
+    path: (r) => `${r.soundDrum}?tab=label`,
+    as: "p2",
+    note: "The printed label through DocumentViewer: the phrase, contents and start date as printed.",
+  },
+  {
+    id: "container-history",
+    group: "Containers",
+    route: "/containers/[id]",
+    title: "Container — History",
+    path: (r) => `${r.overdueDrum}?tab=history`,
+    as: "p2",
+    note: "Storage events for every role; the audit trail for the roles that read it.",
+  },
+
+  // --- documents ---------------------------------------------------------
+  {
+    id: "document-label",
+    group: "Documents",
+    route: "/documents/[id]",
+    title: "Document — container label, as the auditor",
+    path: (r) => r.soundDrumLabel,
+    as: "p5",
+    note: "Print and Download never disabled (Rule 5.27).",
   },
 
   // --- catalog -----------------------------------------------------------
@@ -670,12 +767,15 @@ async function resolveHref(page, baseUrl, spec, resolved) {
         `Could not resolve ${spec.label}: "${spec.fromResolved}" has not been resolved yet — order the RESOLVE entries so it comes first`,
       );
     }
-    await page.goto(`${baseUrl}${from}`);
+    // `path` reaches a section of the resolved page — a tab — where the
+    // anchor lives; without one, the page itself.
+    const on = spec.path === undefined ? from : spec.path(from);
+    await page.goto(`${baseUrl}${on}`);
     const anchor = page.locator(spec.selector, { hasText: spec.match }).first();
     const href = await anchor.getAttribute("href");
     if (href === null) {
       throw new Error(
-        `Could not resolve ${spec.label}: no "${spec.match}" link on ${from}`,
+        `Could not resolve ${spec.label}: no "${spec.match}" link on ${on}`,
       );
     }
     return href;

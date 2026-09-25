@@ -6,10 +6,9 @@
  * carries a capability, a role or a `RequestContext` (§5.3(3)).
  */
 
-export type PaletteGroupId = "pages" | "batteries" | "catalog";
-// b1a-04 adds "containers"; b1a-05 adds "shipments". Each is an id here, a
-// heading below, and one scope in `search-command-palette.ts` — the role filter
-// there already covers them.
+export type PaletteGroupId = "pages" | "batteries" | "containers" | "catalog";
+// b1a-05 adds "shipments". Each is an id here, a heading below, and one scope
+// in `search-command-palette.ts` — the role filter there already covers it.
 
 export interface PaletteResult {
   readonly id: string;
@@ -39,12 +38,14 @@ export const PALETTE_GROUP_HEADINGS: Readonly<Record<PaletteGroupId, string>> =
   {
     pages: "Pages",
     batteries: "Battery records",
+    containers: "Containers",
     catalog: "Catalog",
   };
 
 export const PALETTE_GROUP_ORDER: readonly PaletteGroupId[] = [
   "pages",
   "batteries",
+  "containers",
   "catalog",
 ];
 

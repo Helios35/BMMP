@@ -50,9 +50,10 @@ interface PaletteScope {
 
 const SCOPES: readonly PaletteScope[] = [
   { group: "batteries", detailRoute: "/batteries/[id]" },
+  // P3, P4 and P5 hold `none` on the detail, so they get no container results
+  // at all — not queried, never filtered afterwards.
+  { group: "containers", detailRoute: "/containers/[id]" },
   { group: "catalog", detailRoute: "/catalog/[id]" },
-  // b1a-04: { group: "containers", detailRoute: "/containers/[id]" } — P3, P4
-  //         and P5 hold `none` there, so they get no container results at all.
   // b1a-05: { group: "shipments", detailRoute: "/shipments/[id]" }
 ];
 
@@ -91,6 +92,26 @@ async function batteryResults(
     detail: record.recordNumber,
     detailIsMono: true,
     href: `/batteries/${record.id}`,
+  }));
+}
+
+async function containerResults(
+  ctx: RequestContext,
+  query: string,
+): Promise<readonly PaletteResult[]> {
+  const page = await data.containers.list(ctx, {
+    search: query,
+    limit: PALETTE_RESULTS_PER_GROUP,
+  });
+
+  return page.items.map((container) => ({
+    id: container.id,
+    group: "containers" as const,
+    label: container.containerCode,
+    ...(container.storageLocation === null
+      ? {}
+      : { detail: container.storageLocation }),
+    href: `/containers/${container.id}`,
   }));
 }
 
@@ -151,7 +172,9 @@ export async function searchCommandPalette(input: {
       const results =
         scope.group === "batteries"
           ? await batteryResults(ctx, query)
-          : await catalogResults(ctx, query);
+          : scope.group === "containers"
+            ? await containerResults(ctx, query)
+            : await catalogResults(ctx, query);
 
       if (results.length > 0) {
         groups.push({

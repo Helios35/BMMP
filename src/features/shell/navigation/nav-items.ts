@@ -1,5 +1,6 @@
 import {
   BatteryCharging,
+  Boxes,
   BookMarked,
   BookOpen,
   Building2,
@@ -67,15 +68,15 @@ export type NavBadges = Readonly<Partial<Record<AppRoute, number>>>;
  * The navigation destinations, in `SITE_ARCHITECTURE.md` §2.1's order. **Order
  * is display order.**
  *
- * ## Why two of §2.1's ten entries are commented out
+ * ## Why one of §2.1's ten entries is commented out
  *
- * `b1a-01-shell` builds the shell and the read-only surfaces; `/containers`
- * and `/shipments` are built by later units (`b1a-03` restored `/review` and
- * `/settings/catalog`)
- * and their pages do not exist yet. A nav item pointing at a route with no page
- * is a dead link, and "no dead links" is §2.1's own rule. So the entries sit
- * here, in order, commented, each naming the unit that restores it — the later
- * builder uncomments one line and does not re-derive §2.1's order.
+ * `b1a-01-shell` builds the shell and the read-only surfaces; `/shipments` is
+ * built by a later unit (`b1a-03` restored `/review` and `/settings/catalog`,
+ * `b1a-04` `/containers`), and its page does not exist yet. A nav item
+ * pointing at a route with no page is a dead link, and "no dead links" is
+ * §2.1's own rule. So the entry sits here, in order, commented, naming the unit
+ * that restores it — the later builder uncomments one line and does not
+ * re-derive §2.1's order.
  *
  * **Removing the comment is the whole of the change.** Nothing about access
  * moves: `ROUTE_ACCESS` already carries all four rows and the intersection in
@@ -102,8 +103,14 @@ export const NAV_ITEMS: readonly NavItem[] = [
     group: "primary",
     badge: "reviewOpenItems",
   },
-  // 4 — Containers · /containers · Boxes · primary · badge "alertingContainers"
-  //     Restored by b1a-04, which builds `src/app/(app)/containers/page.tsx`.
+  {
+    route: "/containers",
+    navLabel: "Containers",
+    icon: Boxes,
+    group: "primary",
+    badge: "alertingContainers",
+    matchPrefix: "/containers",
+  },
   // 5 — Shipments · /shipments · Truck · primary
   //     Restored by b1a-05, which builds `src/app/(app)/shipments/page.tsx`.
   {
