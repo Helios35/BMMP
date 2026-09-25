@@ -3,6 +3,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { CHEMISTRY_LABELS } from "@/domain/taxonomy/chemistry";
 
 import {
+  chooseContainer,
   commitIntake,
   confirmCondition,
   confirmRow,
@@ -10,7 +11,9 @@ import {
   fieldRow,
   openReview,
 } from "./support/intake-flow";
-import { storageStateFor } from "./support/roles";
+import { fixtureIds, storageStateFor } from "./support/roles";
+
+const { CONTAINER } = fixtureIds;
 
 /**
  * **Flow F — a catalog miss, closed** (`SITE_ARCHITECTURE.md` Flow F,
@@ -80,6 +83,8 @@ test("a proposal approved by P6 raises the record for P1, and changes nothing un
 
   await continueToPlace(p1);
   await confirmCondition(p1, "none_observed", "sound");
+  // Classified, so placed when logged (D-41).
+  await chooseContainer(p1, CONTAINER.soundDrum);
   const recordId = await commitIntake(p1);
   const recordNumber = (await p1.locator("#page-title").textContent())?.trim();
   expect(recordNumber).toMatch(/^BR-\d+/);

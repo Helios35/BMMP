@@ -8,6 +8,7 @@ import {
 } from "@/features/review/review-copy";
 
 import {
+  chooseContainer,
   confirmCondition,
   confirmRow,
   openReview,
@@ -88,6 +89,8 @@ test.describe("P1's work queue (§3.8a)", () => {
     await confirmRow(page, "chemistry_code");
     await confirmRow(page, "serial_number");
     await confirmCondition(page, "none_observed", "sound");
+    // Classified, so placed when logged (D-41) — through the same picker.
+    await chooseContainer(page, CONTAINER.soundDrum);
 
     const primary = pane(page).locator(
       "[data-review-action-bar] [data-primary-action]",
@@ -110,7 +113,7 @@ test.describe("P1's work queue (§3.8a)", () => {
     await notice.locator("[data-resolved-record]").click();
     await page.waitForURL((url) => /^\/batteries\/[^/]+$/.test(url.pathname));
     await expect(page.locator("[data-page-header]").first()).toContainText(
-      BATTERY_RECORD_STATUS_LABELS.classified,
+      BATTERY_RECORD_STATUS_LABELS.stored,
     );
   });
 

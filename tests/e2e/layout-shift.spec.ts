@@ -208,7 +208,8 @@ function viaFirstRow(): (page: Page) => Locator {
 }
 
 /**
- * The seven routes with a `loading.tsx` that a Facility Manager reaches.
+ * The nine routes with a `loading.tsx` that a Facility Manager reaches — unit
+ * 04 added `/containers` and `/containers/[id]`.
  *
  * `/` has none, and correctly: its four regions stream inside their own
  * `<Suspense>` boundaries and the page header renders before any of them, so
@@ -229,6 +230,8 @@ const JOURNEYS: readonly Journey[] = [
   { from: "/", link: viaSidebar("/settings/users"), to: "/settings/users" },
   { from: "/batteries", link: viaFirstRow(), to: "/batteries/[id]" },
   { from: "/catalog", link: viaFirstRow(), to: "/catalog/[id]" },
+  { from: "/", link: viaSidebar("/containers"), to: "/containers" },
+  { from: "/containers", link: viaFirstRow(), to: "/containers/[id]" },
 ];
 
 /**
