@@ -18,7 +18,8 @@ import {
 } from "@/domain/transport/stored-paper";
 import { absoluteInstant } from "@/features/battery-record/format-instant";
 import { resolveUserNames } from "@/features/battery-record/user-names";
-import type { TimeZone } from "@/types/common";
+import { DocumentIntegrityError, NotFoundError } from "@/lib/errors";
+import type { Sha256, TimeZone } from "@/types/common";
 import type {
   ContainerLabel,
   DocumentRender,
@@ -63,8 +64,34 @@ export type DocumentPage =
   /** A type whose page arrives with its own unit — shown as the render's own record. */
   | { readonly kind: "render_record" };
 
+/**
+ * The render's stored file, as a read of it found it — `TECHNICAL_SPEC.md`
+ * §8.4. **Stored** is bytes that re-hash to the row's `content_hash`;
+ * **absent** is a render with no file behind it (the fixtures that predate
+ * document generation); **integrity failed** is bytes that no longer hash —
+ * never shown, never served.
+ */
+export type StoredFile =
+  | { readonly state: "stored"; readonly contentHash: Sha256 }
+  | { readonly state: "absent" }
+  | { readonly state: "integrity_failed"; readonly message: string };
+
+/** A void's reason and actor, from its audit row (Rule 5.14), for a role that reads the log. */
+export interface VoidRecord {
+  readonly at: string;
+  readonly actor: string;
+  readonly reason: string | null;
+}
+
 export interface DocumentView {
   readonly render: DocumentRender;
+  readonly storedFile: StoredFile;
+  /**
+   * Null when the render is not voided, or when the role cannot read the
+   * audit log the reason lives on (Rule 12.8) — the marking then says where
+   * it is recorded.
+   */
+  readonly voidRecord: VoidRecord | null;
   readonly typeLabel: string;
   readonly statusLabel: string;
   readonly generatedAt: string;
@@ -74,6 +101,53 @@ export interface DocumentView {
   readonly timeZone: TimeZone;
   readonly supersededBy: DocumentRender | null;
   readonly page: DocumentPage;
+}
+
+async function readStoredFile(
+  ctx: RequestContext,
+  render: DocumentRender,
+): Promise<StoredFile> {
+  try {
+    const stored = await data.documentRenders.readBytes(ctx, render.id);
+    return { state: "stored", contentHash: stored.contentHash };
+  } catch (error) {
+    // Both outcomes are states the page shows, stated; anything else is not
+    // ours to interpret and goes on up.
+    if (error instanceof NotFoundError) return { state: "absent" };
+    if (error instanceof DocumentIntegrityError) {
+      return { state: "integrity_failed", message: error.userMessage };
+    }
+    throw error;
+  }
+}
+
+async function readVoidRecord(
+  ctx: RequestContext,
+  render: DocumentRender,
+  timeZone: TimeZone,
+): Promise<VoidRecord | null> {
+  if (render.status !== "voided" || !canReadRoute(ctx.role, "/audit")) {
+    return null;
+  }
+  const page = await data.auditEvents.list(ctx, {
+    entityId: render.id,
+    eventType: "document_render.voided",
+    limit: 1,
+  });
+  const event = page.items[0];
+  if (event === undefined) return null;
+  const names =
+    event.actorUserId === null
+      ? new Map<string, string>()
+      : await resolveUserNames(ctx, [event.actorUserId]);
+  return {
+    at: absoluteInstant(event.occurredAt, timeZone),
+    actor:
+      event.actorUserId === null
+        ? (event.actorLabel ?? "Not recorded")
+        : (names.get(event.actorUserId) ?? "Not recorded"),
+    reason: event.reason,
+  };
 }
 
 export async function readDocument(
@@ -162,8 +236,15 @@ export async function readDocument(
           }
         : { kind: "render_record" };
 
+  const [storedFile, voidRecord] = await Promise.all([
+    readStoredFile(ctx, render),
+    readVoidRecord(ctx, render, timeZone),
+  ]);
+
   return {
     render,
+    storedFile,
+    voidRecord,
     typeLabel: type.recognised ? type.label : type.storedValue,
     statusLabel: status.recognised ? status.label : status.storedValue,
     generatedAt: absoluteInstant(render.renderedAt, timeZone),

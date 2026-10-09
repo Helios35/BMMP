@@ -340,6 +340,24 @@
     [data-print-hide] {
       display: none !important;
     }
+
+    /* A stored PDF prints one drawn page per sheet, edge to edge of the
+       printable area, with its stamp — never a frame around it. */
+    [data-pdf-pages] {
+      max-width: none;
+      gap: 0;
+    }
+
+    [data-pdf-page] {
+      break-after: page;
+      border: 0;
+      border-radius: 0;
+      box-shadow: none;
+    }
+
+    [data-pdf-page]:last-child {
+      break-after: auto;
+    }
   }
 }
 
