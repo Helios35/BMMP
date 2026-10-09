@@ -12,3 +12,5 @@ export * from "./placement";
 export * from "./accumulation";
 export * from "./clock-evaluation";
 export * from "./container-label-flags";
+export * from "./label-rule";
+export * from "./contents-description";
