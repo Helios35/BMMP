@@ -1,14 +1,12 @@
 import type { RequestContext } from "@/data/contracts/context";
-import type { CreateAuditEvent } from "@/data/contracts/audit";
 import type {
   ContainerContentsMove,
   ContainerContentsMoveResult,
   ContainerStatusChange,
   ContainerStorageEvent,
-  StorageWriteAttribution,
 } from "@/data/contracts/storage";
 import type { BatteryRecord } from "@/types/battery-record";
-import type { IsoTimestamp, JsonObject, Uuid } from "@/types/common";
+import type { IsoTimestamp, Uuid } from "@/types/common";
 import type {
   Alert,
   Container,
@@ -39,7 +37,6 @@ import {
   ACCUMULATION_RULE_KEY,
   startStorageClock,
 } from "@/domain/storage/placement";
-import type { AuditEventType } from "@/domain/taxonomy/audit-event-type";
 import { compareDecimal, subtractDecimal, addDecimal } from "@/domain/units";
 import {
   ConflictError,
@@ -49,7 +46,7 @@ import {
   ValidationError,
 } from "@/lib/errors";
 
-import { buildAuditEvent } from "./audit-row";
+import { writeTriggerAudit as audit } from "./audit-row";
 import { now } from "./factory";
 import { nextId } from "./ids";
 import { assertPolicy } from "./policy";
@@ -115,7 +112,10 @@ async function atomically<T>(write: () => Promise<T>): Promise<T> {
  * `container_id` names it. A voided record is retained and sits outside every
  * operational count (Rule 12.12); a draft belongs to its intake session.
  */
-function contentsOf(ctx: RequestContext, containerId: Uuid): BatteryRecord[] {
+export function contentsOf(
+  ctx: RequestContext,
+  containerId: Uuid,
+): BatteryRecord[] {
   return store()
     .batteryRecords.all()
     .filter(
@@ -128,7 +128,10 @@ function contentsOf(ctx: RequestContext, containerId: Uuid): BatteryRecord[] {
 }
 
 /** The container's clock: the running one, else its most recent stopped one, else none. */
-function clockOf(ctx: RequestContext, containerId: Uuid): StorageClock | null {
+export function clockOf(
+  ctx: RequestContext,
+  containerId: Uuid,
+): StorageClock | null {
   const clocks = store()
     .storageClocks.all()
     .filter(
@@ -178,50 +181,6 @@ function lessMass(current: string | null, removed: string): string | null {
 }
 
 // --- writing ------------------------------------------------------------------------------
-
-interface AuditBody {
-  readonly eventType: AuditEventType;
-  readonly entityTable: string;
-  readonly entityId: Uuid;
-  readonly beforeState: JsonObject | null;
-  readonly afterState: JsonObject | null;
-  readonly changedFields?: readonly string[] | null;
-  readonly governingRuleVersionId?: Uuid | null;
-  readonly reason?: string | null;
-}
-
-/** A person's act, as the trigger would record it — actor from `ctx`, attribution from the request. */
-async function audit(
-  ctx: RequestContext,
-  at: IsoTimestamp,
-  attribution: StorageWriteAttribution,
-  body: AuditBody,
-): Promise<void> {
-  const row: CreateAuditEvent = {
-    actorUserId: ctx.userId,
-    actorType: ctx.isPlatformAdmin ? "platform_admin" : "user",
-    actorLabel: null,
-    eventType: body.eventType,
-    entityTable: body.entityTable,
-    entityId: body.entityId,
-    occurredAt: at,
-    recordedAt: at,
-    beforeState: body.beforeState,
-    afterState: body.afterState,
-    changedFields: body.changedFields ?? null,
-    governingRuleVersionId: body.governingRuleVersionId ?? null,
-    ruleVersionsApplied: null,
-    correlationId: ctx.correlationId,
-    requestId: attribution.requestId,
-    ipAddress: attribution.ipAddress,
-    userAgent: attribution.userAgent,
-    reason: body.reason ?? null,
-  };
-  await store().auditEvents.insertAsDefiner(
-    ctx,
-    buildAuditEvent(ctx, row, nextId()),
-  );
-}
 
 async function appendEvent(
   ctx: RequestContext,

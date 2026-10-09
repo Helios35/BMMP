@@ -29,6 +29,8 @@ import type { ConfidenceBand } from "@/domain/taxonomy/confidence-band";
 import type { DdrFlag } from "@/domain/taxonomy/ddr-flag";
 import type { IntakeSessionStatus } from "@/domain/taxonomy/intake-session-status";
 import type { LabelFieldCode } from "@/domain/taxonomy/label-field-code";
+import type { PackingGroup } from "@/domain/taxonomy/packing-group";
+import type { UnTransportIdentifier } from "@/domain/taxonomy/un-transport-identifier";
 import type { Decimal, IsoTimestamp, Uuid } from "@/types/common";
 
 /** Battery, catalog and intake contracts — `ERD.md` §5. */
@@ -165,10 +167,43 @@ export type CreateCatalogEntry = CreateInput<
   readonly organizationId: Uuid | null;
 };
 
+/**
+ * The transport identity — `unIdentifier`, `properShippingName`, `hazardClass`
+ * and `packingGroup` — is **absent here**. It moves only through
+ * {@link CatalogRepository.editTransportIdentity}, which is P6's alone and
+ * needs a stated reason (D-50): **a shipping identifier is never typed by a
+ * handler** (Rule 5.9). The adapter strips the four from an update as well,
+ * because a type is the first line and not the last one.
+ */
 export type UpdateCatalogEntry = UpdateInput<
   CatalogEntry,
-  "partNumberNormalized" | "organizationId"
+  "partNumberNormalized" | "organizationId" | CatalogTransportIdentityField
 >;
+
+/** The four fields a shipping paper's identifiers are read from (Rule 5.9; `ERD.md` §5.2). */
+export type CatalogTransportIdentityField =
+  "unIdentifier" | "properShippingName" | "hazardClass" | "packingGroup";
+
+/**
+ * D-50 — P6 edits an entry's transport identity, with a reason, audited as
+ * `catalog_entry.updated`. Every field is the value after the edit; `null`
+ * clears it. Without this a Flow F match never resolves shipping identifiers
+ * and the paper blocks forever (Rule 5.9, EC-46).
+ */
+export interface CatalogTransportIdentityEdit {
+  readonly unIdentifier: UnTransportIdentifier | null;
+  readonly properShippingName: string | null;
+  readonly hazardClass: string | null;
+  readonly packingGroup: PackingGroup;
+  /** Required. Kept on the audit row. */
+  readonly reason: string;
+  readonly at: IsoTimestamp;
+  readonly attribution: {
+    readonly requestId: string | null;
+    readonly ipAddress: string | null;
+    readonly userAgent: string | null;
+  };
+}
 
 export type CatalogEntrySortField =
   "manufacturerName" | "modelName" | "partNumber" | "updatedAt";
@@ -223,6 +258,20 @@ export interface CatalogRepository extends Repository<
     ctx: RequestContext,
     filter: CatalogCandidateFilter,
   ): Promise<readonly CatalogEntry[]>;
+
+  /**
+   * **P6 only** — edit an entry's transport identity with a stated reason, and
+   * write `catalog_entry.updated` with the before and after, as one operation
+   * (D-50; `UX_SPEC.md` §3.19). Any other role is refused: the identifiers on
+   * a shipping paper are derived from the catalog and **never typed by a
+   * handler** (Rule 5.9). An edit that changes nothing is refused rather than
+   * audited as one.
+   */
+  editTransportIdentity(
+    ctx: RequestContext,
+    id: Uuid,
+    input: CatalogTransportIdentityEdit,
+  ): Promise<CatalogEntry>;
 }
 
 // --- intake_session ---------------------------------------------------------

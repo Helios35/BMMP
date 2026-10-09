@@ -113,7 +113,11 @@ export const supabaseAdapter: DataAdapter = {
     ...CRUD,
     "applyConditionOutcome",
   ]),
-  catalogEntries: unimplemented("catalogEntries", [...CRUD, "findCandidates"]),
+  catalogEntries: unimplemented("catalogEntries", [
+    ...CRUD,
+    "findCandidates",
+    "editTransportIdentity",
+  ]),
   intakeSessions: unimplemented("intakeSessions", [
     ...CRUD,
     "commitConfirmation",
@@ -137,7 +141,17 @@ export const supabaseAdapter: DataAdapter = {
     ...APPEND_ONLY,
     "markSuperseded",
   ]),
-  shipments: unimplemented("shipments", [...CRUD, "offer"]),
+  shipments: unimplemented("shipments", [
+    ...CRUD,
+    "offer",
+    "assemble",
+    "changeContents",
+    "recordTransport",
+    "settleReadiness",
+    "issueShippingPaper",
+    "recordDeparture",
+    "recordArrival",
+  ]),
   shippingPapers: unimplemented("shippingPapers", APPEND_ONLY),
   containerLabels: unimplemented("containerLabels", APPEND_ONLY),
   documentRenders: unimplemented("documentRenders", [

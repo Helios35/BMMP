@@ -1,9 +1,10 @@
 import {
   DAMAGED_OR_DEFECTIVE_FINDING_TYPES,
   DAMAGE_FINDING_TYPES,
+  DAMAGE_FINDING_TYPE_LABELS,
   type DamageFindingType,
 } from "@/domain/taxonomy/damage-finding-type";
-import type { DdrFlag } from "@/domain/taxonomy/ddr-flag";
+import { DDR_FLAG_LABELS, type DdrFlag } from "@/domain/taxonomy/ddr-flag";
 import { isTaxonomyValue } from "@/domain/taxonomy/lookup";
 import type { TransportMode } from "@/domain/taxonomy/transport-mode";
 
@@ -146,4 +147,39 @@ export function isModeAvailable(
   assessment: AirTransportAssessment,
 ): boolean {
   return mode !== "air" || assessment.available;
+}
+
+/** The plain-language statement of the prohibition (Rule 6.9; `UX_SPEC.md` §2.6). */
+export const AIR_PROHIBITION_STATEMENT =
+  "Damaged, defective and recalled batteries are prohibited from air transport.";
+
+/** Rule 6.9's specific indicator, in words: the finding's label, the flag's, or a recall named as a recall. */
+export function airBlockIndicatorText(indicator: AirBlockIndicator): string {
+  if (indicator.kind === "finding") {
+    return DAMAGE_FINDING_TYPE_LABELS[indicator.finding].toLowerCase();
+  }
+  return indicator.flag === "recalled"
+    ? "recall association"
+    : DDR_FLAG_LABELS[indicator.flag].toLowerCase();
+}
+
+/**
+ * The server's refusal of an air request, in the same words the notice uses —
+ * the records, the indicator behind each, and the three ways forward (Rules
+ * 6.9, 6.10). Nothing here offers a fourth.
+ */
+export function airTransportRefusal(
+  assessment: Extract<AirTransportAssessment, { readonly available: false }>,
+): string {
+  const records = assessment.blockingRecords
+    .map(
+      (record) =>
+        `${record.recordNumber} (${record.indicators.map(airBlockIndicatorText).join(", ")})`,
+    )
+    .join(", ");
+  return (
+    `Air transport is not available for this shipment. ${AIR_PROHIBITION_STATEMENT} ` +
+    `Blocking: ${records}. Ship by ground, rail or vessel; remove these records and ship the rest by air; ` +
+    "or re-assess the damage on a record."
+  );
 }

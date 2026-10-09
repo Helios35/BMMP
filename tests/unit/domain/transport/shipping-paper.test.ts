@@ -265,7 +265,7 @@ describe("every Rule 5.3 precondition is named when it is the one unmet", () => 
       ],
     });
     expect(unmetOf(input)).toEqual(["transport_mode"]);
-    expect(findingsOf(input, "transport_mode")[0]).toMatch(/BR-0101.*Swelling/);
+    expect(findingsOf(input, "transport_mode")[0]).toMatch(/BR-0101.*swelling/);
     // By ground the same record documents (with its DDR path stated).
     const ground = buildShippingPaperPayload(
       complete({ records: input.records }),

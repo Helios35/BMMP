@@ -10,6 +10,7 @@ import type {
   BatteryRecordRepository,
   BatteryRecordSortField,
   CatalogCandidateFilter,
+  CatalogTransportIdentityEdit,
   CatalogEntrySortField,
   CatalogQuery,
   CatalogRepository,
@@ -160,6 +161,9 @@ import {
   LABEL_FIELD_CODE_LABELS,
 } from "@/domain/taxonomy/label-field-code";
 import { addDecimal } from "@/domain/units";
+import { isTaxonomyValue } from "@/domain/taxonomy/lookup";
+import { PACKING_GROUPS } from "@/domain/taxonomy/packing-group";
+import { UN_TRANSPORT_IDENTIFIERS } from "@/domain/taxonomy/un-transport-identifier";
 import {
   ConflictError,
   DataIntegrityError,
@@ -188,6 +192,17 @@ import {
   moveContents,
   recordStorageEvent,
 } from "./storage-writes";
+import {
+  assemble,
+  buildShipmentRow,
+  changeContents,
+  issueShippingPaper,
+  recordArrival,
+  recordDeparture,
+  recordTransport,
+  settleReadiness,
+} from "./shipment-writes";
+import { writeTriggerAudit } from "./audit-row";
 
 export { resetMockStore, mockStore } from "./store";
 export { MOCK_DEV_PASSWORD } from "./identity";
@@ -904,8 +919,150 @@ function catalogVisible(ctx: RequestContext, entry: CatalogEntry): boolean {
   );
 }
 
+/** The four fields a shipping paper's identifiers come from (Rule 5.9). */
+const TRANSPORT_IDENTITY_FIELDS = [
+  "unIdentifier",
+  "properShippingName",
+  "hazardClass",
+  "packingGroup",
+] as const;
+
+function blankToNull(value: string | null): string | null {
+  return value === null || value.trim() === "" ? null : value.trim();
+}
+
+/**
+ * D-50 — P6 edits an entry's transport identity, with a reason, as one
+ * operation with its `catalog_entry.updated` row. **Every other role is
+ * refused**: a shipping identifier is derived from the catalog and never typed
+ * by a handler (Rule 5.9).
+ */
+async function editTransportIdentity(
+  ctx: RequestContext,
+  id: Uuid,
+  input: CatalogTransportIdentityEdit,
+): Promise<CatalogEntry> {
+  if (!ctx.isPlatformAdmin) {
+    throw new PermissionError({
+      userMessage:
+        "Only a Platform Admin edits a catalog entry's shipping identity. A shipping identifier is never typed by a handler (Rule 5.9).",
+      correlationId: ctx.correlationId,
+      context: { decision: "D-50", role: ctx.role },
+    });
+  }
+  const entry = await catalogEntries.get(ctx, id);
+  if (entry === null) {
+    throw new NotFoundError({
+      userMessage: "No catalog entry was found.",
+      correlationId: ctx.correlationId,
+      context: { catalogEntryId: id },
+    });
+  }
+  const reason = input.reason.trim();
+  if (reason === "") {
+    throw new ValidationError({
+      userMessage: "State the reason for this edit.",
+      correlationId: ctx.correlationId,
+      field: "reason",
+    });
+  }
+  if (
+    input.unIdentifier !== null &&
+    !isTaxonomyValue(UN_TRANSPORT_IDENTIFIERS, input.unIdentifier)
+  ) {
+    throw new ValidationError({
+      userMessage: "Choose an identification number from the list.",
+      correlationId: ctx.correlationId,
+      field: "unIdentifier",
+    });
+  }
+  if (!isTaxonomyValue(PACKING_GROUPS, input.packingGroup)) {
+    throw new ValidationError({
+      userMessage: "Choose a packing group from the list.",
+      correlationId: ctx.correlationId,
+      field: "packingGroup",
+    });
+  }
+  const next = {
+    unIdentifier: input.unIdentifier,
+    properShippingName: blankToNull(input.properShippingName),
+    hazardClass: blankToNull(input.hazardClass),
+    packingGroup: input.packingGroup,
+  };
+  const changedFields = TRANSPORT_IDENTITY_FIELDS.filter(
+    (field) => entry[field] !== next[field],
+  );
+  if (changedFields.length === 0) {
+    throw new ValidationError({
+      userMessage: "Nothing changed. The entry already carries these values.",
+      correlationId: ctx.correlationId,
+    });
+  }
+
+  const s = store();
+  const savedEntries = [...s.catalogEntries.all()];
+  const savedAudit = [...s.auditEvents.all()];
+  try {
+    const updated = await s.catalogEntries.update(ctx, entry.id, {
+      ...next,
+      updatedAt: now(),
+      updatedBy: ctx.userId,
+    });
+    await writeTriggerAudit(ctx, input.at, input.attribution, {
+      eventType: "catalog_entry.updated",
+      entityTable: "catalog_entry",
+      entityId: entry.id,
+      beforeState: {
+        unIdentifier: entry.unIdentifier,
+        properShippingName: entry.properShippingName,
+        hazardClass: entry.hazardClass,
+        packingGroup: entry.packingGroup,
+      },
+      afterState: next,
+      changedFields,
+      reason,
+    });
+    return updated;
+  } catch (cause) {
+    s.catalogEntries.replaceAll(savedEntries);
+    s.auditEvents.replaceAll(savedAudit);
+    throw cause;
+  }
+}
+
 const catalogEntries: CatalogRepository = {
   ...catalogBase,
+  /**
+   * The transport identity is stripped here as `batteryRecords.update` strips
+   * the two legal booleans: it moves through {@link editTransportIdentity}
+   * alone, P6's, with a reason (D-50, Rule 5.9).
+   */
+  async update(ctx, id, input) {
+    const permitted = { ...(input as Record<string, unknown>) };
+    for (const field of TRANSPORT_IDENTITY_FIELDS) delete permitted[field];
+    return catalogBase.update(ctx, id, permitted as typeof input);
+  },
+  /**
+   * A proposal from the intake floor carries no shipping identifier; only P6
+   * may create an entry that does (Rule 5.9).
+   */
+  async create(ctx, input) {
+    const carriesIdentity =
+      input.unIdentifier !== null ||
+      input.properShippingName !== null ||
+      input.hazardClass !== null ||
+      input.packingGroup !== "not_applicable";
+    if (carriesIdentity && !ctx.isPlatformAdmin) {
+      throw new PermissionError({
+        userMessage:
+          "Only a Platform Admin sets a catalog entry's shipping identity. A shipping identifier is never typed by a handler (Rule 5.9).",
+        correlationId: ctx.correlationId,
+        context: { decision: "D-50", role: ctx.role },
+      });
+    }
+    return catalogBase.create(ctx, input);
+  },
+  editTransportIdentity,
   async get(ctx, id) {
     const entry = await catalogBase.get(ctx, id);
     if (entry === null || !catalogVisible(ctx, entry)) return null;
@@ -1897,50 +2054,45 @@ const shipmentBase = tenantRepository<
       transportMode?: string;
       shippedAfter?: string;
       shippedBefore?: string;
+      destinationFacilityName?: string;
+      holdsDamagedRecord?: boolean;
       search?: string;
     },
   ) =>
     eq(query.status, row.status) &&
     eq(query.transportMode, row.transportMode) &&
+    eq(query.destinationFacilityName, row.destinationFacilityName) &&
     (query.shippedAfter === undefined ||
       (row.shippedAt !== null && row.shippedAt >= query.shippedAfter)) &&
     (query.shippedBefore === undefined ||
       (row.shippedAt !== null && row.shippedAt <= query.shippedBefore)) &&
+    (query.holdsDamagedRecord === undefined ||
+      query.holdsDamagedRecord === shipmentHoldsDamagedRecord(row)) &&
     matchesSearch(
       query.search,
       row.shipmentNumber,
       row.destinationFacilityName,
     ),
-  build: (ctx, input, id) => {
-    const organization = store()
-      .organizations.all()
-      .find((org) => org.id === ctx.organizationId);
-    const seq = nextSequenceNumber(
-      ctx.organizationId,
-      "shipment",
-      organization?.shipmentSeq ?? 0,
-    );
-    return {
-      ...input,
-      id,
-      organizationId: ctx.organizationId,
-      shipmentNumber: formatRecordNumber("SH", seq),
-      airTransportBlockedReason: null,
-      totalMassKg: null,
-      totalEnergyWh: null,
-      offeredAt: null,
-      shippedAt: null,
-      receivedAt: null,
-      receivedConfirmationRef: null,
-      retentionExpiresOn: null,
-      retentionRuleVersionId: null,
-      createdAt: now(),
-      updatedAt: now(),
-      createdBy: ctx.userId,
-      updatedBy: ctx.userId,
-    } satisfies Shipment;
-  },
+  build: buildShipmentRow,
 });
+
+/** Membership derives through the container (`ERD.md` §11.1); voided and draft records are outside it. */
+function shipmentHoldsDamagedRecord(shipment: Shipment): boolean {
+  const containerIds = store()
+    .containers.all()
+    .filter((container) => container.shipmentId === shipment.id)
+    .map((container) => container.id);
+  return store()
+    .batteryRecords.all()
+    .some(
+      (record) =>
+        record.containerId !== null &&
+        containerIds.includes(record.containerId) &&
+        record.status !== "voided" &&
+        record.status !== "draft" &&
+        (record.ddrFlags.length > 0 || record.isAirTransportProhibited),
+    );
+}
 
 const shipments: ShipmentRepository = {
   ...shipmentBase,
@@ -2017,6 +2169,14 @@ const shipments: ShipmentRepository = {
       updatedBy: ctx.userId,
     });
   },
+  // The writes wider than CRUD — each one operation (`./shipment-writes.ts`).
+  assemble,
+  changeContents,
+  recordTransport,
+  settleReadiness,
+  issueShippingPaper,
+  recordDeparture,
+  recordArrival,
 };
 
 const shippingPapers = tenantAppendOnlyRepository<

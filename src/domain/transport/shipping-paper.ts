@@ -6,8 +6,7 @@ import {
   CLASSIFICATION_DECISION_STATUSES,
   CLASSIFICATION_DECISION_STATUS_LABELS,
 } from "@/domain/taxonomy/classification-decision-status";
-import { DAMAGE_FINDING_TYPE_LABELS } from "@/domain/taxonomy/damage-finding-type";
-import { DDR_FLAG_LABELS, type DdrFlag } from "@/domain/taxonomy/ddr-flag";
+import type { DdrFlag } from "@/domain/taxonomy/ddr-flag";
 import { isTaxonomyValue, readTaxonomyValue } from "@/domain/taxonomy/lookup";
 import {
   PACKING_GROUPS,
@@ -26,8 +25,8 @@ import {
 import { addDecimal } from "@/domain/units";
 
 import {
+  airBlockIndicatorText,
   assessAirTransport,
-  type AirBlockIndicator,
   type AirTransportAssessment,
 } from "./air-transport";
 import { buildBasicDescription, type LineIdentity } from "./basic-description";
@@ -411,15 +410,6 @@ function classificationFinding(
   return `${record.recordNumber} has no active classification (its decision is ${statusText}). ${decision.reasoning}`;
 }
 
-function indicatorText(indicator: AirBlockIndicator): string {
-  if (indicator.kind === "finding") {
-    return DAMAGE_FINDING_TYPE_LABELS[indicator.finding];
-  }
-  return indicator.flag === "recalled"
-    ? "a recall association"
-    : DDR_FLAG_LABELS[indicator.flag];
-}
-
 function modeFindings(
   mode: TransportMode,
   air: AirTransportAssessment,
@@ -427,7 +417,7 @@ function modeFindings(
   if (mode !== "air" || air.available) return [];
   return air.blockingRecords.map(
     (record) =>
-      `Air transport is not available: ${record.recordNumber} is on the damaged, defective or recalled path (${record.indicators.map(indicatorText).join(", ")}).`,
+      `Air transport is not available: ${record.recordNumber} is on the damaged, defective or recalled path (${record.indicators.map(airBlockIndicatorText).join(", ")}).`,
   );
 }
 
