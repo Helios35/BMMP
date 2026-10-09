@@ -126,23 +126,21 @@ export function PreconditionChecklist({
               data-precondition-met={item.met ? "true" : "false"}
               className="flex gap-3"
             >
-              {item.met ? (
-                <CircleCheck
-                  aria-hidden="true"
-                  className={cn(
-                    "mt-0.5 size-5 shrink-0",
-                    INTENT_TEXT_CLASSES.ok,
-                  )}
-                />
-              ) : (
-                <CircleAlert
-                  aria-hidden="true"
-                  className={cn(
-                    "mt-0.5 size-5 shrink-0",
-                    INTENT_TEXT_CLASSES.critical,
-                  )}
-                />
-              )}
+              {/* The icon sits on the title's first line: a 24px box, the
+                  line height of the body token, centres it there. */}
+              <span className="flex h-6 shrink-0 items-center">
+                {item.met ? (
+                  <CircleCheck
+                    aria-hidden="true"
+                    className={cn("size-5", INTENT_TEXT_CLASSES.ok)}
+                  />
+                ) : (
+                  <CircleAlert
+                    aria-hidden="true"
+                    className={cn("size-5", INTENT_TEXT_CLASSES.critical)}
+                  />
+                )}
+              </span>
               <div className="flex min-w-0 flex-col gap-1">
                 <p className="text-body-strong">
                   {PRECONDITION_TITLES[item.id]}

@@ -185,7 +185,7 @@ export default async function CatalogAdministrationPage() {
                             the entry, so no column scrolls sideways. */}
                         <span
                           data-entry-identity={entry.id}
-                          className="text-caption font-normal text-muted-foreground"
+                          className="text-caption text-muted-foreground"
                         >
                           {`${IDENTITY_COLUMN}: ${identityText(entry.identity)}`}
                         </span>

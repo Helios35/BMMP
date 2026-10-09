@@ -181,6 +181,32 @@ const RESOLVE = {
     match: "Open the label",
     label: "the sound drum's printed label",
   },
+  shipThisContainer: {
+    fromResolved: "soundDrum",
+    as: "p1",
+    selector: 'a[data-ship-this-container="true"]',
+    match: "Ship this container",
+    label: "Build a shipment, the sound drum pre-selected",
+  },
+  julyShipment: {
+    from: "/shipments",
+    as: "p2",
+    match: "SH-0001",
+    label: "the July shipment, delivered and closed",
+  },
+  augustDraft: {
+    from: "/shipments",
+    as: "p2",
+    match: "SH-0002",
+    label: "the August draft, no paper yet",
+  },
+  julyPaper: {
+    fromResolved: "julyShipment",
+    as: "p2",
+    selector: 'a[data-open-paper="true"]',
+    match: "Open the document",
+    label: "the July shipping paper",
+  },
 };
 
 /**
@@ -465,6 +491,72 @@ const SCREENS = [
     note: "Storage events for every role; the audit trail for the roles that read it.",
   },
 
+  // --- shipments ---------------------------------------------------------
+  {
+    id: "shipments-list",
+    group: "Shipments",
+    route: "/shipments",
+    title: "Shipments — the ledger",
+    path: "/shipments",
+    as: "p1",
+    note: "Build a shipment in the toolbar; the paper's state and the departure date per row.",
+  },
+  {
+    id: "shipments-auditor",
+    group: "Shipments",
+    route: "/shipments",
+    title: "Shipments — E-8a, auditor",
+    path: "/shipments",
+    as: "p5",
+    note: "Build a shipment disabled with its reason; the read-only banner.",
+  },
+  {
+    id: "shipment-new-contents",
+    group: "Shipments",
+    route: "/shipments/new",
+    title: "Build a shipment — step 1, contents",
+    path: (r) => r.shipThisContainer,
+    as: "p1",
+    note: "Ship this container arrives pre-selected; the unlabeled drum and the empty one say why they cannot ship.",
+  },
+  {
+    id: "shipment-new-transport",
+    group: "Shipments",
+    route: "/shipments/new",
+    title: "Build a shipment — step 2, transport",
+    path: (r) =>
+      r.shipThisContainer.replace("?containers=", "?step=2&containers="),
+    as: "p1",
+    note: "Mode, carrier, destination. Air is available: nothing in scope is damaged.",
+  },
+  {
+    id: "shipment-delivered",
+    group: "Shipments",
+    route: "/shipments/[id]",
+    title: "Shipment — delivered, its paper",
+    path: (r) => r.julyShipment,
+    as: "p2",
+    note: "The issued paper through DocumentViewer, and the retention date the rule stamped.",
+  },
+  {
+    id: "shipment-draft",
+    group: "Shipments",
+    route: "/shipments/[id]",
+    title: "Shipment — a draft with no paper",
+    path: (r) => r.augustDraft,
+    as: "p1",
+    note: "No shipping paper: it cannot depart without one. Continue building and Change contents for P1.",
+  },
+  {
+    id: "shipment-history",
+    group: "Shipments",
+    route: "/shipments/[id]",
+    title: "Shipment — History",
+    path: (r) => `${r.julyShipment}?tab=history`,
+    as: "p2",
+    note: "Every render, and the audit trail for the roles that read it.",
+  },
+
   // --- documents ---------------------------------------------------------
   {
     id: "document-label",
@@ -474,6 +566,15 @@ const SCREENS = [
     path: (r) => r.soundDrumLabel,
     as: "p5",
     note: "Print and Download never disabled (Rule 5.27).",
+  },
+  {
+    id: "document-shipping-paper",
+    group: "Documents",
+    route: "/documents/[id]",
+    title: "Document — shipping paper, as the auditor",
+    path: (r) => r.julyPaper,
+    as: "p5",
+    note: "The paper's own stored lines, number and certification — never today's catalog.",
   },
 
   // --- catalog -----------------------------------------------------------
