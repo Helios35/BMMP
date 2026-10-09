@@ -5,7 +5,12 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { INTENT_SURFACE_CLASSES } from "./intent-classes";
 import { INTENT_BADGE_ICON } from "./intent-icons";
-import { statusIntent, statusLabel, type StatusSystem } from "./status-intent";
+import {
+  statusIntent,
+  statusLabel,
+  type StatusIntent,
+  type StatusSystem,
+} from "./status-intent";
 
 /**
  * `StatusBadge` — `UX_SPEC.md` §2.3.
@@ -55,13 +60,30 @@ export interface StatusBadgeProps {
   readonly value: string | null | undefined;
   readonly size?: StatusBadgeSize;
   readonly className?: string;
+  /**
+   * Where a governing rule says this value must not read as complete, the
+   * stronger intent it reads as instead. **It can only escalate — never soften
+   * a value's own intent.** E-14 is the case it exists for: a shipment with an
+   * outstanding manifest obligation is never shown with a green tick, whatever
+   * its status (Rule 3.12; D-36).
+   */
+  readonly escalateTo?: Extract<StatusIntent, "attention" | "critical">;
 }
+
+const INTENT_RANK: Readonly<Record<StatusIntent, number>> = {
+  neutral: 0,
+  pending: 0,
+  ok: 0,
+  attention: 1,
+  critical: 2,
+};
 
 export function StatusBadge({
   system,
   value,
   size = "md",
   className,
+  escalateTo,
 }: StatusBadgeProps) {
   // Empty — no status at all. The literal text "Not set", never an em dash and
   // never "N/A": a user who sees "—" learns nothing (§2.3, §4.5).
@@ -83,7 +105,13 @@ export function StatusBadge({
     );
   }
 
-  const intent = statusIntent(system, value);
+  const ownIntent = statusIntent(system, value);
+  const intent =
+    ownIntent !== null &&
+    escalateTo !== undefined &&
+    INTENT_RANK[escalateTo] > INTENT_RANK[ownIntent]
+      ? escalateTo
+      : ownIntent;
   const label = statusLabel(system, value);
 
   // Error — a value this build does not know. Rendered as-is, in mono, never

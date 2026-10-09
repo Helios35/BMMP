@@ -15,3 +15,5 @@ export * from "./emergency-verification";
 export * from "./packaging-exception";
 export * from "./rule-data";
 export * from "./shipping-paper";
+export * from "./stored-paper";
+export * from "./contents-summary";
