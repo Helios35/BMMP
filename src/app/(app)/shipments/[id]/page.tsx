@@ -44,8 +44,7 @@ import { TRANSPORT_MODE_LABELS } from "@/domain/taxonomy/transport-mode";
 import { ReadOnlyBanner } from "@/components/access/read-only-banner";
 import { absoluteInstant } from "@/features/battery-record/format-instant";
 import { CopyButton } from "@/features/battery-record/copy-button";
-import { RenderViewer } from "@/features/documents/components/render-viewer";
-import { DocumentPageContent } from "@/features/documents/document-page";
+import { DocumentPanel } from "@/features/documents/document-page";
 import { readDocument } from "@/features/documents/server/read-document";
 import { ShipmentActions } from "@/features/shipments/components/shipment-actions";
 import {
@@ -254,6 +253,10 @@ export default async function ShipmentPage({
           changeContents: canWrite && open,
           depart: canWrite && shipment.status === "documents_issued",
           arrive: canWrite && shipment.status === "dispatched",
+          voidPaper:
+            canWrite &&
+            shipment.status === "documents_issued" &&
+            current?.render?.status === "issued",
         }}
       />
 
@@ -374,21 +377,7 @@ async function PaperTab({
           </Link>
         </Button>
       </div>
-      <RenderViewer
-        renderId={current.render.id}
-        pageCount={current.render.pageCount}
-        embedded
-        metadata={{
-          typeLabel: view.typeLabel,
-          generatedAt: view.generatedAt,
-          generatedBy: view.generatedBy,
-          source: view.source,
-          renderId: current.render.id,
-          statusLabel: view.statusLabel,
-        }}
-      >
-        <DocumentPageContent view={view} />
-      </RenderViewer>
+      <DocumentPanel view={view} embedded />
       {earlier.length === 0 ? null : (
         <SectionCard title={PRIOR_PAPERS}>
           <ul className="grid gap-2" data-prior-papers="true">

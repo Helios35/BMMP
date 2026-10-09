@@ -16,6 +16,7 @@ function facts(overrides: Partial<DepartureFacts> = {}): DepartureFacts {
   return {
     status: "documents_issued",
     hasCurrentIssuedPaper: true,
+    currentPaperIsStored: true,
     carrierName: "Coleridge Hauling",
     transportMode: "ground",
     air: { available: true },
@@ -47,6 +48,15 @@ describe("admitDeparture", () => {
     expect(reasonOf(facts({ hasCurrentIssuedPaper: false }))).toBe(
       "no_current_paper",
     );
+  });
+
+  it("refuses an issued paper with no stored file — the bytes are the document (§8.2)", () => {
+    const admission = admitDeparture(facts({ currentPaperIsStored: false }));
+    expect(admission.ok).toBe(false);
+    if (!admission.ok) {
+      expect(admission.reason).toBe("paper_not_stored");
+      expect(admission.message).toContain("Void it with a reason");
+    }
   });
 
   it("refuses without a carrier (Rule 5.16)", () => {

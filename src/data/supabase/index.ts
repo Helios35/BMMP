@@ -149,15 +149,17 @@ export const supabaseAdapter: DataAdapter = {
     "recordTransport",
     "settleReadiness",
     "issueShippingPaper",
+    "voidShippingPaper",
     "recordDeparture",
     "recordArrival",
   ]),
   shippingPapers: unimplemented("shippingPapers", APPEND_ONLY),
-  containerLabels: unimplemented("containerLabels", APPEND_ONLY),
+  containerLabels: unimplemented("containerLabels", [...APPEND_ONLY, "issue"]),
   documentRenders: unimplemented("documentRenders", [
     ...APPEND_ONLY,
     "readBytes",
     "verify",
+    "storeDraft",
     "markSuperseded",
   ]),
 

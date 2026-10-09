@@ -12,6 +12,8 @@ import type {
   ShipmentTransportChange,
   ShipmentTransportDetails,
   ShippingPaperIssue,
+  ShippingPaperVoid,
+  VoidedShippingPaper,
 } from "@/data/contracts/documents";
 import type { StorageWriteAttribution } from "@/data/contracts/storage";
 import type { BatteryRecord } from "@/types/battery-record";
@@ -62,8 +64,14 @@ import {
 } from "@/lib/errors";
 
 import { writeTriggerAudit as audit } from "./audit-row";
+import {
+  DOCUMENTS_BUCKET,
+  recordRenderFailure,
+  writeRender,
+} from "./document-writes";
 import { now } from "./factory";
 import { formatRecordNumber, nextId, nextSequenceNumber } from "./ids";
+import { hasStoredObject, snapshotObjects } from "./object-store";
 import { assertPolicy } from "./policy";
 import { mockStore } from "./store";
 import { contentsOf } from "./storage-writes";
@@ -99,18 +107,6 @@ const OPEN_SHIPMENT_STATUSES: readonly ShipmentStatus[] = [
 
 /** Where the stored clock stop says why it stopped. Free text in `ERD.md` §6.3, as `emptied` is. */
 const DEPARTURE_STOP_REASON = "shipped";
-
-/**
- * The page `/documents/[id]` composes from the stored payload. **Unit 06
- * replaces this with the PDF renderer's identity** — and adds the bytes, the
- * content hash and the verification code this render does not have yet.
- */
-const SHIPPING_PAPER_RENDER = {
-  templateKey: "shipping_paper",
-  templateVersion: "b1a-05",
-  rendererName: "document-viewer",
-  rendererVersion: "b1a-05",
-} as const;
 
 // --- the row builder, shared with the repository's `create` ---------------------------------
 
@@ -164,12 +160,16 @@ function snapshot(): () => void {
     s.auditEvents,
   ] as const;
   const saved = tables.map((table) => [...table.all()]);
+  // Bytes a rolled-back issue stored go with it: never a row pointing at
+  // bytes that are not there, and never bytes no row answers for.
+  const restoreObjects = snapshotObjects();
   return () => {
     tables.forEach((table, index) => {
       (table.replaceAll as (rows: readonly unknown[]) => void)(
         saved[index] ?? [],
       );
     });
+    restoreObjects();
   };
 }
 
@@ -541,6 +541,72 @@ function currentPaper(
   return render === undefined ? null : { paper: newest, render };
 }
 
+/**
+ * **The one predicate offer, departure and the paper tab's readiness stand
+ * on**: the shipment's current paper is issued, and its bytes are stored and
+ * hashed. A render without bytes is not a paper anything may travel with.
+ */
+export function currentIssuedPaperWithBytes(
+  ctx: RequestContext,
+  shipmentId: Uuid,
+): { readonly paper: ShippingPaper; readonly render: DocumentRender } | null {
+  const current = currentPaper(ctx, shipmentId);
+  if (current === null) return null;
+  const { render } = current;
+  if (
+    render.status !== "issued" ||
+    render.contentHash === "" ||
+    render.byteSize <= 0 ||
+    !hasStoredObject(DOCUMENTS_BUCKET, render.storageObjectPath)
+  ) {
+    return null;
+  }
+  return current;
+}
+
+/**
+ * Rules 5.13, 5.14 — the void, as both doors write it: the render marked
+ * `voided` through the trigger's one update, kept in full with its bytes, the
+ * reason and the actor on its `document_render.voided` row, and the shipment
+ * back to `draft` for regeneration.
+ */
+async function voidIssuedPaper(
+  ctx: RequestContext,
+  at: IsoTimestamp,
+  attribution: StorageWriteAttribution,
+  shipment: Shipment,
+  issued: { readonly paper: ShippingPaper; readonly render: DocumentRender },
+  reason: string,
+  change: JsonObject,
+): Promise<void> {
+  await store().documentRenders.updateAsDefiner(ctx, issued.render.id, {
+    status: "voided",
+  });
+  await audit(ctx, at, attribution, {
+    eventType: "document_render.voided",
+    entityTable: "document_render",
+    entityId: issued.render.id,
+    beforeState: { status: issued.render.status },
+    afterState: {
+      status: "voided",
+      shipmentId: shipment.id,
+      shippingPaperId: issued.paper.id,
+      ...change,
+    },
+    changedFields: ["status"],
+    reason,
+  });
+  await audit(ctx, at, attribution, {
+    eventType: "shipment.status_changed",
+    entityTable: "shipment",
+    entityId: shipment.id,
+    beforeState: { status: shipment.status },
+    afterState: { status: "draft", ...change },
+    changedFields: ["status"],
+    reason,
+  });
+}
+
 export async function changeContents(
   ctx: RequestContext,
   input: ShipmentContentsChange,
@@ -648,35 +714,18 @@ export async function changeContents(
     };
     if (voids && issued !== null) {
       // Rule 5.13 — void immediately; Rule 5.14 — retained in full, marked,
-      // with the reason and the actor. The trigger's one update on the render.
-      await s.documentRenders.updateAsDefiner(ctx, issued.render.id, {
-        status: "voided",
-      });
+      // with the reason and the actor.
+      await voidIssuedPaper(
+        ctx,
+        input.at,
+        input.attribution,
+        shipment,
+        issued,
+        reason,
+        change,
+      );
       voidedDocumentRenderId = issued.render.id;
-      await audit(ctx, input.at, input.attribution, {
-        eventType: "document_render.voided",
-        entityTable: "document_render",
-        entityId: issued.render.id,
-        beforeState: { status: issued.render.status },
-        afterState: {
-          status: "voided",
-          shipmentId: shipment.id,
-          shippingPaperId: issued.paper.id,
-          ...change,
-        },
-        changedFields: ["status"],
-        reason,
-      });
       status = "draft";
-      await audit(ctx, input.at, input.attribution, {
-        eventType: "shipment.status_changed",
-        entityTable: "shipment",
-        entityId: shipment.id,
-        beforeState: { status: shipment.status },
-        afterState: { status, ...change },
-        changedFields: ["status"],
-        reason,
-      });
     }
     // TODO(T-43): a contents change on a shipment with no issued paper is an
     // audited act (Rule 12.1) and T-43 has no type for it; the void and the
@@ -897,6 +946,58 @@ export async function issueShippingPaper(
     });
   }
 
+  const previous = currentPaper(ctx, shipment.id);
+  const [governing] = input.paper.ruleVersionsApplied;
+  if (governing === undefined) {
+    throw new DataIntegrityError({
+      userMessage: "Something went wrong and nothing was issued. Try again.",
+      correlationId: ctx.correlationId,
+      context: { reason: "no_governing_rule_version" },
+    });
+  }
+
+  try {
+    return await atomically(async () => {
+      // §8.2 — the bytes, their hash and the row, or none of them. The
+      // corrected paper points at the one it follows (Rule 5.15).
+      const render = await writeRender(ctx, {
+        compose: input.compose,
+        status: "issued",
+        at: input.at,
+        documentType: "shipping_paper",
+        subject: { shipmentId: shipment.id },
+        supersedesDocumentRenderId: previous?.render.id ?? null,
+      });
+      return writePaperRows(ctx, input, shipment, records, render, {
+        previousPaperId: previous?.paper.id ?? null,
+        governingRuleVersionId: governing.ruleVersionId,
+      });
+    });
+  } catch (error) {
+    await recordRenderFailure(ctx, input.at, input.attribution, {
+      error,
+      documentType: "shipping_paper",
+      subject: { entityTable: "shipment", entityId: shipment.id },
+      inputs: payload,
+    });
+    throw error;
+  }
+}
+
+/** The `shipping_paper` row and the shipment's move to issued, after the render is stored. */
+async function writePaperRows(
+  ctx: RequestContext,
+  input: ShippingPaperIssue,
+  shipment: Shipment,
+  records: readonly BatteryRecord[],
+  render: DocumentRender,
+  links: {
+    readonly previousPaperId: Uuid | null;
+    readonly governingRuleVersionId: Uuid;
+  },
+): Promise<IssuedShippingPaper> {
+  const s = store();
+  const payload: ShippingPaperPayload = input.paper.result;
   const [firstLine] = payload.lines;
   if (firstLine === undefined) {
     throw new DataIntegrityError({
@@ -905,113 +1006,133 @@ export async function issueShippingPaper(
       context: { reason: "payload_has_no_line" },
     });
   }
-  const previous = currentPaper(ctx, shipment.id);
+  const paperRow: ShippingPaper = {
+    id: nextId(),
+    organizationId: ctx.organizationId,
+    shipmentId: shipment.id,
+    documentRenderId: render.id,
+    unIdentifier: firstLine.unIdentifier,
+    properShippingName: firstLine.properShippingName,
+    hazardClass: firstLine.hazardClass,
+    packingGroup: firstLine.packingGroup,
+    basicDescription: firstLine.basicDescription,
+    numberAndTypeOfPackages: firstLine.numberAndTypeOfPackages,
+    totalQuantityDescription: firstLine.totalQuantityDescription,
+    emergencyResponsePhone: payload.emergencyResponse.phone,
+    emergencyResponseContractRef: payload.emergencyResponse.contractRef,
+    emergencyResponseGuideNumber: payload.emergencyResponse.guideNumber,
+    shipperCertificationText: payload.shipperCertification,
+    shipperSignatureName: null,
+    shipperSignedAt: null,
+    specialPermitRefs: null,
+    governingRuleVersionId: links.governingRuleVersionId,
+    evaluationTrace: input.paper.ruleVersionsApplied,
+    supersedesShippingPaperId: links.previousPaperId,
+    generatedAt: input.at,
+    generatedBy: ctx.userId,
+    createdAt: now(),
+    lines: payload.lines,
+  };
+  const shippingPaper = await s.shippingPapers.insert(ctx, paperRow);
+
+  // Issuing is the act that offers (`offer` reads the same predicate), so
+  // the status and `offeredAt` move together, here, with the bytes stored.
+  const updated = await s.shipments.update(ctx, shipment.id, {
+    status: "documents_issued",
+    offeredAt: input.at,
+    packagingExceptions: payload.packagingException.exceptions,
+    totalMassKg: payload.lines.reduce(
+      (total, line) => addDecimal(total, line.totalMassKg),
+      "0",
+    ),
+    totalEnergyWh: totalEnergyWh(records),
+    airTransportBlockedReason: null,
+    updatedAt: now(),
+    updatedBy: ctx.userId,
+  });
+
+  await audit(ctx, input.at, input.attribution, {
+    eventType: "document_render.issued",
+    entityTable: "document_render",
+    entityId: render.id,
+    beforeState: null,
+    afterState: {
+      documentType: render.documentType,
+      shipmentId: shipment.id,
+      shippingPaperId: shippingPaper.id,
+      lineCount: payload.lines.length,
+      contentHash: render.contentHash,
+      verificationCode: render.verificationCode,
+      supersedesDocumentRenderId: render.supersedesDocumentRenderId,
+    },
+    governingRuleVersionId: links.governingRuleVersionId,
+    ruleVersionsApplied: input.paper.ruleVersionsApplied,
+  });
+  await audit(ctx, input.at, input.attribution, {
+    eventType: "shipment.status_changed",
+    entityTable: "shipment",
+    entityId: shipment.id,
+    beforeState: { status: shipment.status },
+    afterState: { status: updated.status, documentRenderId: render.id },
+    changedFields: ["status", "offeredAt"],
+    governingRuleVersionId: links.governingRuleVersionId,
+  });
+  return { shipment: updated, shippingPaper, documentRender: render };
+}
+
+// --- voidShippingPaper ---------------------------------------------------------------------------
+
+/**
+ * D-58 item 8 — the one act that voids an issued paper so its transport
+ * details can be corrected. The paper is kept, marked, readable; the reason
+ * and the actor are on the void's audit row; the shipment returns to `draft`.
+ */
+export async function voidShippingPaper(
+  ctx: RequestContext,
+  input: ShippingPaperVoid,
+): Promise<VoidedShippingPaper> {
+  assertPolicy(ctx, "shipment", "update");
+  const s = store();
+  const shipment = await s.shipments.getOrThrow(ctx, input.shipmentId);
+  const reason = input.reason.trim();
+  if (reason === "") {
+    throw new ValidationError({
+      userMessage:
+        "State why the paper is being voided — a void records its reason (Rule 5.14).",
+      correlationId: ctx.correlationId,
+      field: "reason",
+    });
+  }
+  const issued =
+    shipment.status === "documents_issued"
+      ? currentPaper(ctx, shipment.id)
+      : null;
+  if (issued === null || issued.render.status !== "issued") {
+    throw new ConflictError({
+      userMessage:
+        "This shipment has no issued paper to void. A paper can be voided only after it is issued and before the shipment departs.",
+      correlationId: ctx.correlationId,
+      context: { status: shipment.status },
+    });
+  }
 
   return atomically(async () => {
-    const renderRow: DocumentRender = {
-      id: nextId(),
-      organizationId: ctx.organizationId,
-      documentType: "shipping_paper",
-      shipmentId: shipment.id,
-      containerId: null,
-      batteryRecordId: null,
-      evidencePackId: null,
-      ...SHIPPING_PAPER_RENDER,
-      inputSnapshot: payload,
-      // Hashing, the verification code and the bytes are unit 06's. Empty is
-      // "not produced", exactly as `offer` already reads it.
-      inputSnapshotHash: "",
-      verificationCode: "",
-      ruleVersionsApplied: input.paper.ruleVersionsApplied,
-      storageObjectPath: "",
-      contentHash: "",
-      byteSize: 0,
-      pageCount: null,
-      renderedAt: input.at,
-      renderedBy: ctx.userId,
-      renderDurationMs: null,
-      status: "issued",
-      supersedesDocumentRenderId: previous?.render.id ?? null,
-      supersededAt: null,
-      createdAt: now(),
-    };
-    const render = await s.documentRenders.insert(ctx, renderRow);
-
-    const [governing] = input.paper.ruleVersionsApplied;
-    if (governing === undefined) {
-      throw new DataIntegrityError({
-        userMessage: "Something went wrong and nothing was issued. Try again.",
-        correlationId: ctx.correlationId,
-        context: { reason: "no_governing_rule_version" },
-      });
-    }
-    const paperRow: ShippingPaper = {
-      id: nextId(),
-      organizationId: ctx.organizationId,
-      shipmentId: shipment.id,
-      documentRenderId: render.id,
-      unIdentifier: firstLine.unIdentifier,
-      properShippingName: firstLine.properShippingName,
-      hazardClass: firstLine.hazardClass,
-      packingGroup: firstLine.packingGroup,
-      basicDescription: firstLine.basicDescription,
-      numberAndTypeOfPackages: firstLine.numberAndTypeOfPackages,
-      totalQuantityDescription: firstLine.totalQuantityDescription,
-      emergencyResponsePhone: payload.emergencyResponse.phone,
-      emergencyResponseContractRef: payload.emergencyResponse.contractRef,
-      emergencyResponseGuideNumber: payload.emergencyResponse.guideNumber,
-      shipperCertificationText: payload.shipperCertification,
-      shipperSignatureName: null,
-      shipperSignedAt: null,
-      specialPermitRefs: null,
-      governingRuleVersionId: governing.ruleVersionId,
-      evaluationTrace: input.paper.ruleVersionsApplied,
-      supersedesShippingPaperId: previous?.paper.id ?? null,
-      generatedAt: input.at,
-      generatedBy: ctx.userId,
-      createdAt: now(),
-      lines: payload.lines,
-    };
-    const shippingPaper = await s.shippingPapers.insert(ctx, paperRow);
-
+    await voidIssuedPaper(
+      ctx,
+      input.at,
+      input.attribution,
+      shipment,
+      issued,
+      reason,
+      { voided: "transport_correction" },
+    );
     const updated = await s.shipments.update(ctx, shipment.id, {
-      status: "documents_issued",
-      packagingExceptions: payload.packagingException.exceptions,
-      totalMassKg: payload.lines.reduce(
-        (total, line) => addDecimal(total, line.totalMassKg),
-        "0",
-      ),
-      totalEnergyWh: totalEnergyWh(records),
-      airTransportBlockedReason: null,
+      status: "draft",
+      offeredAt: null,
       updatedAt: now(),
       updatedBy: ctx.userId,
     });
-
-    await audit(ctx, input.at, input.attribution, {
-      eventType: "document_render.issued",
-      entityTable: "document_render",
-      entityId: render.id,
-      beforeState: null,
-      afterState: {
-        documentType: render.documentType,
-        shipmentId: shipment.id,
-        shippingPaperId: shippingPaper.id,
-        lineCount: payload.lines.length,
-        supersedesDocumentRenderId: render.supersedesDocumentRenderId,
-      },
-      governingRuleVersionId: governing.ruleVersionId,
-      ruleVersionsApplied: input.paper.ruleVersionsApplied,
-    });
-    await audit(ctx, input.at, input.attribution, {
-      eventType: "shipment.status_changed",
-      entityTable: "shipment",
-      entityId: shipment.id,
-      beforeState: { status: shipment.status },
-      afterState: { status: updated.status, documentRenderId: render.id },
-      changedFields: ["status"],
-      governingRuleVersionId: governing.ruleVersionId,
-    });
-    return { shipment: updated, shippingPaper, documentRender: render };
+    return { shipment: updated, voidedDocumentRenderId: issued.render.id };
   });
 }
 
@@ -1038,6 +1159,8 @@ export async function recordDeparture(
   const containers = containersOf(ctx, shipment.id);
   const records = recordsIn(ctx, containers);
 
+  // An issued paper describing exactly what leaves, with its bytes stored —
+  // a render with no bytes is not a paper anything may travel with.
   const paper = currentPaper(ctx, shipment.id);
   const hasCurrentIssuedPaper =
     paper !== null &&
@@ -1046,6 +1169,8 @@ export async function recordDeparture(
       storedRecordIds(paper.render),
       records.map((record) => record.id),
     );
+  const currentPaperIsStored =
+    currentIssuedPaperWithBytes(ctx, shipment.id) !== null;
 
   const air = assessAirTransport(
     records.map((record) => airSubject(ctx, record)),
@@ -1088,6 +1213,7 @@ export async function recordDeparture(
   const admission = admitDeparture({
     status: shipment.status,
     hasCurrentIssuedPaper,
+    currentPaperIsStored,
     carrierName: shipment.carrierName,
     transportMode: shipment.transportMode,
     air,

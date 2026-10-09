@@ -9,6 +9,7 @@ import { mockAdapter, mockStore, resetMockStore } from "@/data/mock";
 import * as ID from "@/data/mock/fixtures/ids";
 import type { ResolvedRule } from "@/domain/rules/resolve";
 import { ACCUMULATION_RULE_KEY } from "@/domain/storage/placement";
+import { generateContainerLabel } from "@/features/containers/server/label";
 import { readShippingPaperBuild } from "@/features/shipments/server/paper-build";
 import {
   assembleShipment,
@@ -27,13 +28,13 @@ import type { Container } from "@/types/storage";
  * The shipment writes, end to end against the mock adapter, through the same
  * server functions the Server Actions call — `b1a-05-shipments`' "Done".
  *
- * **No fixture is edited.** The fixtures hold no verified 24-hour number, no
- * shipper certification rule and no labelled container a paper can be
- * generated for (the owner's call: prove generate, void and depart here, with
- * in-memory test data, and let the app show the blocked checklist). Each test
- * builds what it needs on a freshly reset store: a verified number, a
- * certification rule version whose text is test data, and containers labelled
- * as unit 06's label generation will label them. Every "now" is fixed.
+ * **No fixture is edited.** The fixtures hold no verified 24-hour number and
+ * no labelled container a paper can be generated for (the owner's call: prove
+ * generate, void and depart here, with in-memory test data, and let the app
+ * show the blocked checklist). Each test builds what it needs on a freshly
+ * reset store: a verified number, and containers labelled by the real label
+ * generation (b1a-06). The shipper certification is the fixture rule version
+ * planning authored in brief 06 (D-58 item 2). Every "now" is fixed.
  */
 
 const AT = "2026-10-09T17:00:00.000Z";
@@ -111,51 +112,14 @@ function verifyCascadeNumber(): void {
   );
 }
 
-const CERTIFICATION_TEXT =
-  "TEST CERTIFICATION STATEMENT — test data, not regulatory text.";
-
-/** A federal shipper-certification rule version. Its words are test data. */
-function addCertificationRule(): void {
-  const s = mockStore();
-  const ruleId = testId();
-  s.jurisdictionRules.replaceAll([
-    ...s.jurisdictionRules.all(),
-    {
-      id: ruleId,
-      jurisdictionId: ID.JURISDICTION.federal,
-      ruleKey: "transport.shipper_certification",
-      domain: "transport",
-      title: "Shipper certification (test)",
-      description: null,
-      appliesToApplicationClasses: null,
-      isActive: true,
-      createdAt: "2025-12-01T00:00:00.000Z",
-      updatedAt: "2025-12-01T00:00:00.000Z",
-      createdBy: ID.USER.platformAdmin,
-      updatedBy: ID.USER.platformAdmin,
-    },
-  ]);
-  s.ruleVersions.replaceAll([
-    ...s.ruleVersions.all(),
-    {
-      id: testId(),
-      jurisdictionRuleId: ruleId,
-      versionLabel: "test",
-      effectiveOn: "2026-01-01",
-      expiresOn: null,
-      citation: "Shipper certification — test citation, not legal text",
-      citationUrl: null,
-      sourceDocumentRef: "test",
-      payload: { statement: CERTIFICATION_TEXT },
-      payloadSchemaKey: "transport.shipper_certification.v1",
-      supersedesRuleVersionId: null,
-      status: "active",
-      publishedAt: "2025-12-15T00:00:00.000Z",
-      publishedBy: ID.USER.platformAdmin,
-      createdAt: "2025-12-01T00:00:00.000Z",
-      createdBy: ID.USER.platformAdmin,
-    },
-  ]);
+/** The certification statement the fixture rule version carries (D-58 item 2). */
+function fixtureCertificationText(): string {
+  const version = mockStore()
+    .ruleVersions.all()
+    .find((row) => row.id === ID.RULE_VERSION.federalShipperCertification2026);
+  const statement = version?.payload.statement;
+  if (typeof statement !== "string") throw new Error("no certification rule");
+  return statement;
 }
 
 async function accumulationRuleOn(day: string): Promise<ResolvedRule> {
@@ -170,69 +134,9 @@ async function accumulationRuleOn(day: string): Promise<ResolvedRule> {
   return rule;
 }
 
-/** A label printed for the container's current start — what unit 06's label generation will write. */
+/** A label printed for the container's current start, by the real label generation. */
 async function label(containerId: Uuid): Promise<void> {
-  const s = mockStore();
-  const container = await s.containers.getOrThrow(HANDLER, containerId);
-  if (container.accumulationStartedAt === null) {
-    throw new Error("label: the container has no start");
-  }
-  const renderId = testId();
-  const labelId = testId();
-  s.documentRenders.replaceAll([
-    ...s.documentRenders.all(),
-    {
-      id: renderId,
-      organizationId: ID.ORG.cascade,
-      documentType: "container_label",
-      shipmentId: null,
-      containerId,
-      batteryRecordId: null,
-      evidencePackId: null,
-      templateKey: "container_label.test",
-      templateVersion: "test",
-      rendererName: "test",
-      rendererVersion: "test",
-      inputSnapshot: {},
-      inputSnapshotHash: "",
-      verificationCode: "",
-      ruleVersionsApplied: [],
-      storageObjectPath: "",
-      contentHash: "",
-      byteSize: 0,
-      pageCount: null,
-      renderedAt: AT,
-      renderedBy: ID.USER.danaHandler,
-      renderDurationMs: null,
-      status: "issued",
-      supersedesDocumentRenderId: null,
-      supersededAt: null,
-      createdAt: AT,
-    },
-  ]);
-  s.containerLabels.replaceAll([
-    ...s.containerLabels.all(),
-    {
-      id: labelId,
-      organizationId: ID.ORG.cascade,
-      containerId,
-      documentRenderId: renderId,
-      labelText: "TEST LABEL",
-      contentsDescription: "Test contents",
-      accumulationStartedAt: container.accumulationStartedAt,
-      handlerIdentifier: null,
-      qrPayloadUrl: `https://example.test/containers/${containerId}`,
-      governingRuleVersionId: ID.RULE_VERSION.waAccumulationPeriod2026,
-      evaluationTrace: [],
-      supersedesContainerLabelId: null,
-      generatedAt: AT,
-      generatedBy: ID.USER.danaHandler,
-      createdAt: AT,
-    },
-  ]);
-  await s.containers.update(HANDLER, containerId, {
-    currentContainerLabelId: labelId,
-  });
+  await generateContainerLabel(HANDLER, containerId, AT, NO_ATTRIBUTION);
 }
 
 /** A second vehicle pack in the sound drum, with its assessment and decision — test rows. */
@@ -331,7 +235,6 @@ beforeEach(() => {
 describe("ship a container end to end (Flow B; Rules 4.7, 5.12, 5.17, 5.18, 5.26)", () => {
   it("assembles, issues the builder's paper, departs — stopping only what left — and arrives", async () => {
     verifyCascadeNumber();
-    addCertificationRule();
     const shipped = await labelledContainerHolding(
       [ID.BATTERY.vehicleTraction],
       "Test bay — shipped",
@@ -359,13 +262,21 @@ describe("ship a container end to end (Flow B; Rules 4.7, 5.12, 5.17, 5.18, 5.26
     );
     expect(issued.shipment.status).toBe("documents_issued");
     expect(issued.shippingPaper.lines).toEqual(build.outcome.result.lines);
-    expect(issued.documentRender.inputSnapshot).toEqual(build.outcome.result);
+    // The stored snapshot is the builder's payload, plus the render's own
+    // identity — everything the render consumed (`ERD.md` §7.5).
+    expect(issued.documentRender.inputSnapshot).toMatchObject(
+      build.outcome.result,
+    );
+    expect(issued.documentRender.inputSnapshot.document).toMatchObject({
+      documentRenderId: issued.documentRender.id,
+      status: "issued",
+    });
     expect(issued.shippingPaper.basicDescription).toBe(
       "UN3480, Lithium ion batteries, 9",
     );
     expect(issued.shippingPaper.emergencyResponsePhone).toBe("+1-800-555-0142");
     expect(issued.shippingPaper.shipperCertificationText).toBe(
-      CERTIFICATION_TEXT,
+      fixtureCertificationText(),
     );
     expect(issued.documentRender.status).toBe("issued");
     expect(issued.documentRender.documentType).toBe("shipping_paper");
@@ -438,7 +349,6 @@ describe("ship a container end to end (Flow B; Rules 4.7, 5.12, 5.17, 5.18, 5.26
 
   it("refuses departure of a shipment with no issued paper", async () => {
     verifyCascadeNumber();
-    addCertificationRule();
     const container = await labelledContainerHolding(
       [ID.BATTERY.vehicleTraction],
       "Test bay — early",
@@ -456,7 +366,7 @@ describe("ship a container end to end (Flow B; Rules 4.7, 5.12, 5.17, 5.18, 5.26
   });
 
   it("issues nothing while a precondition is unmet, and names the count", async () => {
-    // No verification, no certification rule: the fixtures as they stand.
+    // No verified number: the fixtures as they stand.
     const container = await labelledContainerHolding(
       [ID.BATTERY.vehicleTraction],
       "Test bay — blocked",
@@ -469,10 +379,10 @@ describe("ship a container end to end (Flow B; Rules 4.7, 5.12, 5.17, 5.18, 5.26
     );
     expect(shipment.status).toBe("draft");
     const { build } = await readShippingPaperBuild(HANDLER, shipment, AT);
-    expect(build.checklist.unmet).toEqual(["emergency_contact", "rule_data"]);
+    expect(build.checklist.unmet).toEqual(["emergency_contact"]);
     await expect(
       generateShippingPaper(HANDLER, shipment.id, AT, NO_ATTRIBUTION),
-    ).rejects.toThrow(/2 preconditions are unmet/);
+    ).rejects.toThrow(/1 precondition is unmet/);
     expect(
       mockStore()
         .shippingPapers.all()
@@ -484,7 +394,6 @@ describe("ship a container end to end (Flow B; Rules 4.7, 5.12, 5.17, 5.18, 5.26
 describe("a contents change voids an issued paper and keeps it (Rules 5.13–5.15)", () => {
   it("voids with the reason and the actor, returns to regeneration, and the correction references it", async () => {
     verifyCascadeNumber();
-    addCertificationRule();
     const second = anotherVehiclePack();
     const first = await labelledContainerHolding(
       [ID.BATTERY.vehicleTraction],
@@ -570,7 +479,6 @@ describe("a contents change voids an issued paper and keeps it (Rules 5.13–5.1
 
   it("never re-issues over a current paper (Rule 5.12)", async () => {
     verifyCascadeNumber();
-    addCertificationRule();
     const container = await labelledContainerHolding(
       [ID.BATTERY.vehicleTraction],
       "Test bay — twice",
@@ -665,7 +573,6 @@ describe("air is refused server-side for a shipment holding a damaged record (Ru
 
   it("blocks departure while the damaged/defective packet is absent (Rule 6.16)", async () => {
     verifyCascadeNumber();
-    addCertificationRule();
     const shipment = await shipmentHoldingTheSwollenPack();
     await generateShippingPaper(HANDLER, shipment.id, AT, NO_ATTRIBUTION);
     await expect(

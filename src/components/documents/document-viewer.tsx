@@ -6,11 +6,16 @@ import { Download, Minus, Plus, Printer } from "lucide-react";
 
 import { ACTION_BUTTON_CLASS, ICON_BUTTON_CLASS } from "@/components/page";
 import { InlineActionError } from "@/components/extraction-review/review-controls";
-import { INTENT_SURFACE_CLASSES } from "@/components/status/intent-classes";
+import {
+  INTENT_SURFACE_CLASSES,
+  INTENT_TEXT_CLASSES,
+} from "@/components/status/intent-classes";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { ActionResult } from "@/lib/action-result";
 import { cn } from "@/lib/utils";
+
+import { PdfPages } from "./pdf-pages";
 
 /**
  * `DocumentViewer` — `UX_SPEC.md` §2.8, §3.14.
@@ -32,8 +37,12 @@ import { cn } from "@/lib/utils";
  * first: `onPrint` writes the audit row, and a print that could not be recorded
  * does not start (BR §12).
  *
- * **A render is immutable** (Rules 4.20, 5.12). Nothing here edits one; the
- * canvas is whatever the route composed from the render's own frozen rows.
+ * **A render is immutable** (Rules 4.20, 5.12). Nothing here edits one.
+ * **A render with stored bytes shows those bytes** — the issued PDF, drawn
+ * page by page, with any void or supersession stamp laid over every page so
+ * it prints with them (§3.14). A render with no stored file (the fixtures
+ * that predate document generation) shows the page the route composed from
+ * its own frozen rows, and says so.
  */
 
 export interface DocumentViewerMetadata {
@@ -46,16 +55,24 @@ export interface DocumentViewerMetadata {
   readonly source: { readonly label: string; readonly href: string | null };
   /** `document_render.id`, printed in the footer and copyable here. */
   readonly renderId: string;
+  /** `document_render.verification_code`, printed in the footer. */
+  readonly verificationCode: string;
   /** T-39's label for the stored status. */
   readonly statusLabel: string;
 }
 
-/** What the Download action hands back: the stored bytes, as issued. */
+/** What Download hands back: the stored bytes, as issued. */
 export interface DownloadedDocument {
   readonly fileName: string;
-  readonly contentType: string;
-  /** Base64 — Server Action results travel as JSON. */
-  readonly base64: string;
+  readonly bytes: Blob;
+}
+
+/** The render's stored file, where it has one. */
+export interface DocumentViewerFile {
+  /** The stream route for the stored bytes. */
+  readonly src: string;
+  /** Laid over every page — the void or supersession stamp. It prints. */
+  readonly stamp?: ReactNode;
 }
 
 export interface DocumentViewerProps {
@@ -66,8 +83,15 @@ export interface DocumentViewerProps {
   readonly onPrint: () => Promise<ActionResult<unknown>>;
   /** Streams the stored bytes. A render with none says so, stated. */
   readonly onDownload: () => Promise<ActionResult<DownloadedDocument>>;
-  /** The composed page. Marking for void, supersession or draft belongs inside it. */
-  readonly children: ReactNode;
+  /**
+   * The stored file. When present the canvas is the issued PDF itself and
+   * `children` is not shown; when absent the canvas is `children`.
+   */
+  readonly file?: DocumentViewerFile | null;
+  /** Void, supersession or draft — printed above the stored pages. */
+  readonly marking?: ReactNode;
+  /** The composed page, for a render with no stored file. Its marking belongs inside it. */
+  readonly children?: ReactNode;
   /** A preview inside another page — `/containers/[id]`'s Label tab. */
   readonly embedded?: boolean;
   readonly className?: string;
@@ -77,14 +101,7 @@ const ZOOM_STEPS = [0.75, 1, 1.25, 1.5] as const;
 const DEFAULT_ZOOM_INDEX = 1;
 
 function saveBytes(file: DownloadedDocument): void {
-  const binary = atob(file.base64);
-  const bytes = new Uint8Array(binary.length);
-  for (let index = 0; index < binary.length; index += 1) {
-    bytes[index] = binary.charCodeAt(index);
-  }
-  const url = URL.createObjectURL(
-    new Blob([bytes], { type: file.contentType }),
-  );
+  const url = URL.createObjectURL(file.bytes);
   const anchor = document.createElement("a");
   anchor.href = url;
   anchor.download = file.fileName;
@@ -97,6 +114,8 @@ export function DocumentViewer({
   pageCount,
   onPrint,
   onDownload,
+  file = null,
+  marking,
   children,
   embedded = false,
   className,
@@ -229,18 +248,35 @@ export function DocumentViewer({
         data-document-backdrop="true"
         className="overflow-auto rounded-lg bg-muted p-4 md:p-8"
       >
-        <article
-          data-print-document="true"
-          aria-label={`${metadata.typeLabel} ${metadata.renderId}`}
-          style={{ zoom }}
-          className="mx-auto flex aspect-[8.5/11] w-full max-w-3xl flex-col gap-6 rounded-md border border-border bg-background p-6 text-foreground md:p-12"
-        >
-          {children}
-          <footer className="mt-auto flex flex-wrap justify-between gap-2 border-t border-border pt-2 text-caption">
-            <span>{metadata.typeLabel}</span>
-            <span className="text-mono">{metadata.renderId}</span>
-          </footer>
-        </article>
+        {file === null ? null : (
+          <div
+            data-print-document="true"
+            data-document-file="true"
+            style={{ zoom }}
+            className="flex flex-col gap-4"
+          >
+            {marking}
+            <PdfPages
+              src={file.src}
+              label={`${metadata.typeLabel} ${metadata.renderId}`}
+              overlay={file.stamp}
+            />
+          </div>
+        )}
+        {file !== null ? null : (
+          <article
+            data-print-document="true"
+            aria-label={`${metadata.typeLabel} ${metadata.renderId}`}
+            style={{ zoom }}
+            className="mx-auto flex aspect-[8.5/11] w-full max-w-3xl flex-col gap-6 rounded-md border border-border bg-background p-6 text-foreground md:p-12"
+          >
+            {children}
+            <footer className="mt-auto flex flex-wrap justify-between gap-2 border-t border-border pt-2 text-caption">
+              <span>{metadata.typeLabel}</span>
+              <span className="text-mono">{metadata.renderId}</span>
+            </footer>
+          </article>
+        )}
       </div>
 
       <dl
@@ -269,6 +305,16 @@ export function DocumentViewer({
           </dd>
         </div>
         <MetaRow label="Render instance" value={metadata.renderId} mono />
+        <MetaRow
+          label="Verification code"
+          value={
+            metadata.verificationCode === ""
+              ? "None — no stored file"
+              : metadata.verificationCode
+          }
+          mono
+          dataAttribute="data-document-verification-code"
+        />
       </dl>
     </div>
   );
@@ -278,17 +324,56 @@ function MetaRow({
   label,
   value,
   mono = false,
+  dataAttribute,
 }: {
   readonly label: string;
   readonly value: string;
   readonly mono?: boolean;
+  readonly dataAttribute?: string;
 }): ReactElement {
   return (
     <div className="flex flex-col gap-1">
       <dt className="text-caption text-muted-foreground">{label}</dt>
-      <dd className={cn(mono ? "text-mono break-all" : "text-body")}>
+      <dd
+        {...(dataAttribute === undefined ? {} : { [dataAttribute]: "true" })}
+        className={cn(mono ? "text-mono break-all" : "text-body")}
+      >
         {value}
       </dd>
+    </div>
+  );
+}
+
+/**
+ * The stamp a voided or superseded render carries **over every stored page**
+ * (Rules 5.14, 5.15; `UX_SPEC.md` §3.14). It is part of the printed element,
+ * so the paper says what the screen says. A draft carries its own watermark
+ * in its bytes; an issued render carries none.
+ */
+export function DocumentStatusStamp({
+  status,
+  statusLabel,
+}: {
+  /** T-39 as stored. */
+  readonly status: string;
+  readonly statusLabel: string;
+}): ReactElement | null {
+  if (status !== "voided" && status !== "superseded") return null;
+  const intent = status === "voided" ? "critical" : "attention";
+  return (
+    <div
+      aria-hidden="true"
+      data-document-stamp={status}
+      className="pointer-events-none absolute inset-0 flex items-center justify-center"
+    >
+      <span
+        className={cn(
+          "-rotate-[30deg] rounded-md border-4 border-current px-6 py-2 text-display tracking-widest uppercase opacity-80",
+          INTENT_TEXT_CLASSES[intent],
+        )}
+      >
+        {statusLabel}
+      </span>
     </div>
   );
 }

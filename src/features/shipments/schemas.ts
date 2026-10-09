@@ -109,6 +109,16 @@ export const changeContentsSchema = z.object({
 
 export const shipmentIdSchema = z.object({ shipmentId: z.uuid() });
 
+/** D-58 item 8 — a void states its reason (Rule 5.14). */
+export const voidPaperSchema = z.object({
+  shipmentId: z.uuid(),
+  reason: z
+    .string()
+    .trim()
+    .min(1, "State why the paper is being voided — a void records its reason.")
+    .max(MAX_REASON_LENGTH),
+});
+
 export const arrivalSchema = z.object({
   shipmentId: z.uuid(),
   receivedConfirmationRef: optional,

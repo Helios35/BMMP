@@ -207,6 +207,38 @@ const RESOLVE = {
     match: "Open the document",
     label: "the July shipping paper",
   },
+  quarantineDrum: {
+    from: "/containers",
+    as: "p2",
+    match: "C-0002",
+    label: "the quarantine drum, holding the swollen pack, unlabelled",
+  },
+  // b1a-06 — the two documents the sheet makes for itself. Each is an act a
+  // person takes on the screen, so the sheet takes it the same way.
+  quarantineLabel: {
+    act: {
+      fromResolved: "quarantineDrum",
+      path: (href) => `${href}?tab=label`,
+      clicks: [
+        '[data-generate-label="true"]',
+        '[data-generate-label-confirm="true"]',
+      ],
+      landsOn: /\/documents\/[^/]+$/,
+    },
+    as: "p1",
+    label: "the quarantine drum's label, generated for the sheet",
+  },
+  draftPaper: {
+    act: {
+      fromResolved: "augustDraft",
+      path: (href) =>
+        `/shipments/new?shipment=${href.replace("/shipments/", "")}&step=3`,
+      clicks: ['[data-print-draft="true"]'],
+      landsOn: /\/documents\/[^/]+$/,
+    },
+    as: "p1",
+    label: "a draft of the August shipment's paper, stored by printing it",
+  },
 };
 
 /**
@@ -482,6 +514,25 @@ const SCREENS = [
     note: "The printed label through DocumentViewer: the phrase, contents and start date as printed.",
   },
   {
+    id: "container-label-blocked",
+    group: "Containers",
+    route: "/containers/[id]",
+    title: "Container — Label tab, nothing to label",
+    path: (r) => `${r.overdueDrum}?tab=label`,
+    as: "p2",
+    note: "Generate label inert with its reason, and every missing input named beneath it (Rule 4.18).",
+  },
+  {
+    id: "container-label-issued",
+    group: "Containers",
+    route: "/containers/[id]",
+    title: "Container — Label tab, a generated label",
+    path: (r) => `${r.quarantineDrum}?tab=label`,
+    as: "p2",
+    ready: '[data-pdf-pages="ready"]',
+    note: "The issued PDF, drawn from its stored bytes; Generate a new label supersedes it (Rules 4.20, 4.21).",
+  },
+  {
     id: "container-history",
     group: "Containers",
     route: "/containers/[id]",
@@ -566,6 +617,26 @@ const SCREENS = [
     path: (r) => r.soundDrumLabel,
     as: "p5",
     note: "Print and Download never disabled (Rule 5.27).",
+  },
+  {
+    id: "document-label-issued",
+    group: "Documents",
+    route: "/documents/[id]",
+    title: "Document — a generated label, as the auditor",
+    path: (r) => r.quarantineLabel,
+    as: "p5",
+    ready: '[data-pdf-pages="ready"]',
+    note: "The stored PDF itself; render id and verification code in the strip; a paper copy's code checks here (§8.4).",
+  },
+  {
+    id: "document-draft",
+    group: "Documents",
+    route: "/documents/[id]",
+    title: "Document — a draft paper",
+    path: (r) => r.draftPaper,
+    as: "p1",
+    ready: '[data-pdf-pages="ready"]',
+    note: "Stored only because it was printed; NOT VALID on every page, marked above (Rule 5.28).",
   },
   {
     id: "document-shipping-paper",
@@ -851,6 +922,20 @@ async function signIn(page, baseUrl, persona) {
  * so the value a person recognises is not always the one carrying the anchor.
  */
 async function resolveHref(page, baseUrl, spec, resolved) {
+  if (spec.act !== undefined) {
+    const from = resolved[spec.act.fromResolved];
+    if (from === undefined) {
+      throw new Error(
+        `Could not resolve ${spec.label}: "${spec.act.fromResolved}" has not been resolved yet`,
+      );
+    }
+    await page.goto(`${baseUrl}${spec.act.path(from)}`);
+    for (const selector of spec.act.clicks) {
+      await page.locator(selector).first().click();
+    }
+    await page.waitForURL(spec.act.landsOn);
+    return new URL(page.url()).pathname;
+  }
   if (spec.on !== undefined) {
     await page.goto(`${baseUrl}${spec.on}`);
     const href = await page.locator(spec.selector).first().getAttribute("href");
@@ -915,6 +1000,15 @@ async function settle(page, screen) {
   }
   const marker = screen.as === null ? "text=BMMP" : "#page-title";
   await page.locator(marker).first().waitFor({ state: "visible" });
+  // A stored PDF is drawn after the page renders; photograph it drawn.
+  if (screen.ready !== undefined) {
+    await page.locator(screen.ready).first().waitFor({ state: "visible" });
+    await page.waitForFunction(() =>
+      Array.from(document.querySelectorAll("[data-pdf-page] canvas")).every(
+        (canvas) => canvas.width > 0,
+      ),
+    );
+  }
   await page.waitForLoadState("load");
   await page.evaluate(() =>
     document.fonts.ready.then(

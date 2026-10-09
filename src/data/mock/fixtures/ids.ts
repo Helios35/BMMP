@@ -87,6 +87,10 @@ export const JURISDICTION_RULE = {
   waWasteClassification: uid("0a000006", 2),
   federalTransport: uid("0a000006", 3),
   federalRetention: uid("0a000006", 4),
+  /** Authored by planning in brief 06 (D-58 item 2). */
+  federalShipperCertification: uid("0a000006", 5),
+  /** The container label phrase — the owner's call in b1a-06. */
+  waContainerLabel: uid("0a000006", 6),
 } as const;
 
 export const RULE_VERSION = {
@@ -96,6 +100,8 @@ export const RULE_VERSION = {
   federalRetention2026: uid("0a000007", 4),
   /** Drafted, never published — so "only a published version resolves" is testable. */
   waAccumulationPeriodDraft2027: uid("0a000007", 5),
+  federalShipperCertification2026: uid("0a000007", 6),
+  waContainerLabel2026: uid("0a000007", 7),
 } as const;
 
 export const CATALOG = {

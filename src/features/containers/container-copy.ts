@@ -74,8 +74,20 @@ export const CONTENTS_EMPTY =
   "This container holds nothing. The storage clock starts when the first battery goes in.";
 export const CONTENTS_CAPTION = "Batteries in this container";
 
-export const LABEL_NONE =
-  "No label has been printed for this container. Label generation arrives with document generation.";
+export const LABEL_NONE = "No label has been printed for this container.";
+export const LABEL_GENERATE = "Generate label";
+export const LABEL_GENERATE_NEW = "Generate a new label";
+export const LABEL_GENERATING = "Generating…";
+export const LABEL_CONFIRM_TITLE = "Generate the container label?";
+export const LABEL_CONFIRM_BODY =
+  "The label is issued with the wording, contents and start date the records hold now, and is never edited afterwards. Print it from the label that opens next.";
+export const LABEL_CONFIRM_SUPERSEDES =
+  "The label in force is kept, still readable, and marked superseded by this one (Rules 4.20, 5.15).";
+export const LABEL_CONFIRM = "Generate";
+export const LABEL_CANCEL = "Cancel";
+export const LABEL_BLOCKED_TITLE = "The label cannot be generated yet";
+export const LABEL_BLOCKED_GATED =
+  "Everything listed under the label must be in place first.";
 export const LABEL_OPEN = "Open the label";
 export const LABEL_REGENERATE_FLAG =
   "The label no longer matches this container. A person must print a new one before it ships.";

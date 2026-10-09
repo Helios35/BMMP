@@ -6,8 +6,8 @@ import { ReadOnlyBanner } from "@/components/access/read-only-banner";
 import { data } from "@/data";
 import { showsReadOnlyBanner } from "@/domain/access/control-treatment";
 import { APP_ROUTE_NAMES } from "@/domain/access/routes";
-import { RenderViewer } from "@/features/documents/components/render-viewer";
-import { DocumentPageContent } from "@/features/documents/document-page";
+import { VerifyCodeForm } from "@/features/documents/components/verify-code-form";
+import { DocumentPanel } from "@/features/documents/document-page";
 import { readDocument } from "@/features/documents/server/read-document";
 import { Breadcrumbs } from "@/features/shell/chrome/breadcrumbs";
 import { breadcrumbTrail } from "@/features/shell/navigation/breadcrumb-ancestors";
@@ -22,13 +22,13 @@ import { recordNotFound } from "@/lib/auth/record-denial";
  * role that can reach the route (Rule 5.27). Authenticated only — there is no
  * public document URL in B1a (`SITE_ARCHITECTURE.md` §5.6).
  *
- * **Every render is immutable** (Rule 5.12): nothing here edits one. A render
- * that is superseded or voided is marked on its own page, and the marking
- * prints.
- *
- * **No PDF is generated here** — document generation is unit 06. A fixture
- * render has no stored file behind it, and Download says so rather than
- * producing one.
+ * **Every render is immutable** (Rule 5.12): nothing here edits one, and
+ * **nothing here renders one** — the canvas is the stored PDF, streamed from
+ * `GET /api/documents/[id]/pdf` and drawn as it was issued. A render that is
+ * superseded or voided is marked over its own pages, and the marking prints.
+ * A paper copy's footer code can be checked against the render here
+ * (`TECHNICAL_SPEC.md` §8.4). A fixture render with no stored file shows the
+ * page composed from its rows, and says so.
  */
 
 export const metadata: Metadata = {
@@ -77,20 +77,10 @@ export default async function DocumentPage({
           ) : undefined
         }
       />
-      <RenderViewer
-        renderId={render.id}
-        pageCount={render.pageCount}
-        metadata={{
-          typeLabel: view.typeLabel,
-          generatedAt: view.generatedAt,
-          generatedBy: view.generatedBy,
-          source: view.source,
-          renderId: render.id,
-          statusLabel: view.statusLabel,
-        }}
-      >
-        <DocumentPageContent view={view} />
-      </RenderViewer>
+      <DocumentPanel view={view} />
+      {view.storedFile.state === "stored" ? (
+        <VerifyCodeForm renderId={render.id} statusLabel={view.statusLabel} />
+      ) : null}
     </PageShell>
   );
 }

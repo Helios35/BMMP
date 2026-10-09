@@ -30,6 +30,7 @@ import {
   recordTransportSchema,
   shipmentIdSchema,
   transportDetails,
+  voidPaperSchema,
 } from "./schemas";
 import {
   assembleShipment as assemble,
@@ -38,6 +39,8 @@ import {
   generateShippingPaper as generate,
   recordShipmentArrival,
   recordShipmentTransport,
+  storeShippingPaperDraft,
+  voidShippingPaper,
 } from "./server/writes";
 
 /**
@@ -227,6 +230,57 @@ export async function recordArrival(
         attribution,
       );
       return { shipmentId: shipment.id };
+    },
+  );
+}
+
+/**
+ * **Void the paper** on `/shipments/[id]` — D-58 item 8. One audited act with
+ * a stated reason; the paper is kept, marked and readable, and the shipment
+ * returns to needing a new one.
+ */
+export async function voidPaper(
+  input: unknown,
+): Promise<ActionResult<{ readonly shipmentId: Uuid }>> {
+  return shipmentAction(
+    "/shipments/[id]",
+    "voidShippingPaper",
+    voidPaperSchema,
+    input,
+    async (ctx, parsed, attribution) => {
+      const result = await voidShippingPaper(
+        ctx,
+        { shipmentId: parsed.shipmentId, reason: parsed.reason },
+        nowIso(),
+        attribution,
+      );
+      return { shipmentId: result.shipment.id };
+    },
+  );
+}
+
+/**
+ * Step 3's **Print draft** / **Download draft** — D-58 item 9; Rule 5.28. The
+ * draft is rendered and stored as a `draft` render now, because someone is
+ * about to print or download it; the browser then streams that render's
+ * stored bytes like any other document. The checklist is untouched.
+ */
+export async function storeDraftPaper(
+  input: unknown,
+): Promise<ActionResult<{ readonly documentRenderId: Uuid }>> {
+  return shipmentAction(
+    "/shipments/new",
+    "storeShippingPaperDraft",
+    shipmentIdSchema,
+    input,
+    async (ctx, parsed, attribution) => {
+      const render = await storeShippingPaperDraft(
+        ctx,
+        parsed.shipmentId,
+        nowIso(),
+        attribution,
+      );
+      return { documentRenderId: render.id };
     },
   );
 }

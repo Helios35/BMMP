@@ -7,7 +7,7 @@
  * arrive with the real object store, and nothing here will need to change when
  * they do.
  */
-export { sha256Hex } from "./sha256";
+export { sha256Hex } from "@/lib/hash/sha256";
 export {
   SUPPORTED_IMAGE_MIME_TYPES,
   isSupportedImageMimeType,

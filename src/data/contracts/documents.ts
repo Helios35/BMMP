@@ -21,12 +21,65 @@ import type { DocumentType } from "@/domain/taxonomy/document-type";
 import type { ShipmentStatus } from "@/domain/taxonomy/shipment-status";
 import type { TransportMode } from "@/domain/taxonomy/transport-mode";
 import type { WasteClassification } from "@/domain/taxonomy/waste-classification";
-import type { RuleOutcome } from "@/domain/rules/outcome";
+import type { ContainerLabelContent } from "@/domain/documents/build-container-label-payload";
+import type { AppliedRuleVersion, RuleOutcome } from "@/domain/rules/outcome";
 import type { ResolvedRule } from "@/domain/rules/resolve";
 import type { ShippingPaperPayload } from "@/domain/transport/shipping-paper";
-import type { IsoTimestamp, PostalAddress, Sha256, Uuid } from "@/types/common";
+import type { Container } from "@/types/storage";
+import type {
+  IsoTimestamp,
+  JsonObject,
+  PostalAddress,
+  Sha256,
+  Uuid,
+} from "@/types/common";
 
 /** Classification and document contracts — `ERD.md` §7. */
+
+// --- rendering, as a write receives it ----------------------------------------
+
+/**
+ * The identity the adapter mints for a render **before** it is composed — the
+ * render id is printed in the footer and sits in the snapshot, so it must
+ * exist before the bytes do (`TECHNICAL_SPEC.md` §8.1, §8.4).
+ */
+export interface DocumentRenderIdentity {
+  readonly documentRenderId: Uuid;
+  readonly renderedAt: IsoTimestamp;
+  readonly status: Extract<DocumentRenderStatus, "issued" | "draft">;
+}
+
+/** One render, composed by the document engine for the identity it was given. */
+export interface ComposedDocument {
+  readonly documentType: DocumentType;
+  /** Everything the render consumed. Its `document` carries the identity it was composed for. */
+  readonly inputSnapshot: JsonObject;
+  /** SHA-256 of the canonical snapshot, computed before rendering. */
+  readonly inputSnapshotHash: Sha256;
+  readonly templateKey: string;
+  readonly templateVersion: string;
+  readonly rendererName: string;
+  readonly rendererVersion: string;
+  readonly bytes: Uint8Array;
+  readonly pageCount: number;
+  readonly ruleVersionsApplied: readonly AppliedRuleVersion[];
+  readonly renderDurationMs: number | null;
+}
+
+/**
+ * Renders one document for the identity the adapter minted.
+ *
+ * **Called inside the write**, so issuing is one operation (§8.2): the adapter
+ * mints the id, composes, re-hashes the snapshot it was handed, hashes the
+ * bytes, stores them where nothing can overwrite them, and only then appends
+ * the rows. The adapter never renders and the composer never writes — the
+ * renderer stays in `src/lib`, the data stays behind the seam, and a composer
+ * that throws leaves no row and no bytes behind (a failed render is an
+ * `audit_event`, never a row — §10.4).
+ */
+export type DocumentComposer = (
+  identity: DocumentRenderIdentity,
+) => Promise<ComposedDocument>;
 
 // --- classification_decision ------------------------------------------------
 
@@ -132,8 +185,14 @@ export interface ShipmentRepository extends Repository<
   ShipmentQuery
 > {
   /**
-   * Transition a shipment to offered — **only if a `shipping_paper` and its
-   * `document_render` exist**.
+   * Transition a shipment to offered — **only if its current `shipping_paper`
+   * is issued and its render's bytes are stored**.
+   *
+   * **One path with {@link ShipmentRepository.issueShippingPaper}**: issuing
+   * is the act that offers (it stamps `offeredAt` and `documents_issued` in
+   * the same operation), and both read the one predicate — a current issued
+   * paper with bytes — that departure reads too. Called on a shipment already
+   * offered it changes nothing; called on one without that paper it refuses.
    *
    * The database enforces this too, with a trigger (`TECHNICAL_SPEC.md` §10.4).
    * The contract makes it a single call so the UI cannot construct the invalid
@@ -200,9 +259,13 @@ export interface ShipmentRepository extends Repository<
   ): Promise<Shipment>;
 
   /**
-   * **Issue the shipping paper** — write the `document_render` and the
-   * `shipping_paper` from the builder's complete outcome, and move the
-   * shipment to `documents_issued`, as one operation (Flow B4).
+   * **Issue the shipping paper** — render it, hash it, store the bytes at
+   * `org/{org}/shipping_paper/{render_id}.pdf` with overwrite disabled, write
+   * the `document_render` with its content hash, byte size, page count, input
+   * snapshot and verification code, write the `shipping_paper`, and move the
+   * shipment to `documents_issued` with `offeredAt` stamped — **one
+   * operation** (Flow B4; `TECHNICAL_SPEC.md` §8.2). A render that fails
+   * leaves no row and no bytes, and is audited as `document.render_failed`.
    *
    * The payload is the builder's, recomputed server-side at commit; the
    * adapter refuses one that no longer describes the shipment's contents
@@ -215,6 +278,19 @@ export interface ShipmentRepository extends Repository<
     ctx: RequestContext,
     input: ShippingPaperIssue,
   ): Promise<IssuedShippingPaper>;
+
+  /**
+   * **Void the issued paper, with a reason** (D-58 item 8; Rules 5.13, 5.14) —
+   * one audited act. The render is kept, marked `voided`, with the reason and
+   * the actor on its `document_render.voided` row; its bytes stay readable;
+   * the shipment returns to `draft`, so its transport details reopen (T-18)
+   * and a new paper must be generated before it can depart. A void without a
+   * stated reason is refused.
+   */
+  voidShippingPaper(
+    ctx: RequestContext,
+    input: ShippingPaperVoid,
+  ): Promise<VoidedShippingPaper>;
 
   /**
    * **Departure** (Rule 5.17) — one operation: the shipment to `dispatched`
@@ -294,6 +370,8 @@ export interface ShippingPaperIssue {
   readonly shipmentId: Uuid;
   /** The builder's complete outcome, computed at commit from the rows. */
   readonly paper: RuleOutcome<ShippingPaperPayload>;
+  /** Renders exactly that outcome, for the render id the adapter mints. */
+  readonly compose: DocumentComposer;
   readonly at: IsoTimestamp;
   readonly attribution: StorageWriteAttribution;
 }
@@ -302,6 +380,19 @@ export interface IssuedShippingPaper {
   readonly shipment: Shipment;
   readonly shippingPaper: ShippingPaper;
   readonly documentRender: DocumentRender;
+}
+
+export interface ShippingPaperVoid {
+  readonly shipmentId: Uuid;
+  /** Required. A void records its reason and its actor (Rule 5.14). */
+  readonly reason: string;
+  readonly at: IsoTimestamp;
+  readonly attribution: StorageWriteAttribution;
+}
+
+export interface VoidedShippingPaper {
+  readonly shipment: Shipment;
+  readonly voidedDocumentRenderId: Uuid;
 }
 
 export interface ShipmentDeparture {
@@ -355,11 +446,47 @@ export interface ContainerLabelQuery extends BaseQuery {
   readonly documentRenderId?: Uuid;
 }
 
-export type ContainerLabelRepository = AppendOnlyRepository<
+export interface ContainerLabelRepository extends AppendOnlyRepository<
   ContainerLabel,
   CreateContainerLabel,
   ContainerLabelQuery
->;
+> {
+  /**
+   * **Issue a container label** — one operation (Rules 4.18–4.21;
+   * `TECHNICAL_SPEC.md` §8.2): render it, store the bytes at
+   * `org/{org}/container_label/{render_id}.pdf` with overwrite disabled,
+   * append the `document_render` and the `container_label`, point
+   * `container.current_container_label_id` at the new label, and **mark the
+   * label it replaces superseded** — its render kept in full and readable,
+   * the new one linked to it (Rules 4.20, 5.15).
+   *
+   * The content is the builder's, computed from the rows; the adapter refuses
+   * one whose start date or contents no longer match the container's
+   * (Rule 4.19), and refuses a container that has shipped or been retired.
+   */
+  issue(
+    ctx: RequestContext,
+    input: ContainerLabelIssue,
+  ): Promise<IssuedContainerLabel>;
+}
+
+export interface ContainerLabelIssue {
+  readonly containerId: Uuid;
+  /** `buildContainerLabelContent`'s outcome, computed at commit from the rows. */
+  readonly label: RuleOutcome<ContainerLabelContent>;
+  /** Renders exactly that content, for the render id the adapter mints. */
+  readonly compose: DocumentComposer;
+  readonly at: IsoTimestamp;
+  readonly attribution: StorageWriteAttribution;
+}
+
+export interface IssuedContainerLabel {
+  readonly container: Container;
+  readonly containerLabel: ContainerLabel;
+  readonly documentRender: DocumentRender;
+  /** The render this label superseded, where one was in force. */
+  readonly supersededDocumentRenderId: Uuid | null;
+}
 
 // --- document_render --------------------------------------------------------
 
@@ -397,6 +524,17 @@ export interface DocumentVerification {
   readonly verifiedAt: IsoTimestamp;
 }
 
+/** A draft, stored because someone printed or downloaded it (D-58 item 9). */
+export interface DocumentDraftRender {
+  /** The one document this unit drafts. */
+  readonly documentType: Extract<DocumentType, "shipping_paper">;
+  readonly shipmentId: Uuid;
+  /** Renders the draft, watermarked, for the render id the adapter mints. */
+  readonly compose: DocumentComposer;
+  readonly at: IsoTimestamp;
+  readonly attribution: StorageWriteAttribution;
+}
+
 export interface DocumentRenderRepository extends AppendOnlyRepository<
   DocumentRender,
   CreateDocumentRender,
@@ -409,8 +547,9 @@ export interface DocumentRenderRepository extends AppendOnlyRepository<
    * reprint proves it is the same document" true (`TECHNICAL_SPEC.md` §8.4). The
    * content hash is re-checked on every read, and a mismatch is a
    * `DOCUMENT_INTEGRITY` failure that alerts immediately rather than a document
-   * that gets served anyway. A reprint is an `audit_event`, not a counter on an
-   * immutable row.
+   * that gets served anyway. A render with no bytes stored behind it is
+   * `NOT_FOUND` — nothing is served in place of a document that is not there.
+   * A reprint is an `audit_event`, not a counter on an immutable row.
    */
   readBytes(
     ctx: RequestContext,
@@ -421,12 +560,29 @@ export interface DocumentRenderRepository extends AppendOnlyRepository<
     readonly byteSize: number;
   }>;
 
-  /** Re-hash the stored bytes and the stored input snapshot and compare. */
+  /**
+   * Re-hash the stored bytes and the stored input snapshot and compare. A
+   * render with no bytes behind it cannot be verified, and says so as a
+   * `DOCUMENT_INTEGRITY` failure — never as a pass.
+   */
   verify(ctx: RequestContext, id: Uuid): Promise<DocumentVerification>;
 
   /**
+   * Store a **draft** render (Rule 5.28; D-58 item 9) — composed, hashed and
+   * stored exactly as an issued render is, at `T-39 draft`, watermarked not
+   * valid. **Only when someone prints or downloads one**, never per page view.
+   * A draft writes no `shipping_paper`, closes no precondition and can never
+   * be offered, departed on or issued from.
+   */
+  storeDraft(
+    ctx: RequestContext,
+    input: DocumentDraftRender,
+  ): Promise<DocumentRender>;
+
+  /**
    * Mark a render superseded by a later one — **the only permitted update**,
-   * applied by trigger on the old row when a replacement is issued.
+   * applied by trigger on the old row when a replacement is issued, so it
+   * goes through the definer door and is never refused by role.
    */
   markSuperseded(
     ctx: RequestContext,

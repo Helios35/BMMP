@@ -48,6 +48,7 @@ import {
 } from "@/features/containers/container-tabs";
 import { HistorySection } from "@/features/containers/history-section";
 import { LabelTab } from "@/features/containers/label-tab";
+import { readContainerLabelBuild } from "@/features/containers/server/label";
 import { readContainer } from "@/features/containers/server/read-container";
 import { Breadcrumbs } from "@/features/shell/chrome/breadcrumbs";
 import { breadcrumbTrail } from "@/features/shell/navigation/breadcrumb-ancestors";
@@ -333,8 +334,14 @@ export default async function ContainerPage({
       {tab === "label" ? (
         <LabelTab
           ctx={ctx}
+          containerId={container.id}
           labelRender={detail.labelRender}
           needsRelabel={detail.flags.mislabelled !== null}
+          labelBuild={
+            can("generate_label")
+              ? await readContainerLabelBuild(ctx, container, asOf)
+              : null
+          }
         />
       ) : null}
       {tab === "history" ? (
