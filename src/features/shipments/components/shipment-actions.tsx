@@ -6,6 +6,7 @@ import { useId, useState, type ReactElement } from "react";
 import { toast } from "sonner";
 
 import { GatedControl } from "@/components/access/gated-control";
+import { ReasonDialog } from "@/components/extraction-review/reason-dialog";
 import {
   InlineActionError,
   ReviewButton,
@@ -26,7 +27,7 @@ import { Label } from "@/components/ui/label";
 import type { ActionResult } from "@/lib/action-result";
 import { cn } from "@/lib/utils";
 
-import { recordArrival, recordDeparture } from "../actions";
+import { recordArrival, recordDeparture, voidPaper } from "../actions";
 import {
   ARRIVE,
   ARRIVE_BODY,
@@ -42,6 +43,13 @@ import {
   DEPART_CONFIRM,
   DEPART_TITLE,
   DEPARTING,
+  VOID_PAPER,
+  VOID_PAPER_BODY,
+  VOID_PAPER_CONFIRM,
+  VOID_PAPER_REASON,
+  VOID_PAPER_REASON_REQUIRED,
+  VOID_PAPER_TITLE,
+  VOIDING_PAPER,
 } from "../shipment-copy";
 
 /**
@@ -64,6 +72,8 @@ export interface ShipmentActionsProps {
     readonly changeContents: boolean;
     readonly depart: boolean;
     readonly arrive: boolean;
+    /** An issued paper, before departure (D-58 item 8). */
+    readonly voidPaper: boolean;
   };
   /** E-8a — the auditor's reason, where the controls render disabled. */
   readonly readOnlyReason: string | null;
@@ -144,7 +154,8 @@ export function ShipmentActions({
     !can.continueBuilding &&
     !can.changeContents &&
     !can.depart &&
-    !can.arrive
+    !can.arrive &&
+    !can.voidPaper
   ) {
     return null;
   }
@@ -165,6 +176,27 @@ export function ShipmentActions({
       ) : null}
       {can.depart ? <DepartDialog shipmentId={shipmentId} /> : null}
       {can.arrive ? <ArriveDialog shipmentId={shipmentId} /> : null}
+      {can.voidPaper ? (
+        <ReasonDialog
+          copy={{
+            trigger: VOID_PAPER,
+            title: VOID_PAPER_TITLE,
+            body: VOID_PAPER_BODY,
+            reasonLabel: VOID_PAPER_REASON,
+            reasonRequired: VOID_PAPER_REASON_REQUIRED,
+            confirm: VOID_PAPER_CONFIRM,
+            confirming: VOIDING_PAPER,
+            cancel: CANCEL,
+          }}
+          onSubmit={(reason) => voidPaper({ shipmentId, reason })}
+          attributes={{
+            trigger: { "data-void-paper": "true" },
+            dialog: { "data-void-paper-dialog": "true" },
+            reason: { "data-void-paper-reason": "true" },
+            confirm: { "data-void-paper-confirm": "true" },
+          }}
+        />
+      ) : null}
       {can.changeContents ? (
         <Button
           asChild

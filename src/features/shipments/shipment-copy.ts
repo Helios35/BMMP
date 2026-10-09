@@ -226,7 +226,24 @@ export const NO_PAPER_BODY =
 export const REVIEW_CHECKLIST = "Review the checklist";
 export const PAPER_VOIDED_TITLE = "This shipment's shipping paper was voided.";
 export const PAPER_VOIDED_BODY =
-  "Its contents changed after the paper was generated. The voided paper is kept below; a new one must be generated before departure.";
+  "Its contents changed after the paper was generated, or its transport details needed correcting. The voided paper is kept and readable; a new one must be generated before departure.";
+
+/** D-58 item 8 — void with a reason, so transport details can be corrected. */
+export const VOID_PAPER = "Void paper";
+export const VOID_PAPER_TITLE = "Void the shipping paper?";
+export const VOID_PAPER_BODY =
+  "The paper is kept, still readable, and marked void with your reason and your name. The shipment returns to needing a new paper, and its transport details open for correction.";
+export const VOID_PAPER_REASON = "Why is this paper being voided?";
+export const VOID_PAPER_REASON_REQUIRED =
+  "A void records its reason (Rule 5.14). State it to continue.";
+export const VOID_PAPER_CONFIRM = "Void paper";
+export const VOIDING_PAPER = "Voiding…";
+
+/** D-58 item 9 — a draft is stored only when someone prints or downloads it. */
+export const PRINT_DRAFT = "Open the draft to print";
+export const DOWNLOAD_DRAFT = "Download draft";
+export const DRAFT_STORED_NOTE =
+  "Printing or downloading stores the draft as it stands, watermarked not valid on every page. It changes nothing on the checklist.";
 export const PRIOR_PAPERS = "Earlier papers";
 export const OPEN_DOCUMENT = "Open the document";
 

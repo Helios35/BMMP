@@ -39,6 +39,7 @@ import {
   recordInspectionSchema,
   recordRemediationSchema,
 } from "./schemas";
+import { generateContainerLabel } from "./server/label";
 import { resolveReceivingRule } from "./server/receiving-rule";
 
 /**
@@ -347,6 +348,36 @@ export async function editContainerDetails(
       // (`container.status_changed` is a status move, which this is not).
       // Written nowhere rather than under a near neighbour.
       return updated;
+    },
+  );
+}
+
+/**
+ * **Generate label** on the Label tab — Rules 4.18–4.21; `TECHNICAL_SPEC.md`
+ * §7.3 `generateContainerLabel`. P1, P2 and P6 (§5.5).
+ *
+ * The label is rebuilt from the rows at commit; the render, its stored bytes,
+ * the label row, the container's pointer and the supersession of the label it
+ * replaces are one operation. Nothing about the label is sent from the
+ * browser but which container.
+ */
+export async function generateLabel(
+  input: unknown,
+): Promise<ActionResult<{ readonly documentRenderId: Uuid }>> {
+  return containerAction(
+    "generate_label",
+    "generateContainerLabel",
+    "generate a container label",
+    containerIdSchema,
+    input,
+    async (ctx, parsed, attribution) => {
+      const issued = await generateContainerLabel(
+        ctx,
+        parsed.containerId,
+        nowIso(),
+        attribution,
+      );
+      return { documentRenderId: issued.documentRender.id };
     },
   );
 }
