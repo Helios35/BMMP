@@ -29,6 +29,11 @@
  * catalog miss, and P6 approving or rejecting it at `/settings/catalog`.
  * **`alert.resolved` is D-48**: a person resolving an open alert with a stated
  * reason, written on both exits of a Flow F re-match raise.
+ * **`catalog_entry.updated`, `shipment.created` and `document_render.voided`**
+ * were approved by the owner in `b1a-05-shipments` and added at TAXONOMY.md
+ * v1.5: a P6 edit of an entry's shipping identity with its reason (D-50), a
+ * shipment's creation, and a shipping paper voided by a contents change
+ * (Rules 5.13, 5.14).
  *
  * **Never invent a value.** If one is needed and is not here, it does not exist
  * yet — raise it to P6 (TAXONOMY.md §1.1).
@@ -41,6 +46,7 @@ export const AUDIT_EVENT_TYPES = [
   "catalog_entry.matched",
   "catalog_entry.proposed",
   "catalog_entry.status_changed",
+  "catalog_entry.updated",
   "battery_record.routed_to_review",
   "battery_record.confirmed",
   "battery_record.status_changed",
@@ -51,9 +57,11 @@ export const AUDIT_EVENT_TYPES = [
   "storage_event.recorded",
   "storage_clock.status_changed",
   "alert.resolved",
+  "shipment.created",
   "shipment.status_changed",
   "document_render.issued",
   "document_render.superseded",
+  "document_render.voided",
   "document.render_failed",
   "document.reprinted",
   "document.viewed",
@@ -84,6 +92,7 @@ export const AUDIT_EVENT_TYPE_LABELS: Readonly<Record<AuditEventType, string>> =
     "catalog_entry.matched": "Catalog matched",
     "catalog_entry.proposed": "Catalog entry proposed",
     "catalog_entry.status_changed": "Catalog entry status changed",
+    "catalog_entry.updated": "Catalog entry edited",
     "battery_record.routed_to_review": "Routed to review",
     "battery_record.confirmed": "Identification confirmed",
     "battery_record.status_changed": "Record status changed",
@@ -94,9 +103,11 @@ export const AUDIT_EVENT_TYPE_LABELS: Readonly<Record<AuditEventType, string>> =
     "storage_event.recorded": "Storage event recorded",
     "storage_clock.status_changed": "Storage clock changed",
     "alert.resolved": "Alert resolved",
+    "shipment.created": "Shipment created",
     "shipment.status_changed": "Shipment status changed",
     "document_render.issued": "Document issued",
     "document_render.superseded": "Document superseded",
+    "document_render.voided": "Document voided",
     "document.render_failed": "Document render failed",
     "document.reprinted": "Document reprinted",
     "document.viewed": "Document viewed",
