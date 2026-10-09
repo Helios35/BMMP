@@ -412,6 +412,33 @@ describe("a new container is labelled, and then it ships (outcome 4)", () => {
     ).toHaveLength(1);
   });
 
+  it("marks supersession only for the render that replaces it, and never refuses P1 (b1a-05's landmine)", async () => {
+    const container = await newContainerHolding(
+      [ID.BATTERY.vehicleTraction],
+      "Mark bay",
+    );
+    const first = await labelFor(container.id);
+    const second = await generateContainerLabel(
+      HANDLER,
+      container.id,
+      LATER,
+      NO_ATTRIBUTION,
+    );
+    const marked = await mockAdapter.documentRenders.markSuperseded(
+      HANDLER,
+      first.documentRender.id,
+      second.documentRender.id,
+    );
+    expect(marked).toMatchObject({ status: "superseded", supersededAt: LATER });
+    await expect(
+      mockAdapter.documentRenders.markSuperseded(
+        HANDLER,
+        second.documentRender.id,
+        first.documentRender.id,
+      ),
+    ).rejects.toBeInstanceOf(ValidationError);
+  });
+
   it("supersedes the sound drum's fixture label too, through the definer door, for P1", async () => {
     // b1a-05's landmine: `markSuperseded` used a policy-checked update and
     // refused P1. The supersession is the trigger's, so a handler makes it.
