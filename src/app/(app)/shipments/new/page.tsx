@@ -38,6 +38,7 @@ import {
 import { admitContainerToShipment } from "@/domain/transport/container-admission";
 import { ContentsStep } from "@/features/shipments/components/contents-step";
 import { GenerateControl } from "@/features/shipments/components/generate-control";
+import { DraftPaperControls } from "@/features/shipments/components/draft-controls";
 import { PreconditionChecklist } from "@/features/shipments/components/precondition-checklist";
 import { ShipmentStepper } from "@/features/shipments/components/shipment-stepper";
 import {
@@ -695,6 +696,7 @@ async function StepThree({
             />
           </article>
         </div>
+        <DraftPaperControls shipmentId={shipment.id} />
       </SectionCard>
 
       <div>
