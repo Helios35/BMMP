@@ -26,6 +26,8 @@ import {
   CATALOG_ADMIN_DESCRIPTION,
   ENTRIES_DESCRIPTION,
   ENTRIES_SECTION,
+  IDENTITY_COLUMN,
+  IDENTITY_NONE,
   NO_PROPOSALS,
   NO_PROPOSALS_BODY,
   ORGANIZATION_ENTRY,
@@ -34,6 +36,16 @@ import {
   PROPOSALS_SECTION,
 } from "@/features/catalog-admin/catalog-admin-copy";
 import { ProposalCard } from "@/features/catalog-admin/components/proposal-card";
+import { TransportIdentityDialog } from "@/features/catalog-admin/components/transport-identity-dialog";
+import { optionsFor, readTaxonomyValue } from "@/domain/taxonomy/lookup";
+import {
+  PACKING_GROUPS,
+  PACKING_GROUP_LABELS,
+} from "@/domain/taxonomy/packing-group";
+import {
+  UN_TRANSPORT_IDENTIFIERS,
+  UN_TRANSPORT_IDENTIFIER_LABELS,
+} from "@/domain/taxonomy/un-transport-identifier";
 import { CatalogSourceType } from "@/features/catalog/components/catalog-source-type";
 import {
   readCatalogEntries,
@@ -54,8 +66,11 @@ import { requireRoute } from "@/lib/auth/guard";
  * crop it came from, with **Approve entry** and **Reject**, each needing a
  * stated reason; and **All entries**, the decided catalog. Approval publishes
  * the entry and raises matching unmatched records on `/review` — it never
- * changes a record (Flow F step 4). Editing an entry's fields is not built in
- * this unit; see the build-notes.
+ * changes a record (Flow F step 4). **Edit shipping identity** (D-50) sets the
+ * transport identity a shipping paper reads — identification number, proper
+ * shipping name, hazard class, packing group — with a stated reason, audited.
+ * Only P6 edits the catalog; a handler never types a shipping identifier
+ * (Rule 5.9). The entry's other fields are not editable here (build-notes).
  */
 
 export const metadata: Metadata = {
@@ -155,16 +170,39 @@ export default async function CatalogAdministrationPage() {
                     className="h-14 lg:h-12"
                   >
                     <TableCell className="px-3 py-2 text-body-strong whitespace-normal">
-                      {canOpenEntry && entry.statusValue === "published" ? (
-                        <Link
-                          href={`/catalog/${entry.id}`}
-                          className="inline-flex min-h-11 items-center rounded-md underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                      <div className="flex flex-col items-start gap-2">
+                        {canOpenEntry && entry.statusValue === "published" ? (
+                          <Link
+                            href={`/catalog/${entry.id}`}
+                            className="inline-flex min-h-11 items-center rounded-md underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                          >
+                            {entry.title}
+                          </Link>
+                        ) : (
+                          entry.title
+                        )}
+                        {/* D-50 — the transport identity a paper reads, under
+                            the entry, so no column scrolls sideways. */}
+                        <span
+                          data-entry-identity={entry.id}
+                          className="text-caption font-normal text-muted-foreground"
                         >
-                          {entry.title}
-                        </Link>
-                      ) : (
-                        entry.title
-                      )}
+                          {`${IDENTITY_COLUMN}: ${identityText(entry.identity)}`}
+                        </span>
+                        <TransportIdentityDialog
+                          catalogEntryId={entry.id}
+                          entryTitle={entry.title}
+                          current={entry.identity}
+                          unOptions={optionsFor(
+                            UN_TRANSPORT_IDENTIFIERS,
+                            UN_TRANSPORT_IDENTIFIER_LABELS,
+                          )}
+                          packingGroupOptions={optionsFor(
+                            PACKING_GROUPS,
+                            PACKING_GROUP_LABELS,
+                          )}
+                        />
+                      </div>
                     </TableCell>
                     <TableCell className="px-3 py-2">
                       <StatusBadge
@@ -189,4 +227,45 @@ export default async function CatalogAdministrationPage() {
       </PageColumns>
     </PageShell>
   );
+}
+
+/** The identity as stored, in the taxonomy's labels — or the gap, stated. */
+function identityText(identity: {
+  readonly unIdentifier: string | null;
+  readonly properShippingName: string | null;
+  readonly hazardClass: string | null;
+  readonly packingGroup: string;
+}): string {
+  if (
+    identity.unIdentifier === null &&
+    identity.properShippingName === null &&
+    identity.hazardClass === null
+  ) {
+    return IDENTITY_NONE;
+  }
+  const un =
+    identity.unIdentifier === null
+      ? null
+      : readTaxonomyValue(
+          UN_TRANSPORT_IDENTIFIERS,
+          UN_TRANSPORT_IDENTIFIER_LABELS,
+          identity.unIdentifier,
+        );
+  const pg = readTaxonomyValue(
+    PACKING_GROUPS,
+    PACKING_GROUP_LABELS,
+    identity.packingGroup,
+  );
+  return [
+    un === null ? null : un.recognised ? un.label : un.storedValue,
+    identity.properShippingName,
+    identity.hazardClass,
+    pg.recognised
+      ? identity.packingGroup === "not_applicable"
+        ? null
+        : pg.label
+      : pg.storedValue,
+  ]
+    .filter((part): part is string => part !== null)
+    .join(" · ");
 }

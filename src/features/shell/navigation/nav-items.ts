@@ -7,6 +7,7 @@ import {
   ClipboardCheck,
   LayoutDashboard,
   ScrollText,
+  Truck,
   Users,
   type LucideIcon,
 } from "lucide-react";
@@ -68,19 +69,11 @@ export type NavBadges = Readonly<Partial<Record<AppRoute, number>>>;
  * The navigation destinations, in `SITE_ARCHITECTURE.md` §2.1's order. **Order
  * is display order.**
  *
- * ## Why one of §2.1's ten entries is commented out
- *
- * `b1a-01-shell` builds the shell and the read-only surfaces; `/shipments` is
- * built by a later unit (`b1a-03` restored `/review` and `/settings/catalog`,
- * `b1a-04` `/containers`), and its page does not exist yet. A nav item
- * pointing at a route with no page is a dead link, and "no dead links" is
- * §2.1's own rule. So the entry sits here, in order, commented, naming the unit
- * that restores it — the later builder uncomments one line and does not
- * re-derive §2.1's order.
- *
- * **Removing the comment is the whole of the change.** Nothing about access
- * moves: `ROUTE_ACCESS` already carries all four rows and the intersection in
- * the renderer already handles them.
+ * All ten of §2.1's entries are here: `b1a-03` restored `/review` and
+ * `/settings/catalog`, `b1a-04` `/containers`, and `b1a-05` `/shipments`. A nav
+ * item pointing at a route with no page is a dead link, and "no dead links" is
+ * §2.1's own rule. Nothing about access moved when each was restored:
+ * `ROUTE_ACCESS` already carried every row.
  */
 export const NAV_ITEMS: readonly NavItem[] = [
   {
@@ -111,8 +104,13 @@ export const NAV_ITEMS: readonly NavItem[] = [
     badge: "alertingContainers",
     matchPrefix: "/containers",
   },
-  // 5 — Shipments · /shipments · Truck · primary
-  //     Restored by b1a-05, which builds `src/app/(app)/shipments/page.tsx`.
+  {
+    route: "/shipments",
+    navLabel: "Shipments",
+    icon: Truck,
+    group: "primary",
+    matchPrefix: "/shipments",
+  },
   {
     route: "/catalog",
     navLabel: "Catalog",
