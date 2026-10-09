@@ -8,11 +8,19 @@ import type {
   ShipmentDepartureResult,
   ShipmentTransportDetails,
   StorageWriteAttribution,
+  VoidedShippingPaper,
 } from "@/data/contracts";
 import { preDocumentStatus } from "@/domain/transport/shipping-paper";
+import {
+  composeShippingPaper,
+  composeShippingPaperDraft,
+} from "@/features/documents/server/compose";
 import { NotFoundError, ValidationError } from "@/lib/errors";
 import type { IsoTimestamp, Uuid } from "@/types/common";
-import type { Shipment } from "@/types/documents";
+import type { DocumentRender, Shipment } from "@/types/documents";
+
+import { shipperName } from "../paper-view";
+import { DRAFT_DETAIL, PAPER_GAP } from "../shipment-copy";
 
 import {
   activeOrganization,
@@ -144,7 +152,11 @@ export async function generateShippingPaper(
   attribution: StorageWriteAttribution,
 ): Promise<IssuedShippingPaper> {
   const shipment = await shipmentOrThrow(ctx, shipmentId);
-  const { build } = await readShippingPaperBuild(ctx, shipment, at);
+  const { build, organization, rules } = await readShippingPaperBuild(
+    ctx,
+    shipment,
+    at,
+  );
   if (build.kind !== "complete") {
     const count = build.checklist.unmet.length;
     throw new ValidationError({
@@ -158,6 +170,76 @@ export async function generateShippingPaper(
   return data.shipments.issueShippingPaper(ctx, {
     shipmentId,
     paper: build.outcome,
+    // The bytes are rendered from exactly the outcome the checklist called
+    // complete, inside the adapter's one operation (`TECHNICAL_SPEC.md` §8.2).
+    compose: composeShippingPaper({
+      paper: build.outcome,
+      shipperName: shipperName(organization),
+      timeZone: rules.timeZone,
+    }),
+    at,
+    attribution,
+  });
+}
+
+/**
+ * **Void the issued paper, with a reason** (D-58 item 8) — so transport
+ * details can be corrected. The shipment returns to `draft` and its
+ * readiness is settled again from the checklist.
+ */
+export async function voidShippingPaper(
+  ctx: RequestContext,
+  input: { readonly shipmentId: Uuid; readonly reason: string },
+  at: IsoTimestamp,
+  attribution: StorageWriteAttribution,
+): Promise<VoidedShippingPaper> {
+  const result = await data.shipments.voidShippingPaper(ctx, {
+    shipmentId: input.shipmentId,
+    reason: input.reason,
+    at,
+    attribution,
+  });
+  const shipment = await settleShipmentReadiness(
+    ctx,
+    result.shipment,
+    at,
+    attribution,
+  );
+  return { ...result, shipment };
+}
+
+/**
+ * **A draft, stored because someone printed or downloaded it** (D-58 item 9;
+ * Rule 5.28). The builder's draft as it stands, watermarked not valid. It
+ * closes no precondition and writes no `shipping_paper`: the checklist reads
+ * the same before and after.
+ */
+export async function storeShippingPaperDraft(
+  ctx: RequestContext,
+  shipmentId: Uuid,
+  at: IsoTimestamp,
+  attribution: StorageWriteAttribution,
+): Promise<DocumentRender> {
+  const shipment = await shipmentOrThrow(ctx, shipmentId);
+  const { build, organization, rules } = await readShippingPaperBuild(
+    ctx,
+    shipment,
+    at,
+  );
+  return data.documentRenders.storeDraft(ctx, {
+    documentType: "shipping_paper",
+    shipmentId,
+    compose: composeShippingPaperDraft({
+      draft: build.draft,
+      origin: shipment.originAddress,
+      destinationAddress: shipment.destinationAddress,
+      destinationIdentifier: shipment.destinationIdentifier,
+      carrierIdentifier: shipment.transporterIdentifier,
+      shipperName: shipperName(organization),
+      gap: PAPER_GAP,
+      draftNotice: DRAFT_DETAIL,
+      timeZone: rules.timeZone,
+    }),
     at,
     attribution,
   });

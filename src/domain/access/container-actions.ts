@@ -14,9 +14,9 @@ import type { RoleCode } from "@/domain/taxonomy/role";
  * A row is honoured only where the role also holds `write` on the route — P6's
  * column is read as "under an active support grant", as every P6 row is.
  *
- * Two §5.5 rows are **not here**, and the build-notes say why: choosing the
+ * One §5.5 row is **not here**, and the build-notes say why: choosing the
  * site's demonstration method (Rule 4.3) needs a site entity, which does not
- * exist; generating or reprinting the label is document generation (unit 06).
+ * exist.
  *
  * **No row changes an accumulation start date, for any role.** The absence is
  * the enforcement (Rules 4.4, 4.9–4.12).
@@ -37,6 +37,12 @@ export const CONTAINER_ACTIONS = [
   "edit_capacity_or_location",
   /** An empty container with a closed clock (Rule 4.30). */
   "retire",
+  /**
+   * Generate the label, or a new one that supersedes it (Rules 4.20, 4.21) —
+   * §5.5's label row, P1, P2 and P6. Printing the label in force is never
+   * gated: it is reading a document (Rule 5.27).
+   */
+  "generate_label",
 ] as const;
 
 export type ContainerAction = (typeof CONTAINER_ACTIONS)[number];
@@ -54,6 +60,7 @@ const WRITE_SET: Readonly<Record<ContainerRole, readonly ContainerAction[]>> = {
     "add_or_remove_records",
     "mark_ready_to_ship",
     "ship_this_container",
+    "generate_label",
   ],
   facility_manager: [
     "create",
@@ -62,6 +69,7 @@ const WRITE_SET: Readonly<Record<ContainerRole, readonly ContainerAction[]>> = {
     "mark_ready_to_ship",
     "edit_capacity_or_location",
     "retire",
+    "generate_label",
   ],
   platform_admin: [...CONTAINER_ACTIONS],
 };

@@ -52,6 +52,7 @@ import type {
   ClassificationDecisionQuery,
   ClassificationDecisionRepository,
   ContainerLabelQuery,
+  ContainerLabelRepository,
   CreateClassificationDecision,
   CreateContainerLabel,
   CreateDocumentRender,
@@ -107,7 +108,6 @@ import type {
   CreateAuditEvent,
 } from "@/data/contracts/audit";
 import type { IdentityRepository } from "@/data/contracts/identity";
-import type { ObjectStore } from "@/data/contracts/object-store";
 import type { BatteryRecord } from "@/types/battery-record";
 import type { CatalogEntry } from "@/types/catalog";
 import type {
@@ -196,12 +196,18 @@ import {
   assemble,
   buildShipmentRow,
   changeContents,
+  currentIssuedPaperWithBytes,
   issueShippingPaper,
   recordArrival,
   recordDeparture,
   recordTransport,
   settleReadiness,
+  voidShippingPaper,
 } from "./shipment-writes";
+import { issueContainerLabel, storeDraftRender } from "./document-writes";
+import { mockObjects } from "./object-store";
+import { canonicalJson, verificationCodeOf } from "@/domain/documents/snapshot";
+import { sha256Hex, sha256HexOfText } from "@/lib/hash/sha256";
 import { writeTriggerAudit } from "./audit-row";
 
 export { resetMockStore, mockStore } from "./store";
@@ -2101,30 +2107,14 @@ const shipments: ShipmentRepository = {
     shipmentId: Uuid,
     input: OfferShipment,
   ): Promise<Shipment> {
+    assertPolicy(ctx, "shipment", "update");
     const shipment = await store().shipments.getOrThrow(ctx, shipmentId);
 
-    // A shipment cannot be offered without a shipping paper whose render
-    // produced bytes. In Postgres a trigger refuses this transition; here the
-    // same refusal is in code, so a screen built against the mock meets it at
-    // the same moment (TECHNICAL_SPEC.md §10.4, Rules 5.3, 5.4).
-    const paper = store()
-      .shippingPapers.all()
-      .find(
-        (candidate) =>
-          candidate.shipmentId === shipmentId &&
-          candidate.organizationId === ctx.organizationId,
-      );
-    const render =
-      paper === undefined
-        ? undefined
-        : store()
-            .documentRenders.all()
-            .find((candidate) => candidate.id === paper.documentRenderId);
-    if (
-      paper === undefined ||
-      render === undefined ||
-      render.contentHash === ""
-    ) {
+    // A shipment cannot be offered without an issued shipping paper whose
+    // bytes are stored. In Postgres a trigger refuses this transition; here
+    // the same refusal is in code, and it is the one predicate issue and
+    // departure read too (TECHNICAL_SPEC.md §10.4, Rules 5.3, 5.4).
+    if (currentIssuedPaperWithBytes(ctx, shipmentId) === null) {
       throw new ValidationError({
         userMessage:
           "This shipment has no issued shipping paper. Generate the shipping paper before offering the shipment.",
@@ -2162,8 +2152,16 @@ const shipments: ShipmentRepository = {
       }
     }
 
+    // Issuing offered it already; offering again changes nothing.
+    if (shipment.status !== "documents_issued") {
+      throw new ConflictError({
+        userMessage: "This shipment has departed. It cannot be offered again.",
+        correlationId: ctx.correlationId,
+        context: { status: shipment.status },
+      });
+    }
+    if (shipment.offeredAt !== null) return shipment;
     return store().shipments.update(ctx, shipmentId, {
-      status: "documents_issued",
       offeredAt: input.offeredAt,
       updatedAt: now(),
       updatedBy: ctx.userId,
@@ -2175,6 +2173,7 @@ const shipments: ShipmentRepository = {
   recordTransport,
   settleReadiness,
   issueShippingPaper,
+  voidShippingPaper,
   recordDeparture,
   recordArrival,
 };
@@ -2200,7 +2199,7 @@ const shippingPapers = tenantAppendOnlyRepository<
   }),
 });
 
-const containerLabels = tenantAppendOnlyRepository<
+const containerLabelBase = tenantAppendOnlyRepository<
   ContainerLabel,
   CreateContainerLabel,
   ContainerLabelQuery
@@ -2220,6 +2219,13 @@ const containerLabels = tenantAppendOnlyRepository<
     createdAt: now(),
   }),
 });
+
+const containerLabels: ContainerLabelRepository = {
+  ...containerLabelBase,
+  // Wider than CRUD: render, store, supersede and point the container at it,
+  // as one operation (`./document-writes.ts`).
+  issue: issueContainerLabel,
+};
 
 const documentRenderBase = tenantAppendOnlyRepository<
   DocumentRender,
@@ -2259,22 +2265,46 @@ const documentRenderBase = tenantAppendOnlyRepository<
   }),
 });
 
+/**
+ * The stored bytes behind a render, re-hashed. **Absent is `NOT_FOUND`**
+ * (a fixture render has no file behind it, and nothing is served in its
+ * place); **present but not hashing to `content_hash` is
+ * `DOCUMENT_INTEGRITY`**, logged at `error` so it alerts — a document the
+ * platform cannot vouch for is not served (`TECHNICAL_SPEC.md` §8.4).
+ */
+async function storedBytesOf(
+  ctx: RequestContext,
+  render: DocumentRender,
+): Promise<Uint8Array> {
+  const stored = store().objects.get(`documents:${render.storageObjectPath}`);
+  if (stored === undefined || render.storageObjectPath === "") {
+    throw new NotFoundError({
+      userMessage: "This render's stored file is not available.",
+      correlationId: ctx.correlationId,
+      context: { documentRenderId: render.id, reason: "bytes_absent" },
+    });
+  }
+  const contentHash = await sha256Hex(stored.bytes);
+  if (contentHash !== render.contentHash) {
+    const failure = new DocumentIntegrityError({
+      userMessage:
+        "This document failed its integrity check and will not be served.",
+      correlationId: ctx.correlationId,
+      context: { documentRenderId: render.id, reason: "content_hash_mismatch" },
+    });
+    console.error("[documents] integrity check failed", failure.context);
+    throw failure;
+  }
+  return stored.bytes;
+}
+
 const documentRenders: DocumentRenderRepository = {
   ...documentRenderBase,
   async readBytes(ctx: RequestContext, id: Uuid) {
     const render = await store().documentRenders.getOrThrow(ctx, id);
-    const stored = store().objects.get(`documents:${render.storageObjectPath}`);
-    if (stored === undefined) {
-      // A row pointing at bytes that are not there should be impossible: a
-      // storage failure rolls the whole render back (TECHNICAL_SPEC.md §10.4).
-      throw new NotFoundError({
-        userMessage: "That document could not be retrieved.",
-        correlationId: ctx.correlationId,
-        context: { documentRenderId: id },
-      });
-    }
+    const bytes = await storedBytesOf(ctx, render);
     return {
-      bytes: stored.bytes,
+      bytes,
       contentHash: render.contentHash,
       byteSize: render.byteSize,
     };
@@ -2285,7 +2315,7 @@ const documentRenders: DocumentRenderRepository = {
     // A fixture render has no bytes behind it, which is a legitimate "cannot
     // verify" rather than a failed verification — an unverifiable document is
     // never served as if it had passed.
-    if (stored === undefined) {
+    if (stored === undefined || render.storageObjectPath === "") {
       throw new DocumentIntegrityError({
         userMessage:
           "This document failed its integrity check and will not be served.",
@@ -2293,25 +2323,45 @@ const documentRenders: DocumentRenderRepository = {
         context: { documentRenderId: id, reason: "bytes_absent" },
       });
     }
+    const [contentHash, snapshotHash] = await Promise.all([
+      sha256Hex(stored.bytes),
+      sha256HexOfText(canonicalJson(render.inputSnapshot)),
+    ]);
     return {
       documentRenderId: render.id,
-      bytesMatch: true,
-      inputSnapshotMatches: true,
+      bytesMatch: contentHash === render.contentHash,
+      inputSnapshotMatches:
+        snapshotHash === render.inputSnapshotHash &&
+        verificationCodeOf(snapshotHash) === render.verificationCode,
       verificationCode: render.verificationCode,
       verifiedAt: now(),
     };
   },
+  storeDraft: storeDraftRender,
   async markSuperseded(
     ctx: RequestContext,
     id: Uuid,
     supersededByDocumentRenderId: Uuid,
   ): Promise<DocumentRender> {
-    await store().documentRenders.getOrThrow(ctx, supersededByDocumentRenderId);
-    // The only permitted update on an immutable row, applied when a replacement
-    // is issued. The superseded render is retained in full and stays readable.
-    return store().documentRenders.update(ctx, id, {
+    const replacement = await store().documentRenders.getOrThrow(
+      ctx,
+      supersededByDocumentRenderId,
+    );
+    if (replacement.supersedesDocumentRenderId !== id) {
+      throw new ValidationError({
+        userMessage:
+          "That render does not replace this one, so it cannot supersede it.",
+        correlationId: ctx.correlationId,
+        context: { documentRenderId: id, supersededByDocumentRenderId },
+      });
+    }
+    // The only permitted update on an immutable row, applied by trigger when a
+    // replacement is issued — through the definer door, because no tenant role
+    // holds UPDATE on `document_render` (b1a-05 landmine: P1 was refused). The
+    // superseded render is retained in full and stays readable.
+    return store().documentRenders.updateAsDefiner(ctx, id, {
       status: "superseded",
-      supersededAt: now(),
+      supersededAt: replacement.renderedAt,
     });
   },
 };
@@ -2469,65 +2519,7 @@ const auditEvents: AuditEventRepository = {
 // Object store
 // ---------------------------------------------------------------------------
 
-const objects: ObjectStore = {
-  async put(ctx, req) {
-    if (!req.path.startsWith(`org/${ctx.organizationId}/`)) {
-      throw new ValidationError({
-        userMessage: "That storage path is not available.",
-        correlationId: ctx.correlationId,
-        context: { path: req.path },
-      });
-    }
-    const key = `${req.bucket}:${req.path}`;
-    if (store().objects.has(key)) {
-      // Overwrite is disabled. A correction is a new object at a new path,
-      // exactly as a correction to an append-only row is a new row.
-      throw new ConflictError({
-        userMessage: "That object already exists and cannot be overwritten.",
-        correlationId: ctx.correlationId,
-        context: { path: req.path },
-      });
-    }
-    store().objects.set(key, {
-      bytes: req.bytes,
-      contentType: req.contentType,
-    });
-    return {
-      bucket: req.bucket,
-      path: req.path,
-      // A real hash is `src/lib`'s job at the point bytes are produced; the mock
-      // records the size and a placeholder digest rather than pretending to hash.
-      contentHash: `mock-${req.bytes.byteLength.toString(16)}`,
-      byteSize: req.bytes.byteLength,
-      contentType: req.contentType,
-    };
-  },
-  async get(ctx, req) {
-    const stored = store().objects.get(`${req.bucket}:${req.path}`);
-    if (
-      stored === undefined ||
-      !req.path.startsWith(`org/${ctx.organizationId}/`)
-    ) {
-      throw new NotFoundError({
-        userMessage: "That file could not be retrieved.",
-        correlationId: ctx.correlationId,
-        context: { path: req.path },
-      });
-    }
-    return stored.bytes;
-  },
-  async signedUrl(ctx, req) {
-    if (!req.path.startsWith(`org/${ctx.organizationId}/`)) {
-      throw new NotFoundError({
-        userMessage: "That file could not be retrieved.",
-        correlationId: ctx.correlationId,
-        context: { path: req.path },
-      });
-    }
-    // Never logged, in either adapter.
-    return `mock://${req.bucket}/${req.path}?ttl=${req.ttlSeconds}`;
-  },
-};
+const objects = mockObjects;
 
 // ---------------------------------------------------------------------------
 

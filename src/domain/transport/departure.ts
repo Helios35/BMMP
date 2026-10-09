@@ -17,7 +17,7 @@ import { readRetentionRule } from "./rule-data";
  * **Departure is a recorded act** with a date, a time zone and an actor. It
  * creates the ledger entry, closes the storage clocks of what left, and moves
  * the records to shipped (Rule 5.17). It needs an issued paper that is current
- * for the contents (Rule 5.13), the carrier on record (Rule 5.16), no air
+ * for the contents (Rule 5.13) and whose bytes are stored (§8.2), the carrier on record (Rule 5.16), no air
  * conflict (Rule 6.7 — re-checked, because a condition can change after the
  * paper issued), the damaged/defective packet where any record needs one
  * (Rule 6.16), and a retention period read from rule data (Rule 5.18). **Each
@@ -30,6 +30,7 @@ import { readRetentionRule } from "./rule-data";
 export type DepartureRefusal =
   | "not_documented"
   | "no_current_paper"
+  | "paper_not_stored"
   | "carrier_missing"
   | "air_blocked"
   | "ddr_packet_missing"
@@ -47,6 +48,11 @@ export interface DepartureFacts {
   readonly status: ShipmentStatus;
   /** An issued, unvoided paper describing exactly the current contents. */
   readonly hasCurrentIssuedPaper: boolean;
+  /**
+   * That paper's bytes are stored and hashed (`TECHNICAL_SPEC.md` §8.2). A
+   * paper with no file behind it is not a paper anything may travel with.
+   */
+  readonly currentPaperIsStored: boolean;
   readonly carrierName: string | null;
   readonly transportMode: TransportMode;
   readonly air: AirTransportAssessment;
@@ -74,6 +80,12 @@ export function admitDeparture(facts: DepartureFacts): DepartureAdmission {
     return refuse(
       "no_current_paper",
       "This shipment's shipping paper is not current for its contents. Generate a new one before recording departure (Rule 5.13).",
+    );
+  }
+  if (!facts.currentPaperIsStored) {
+    return refuse(
+      "paper_not_stored",
+      "This shipment's issued shipping paper has no stored file behind it, so it cannot travel with the shipment. Void it with a reason and generate a new one before recording departure.",
     );
   }
   if ((facts.carrierName?.trim() ?? "") === "") {

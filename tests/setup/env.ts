@@ -9,3 +9,7 @@ process.env.DATA_ADAPTER = "mock";
 // one a test may ever spend on.
 process.env.VISION_PROVIDER = "fixture";
 delete process.env.VERCEL_ENV;
+// The permanent origin a printed label's QR points at (src/lib/app-url.ts).
+// Playwright pins it to the server it starts; this suite pins a host no
+// request is ever sent to.
+process.env.NEXT_PUBLIC_APP_URL = "https://bmmp.test";

@@ -112,6 +112,9 @@ const T = {
  */
 const STAYS_IN_FORCE = "2099-12-31T23:59:59.000Z";
 
+/** When the two rule versions b1a-06 adds were authored and published. */
+const RULES_AUTHORED_B1A_06 = "2026-10-09T00:00:00.000Z";
+
 /** The Washington accumulation-period rule as it applied to the running clocks. */
 const WA_ACCUMULATION_APPLIED: AppliedRuleVersion = {
   jurisdictionRuleId: ID.JURISDICTION_RULE.waAccumulationPeriod,
@@ -942,6 +945,38 @@ export const jurisdictionRules: readonly JurisdictionRule[] = [
     createdBy: ID.USER.platformAdmin,
     updatedBy: ID.USER.platformAdmin,
   },
+  // Added in b1a-06, never edited into an existing row (D-58 item 2).
+  {
+    id: ID.JURISDICTION_RULE.federalShipperCertification,
+    jurisdictionId: ID.JURISDICTION.federal,
+    ruleKey: "transport.shipper_certification",
+    domain: "transport",
+    title: "Shipper certification statement",
+    description:
+      "The certification the shipper signs on every shipping paper, printed verbatim.",
+    appliesToApplicationClasses: null,
+    isActive: true,
+    createdAt: RULES_AUTHORED_B1A_06,
+    updatedAt: RULES_AUTHORED_B1A_06,
+    createdBy: ID.USER.platformAdmin,
+    updatedBy: ID.USER.platformAdmin,
+  },
+  // Added in b1a-06 — the owner's call: the label wording is rule data (Rule 4.18).
+  {
+    id: ID.JURISDICTION_RULE.waContainerLabel,
+    jurisdictionId: ID.JURISDICTION.washington,
+    ruleKey: "storage.container_label",
+    domain: "labeling_marking",
+    title: "Container label wording",
+    description:
+      "The phrase a battery accumulation container must carry, printed verbatim on its label.",
+    appliesToApplicationClasses: null,
+    isActive: true,
+    createdAt: RULES_AUTHORED_B1A_06,
+    updatedAt: RULES_AUTHORED_B1A_06,
+    createdBy: ID.USER.platformAdmin,
+    updatedBy: ID.USER.platformAdmin,
+  },
 ];
 
 export const ruleVersions: readonly RuleVersion[] = [
@@ -1068,6 +1103,49 @@ export const ruleVersions: readonly RuleVersion[] = [
     publishedAt: "2025-12-15T00:00:00.000Z",
     publishedBy: ID.USER.platformAdmin,
     createdAt: "2025-12-01T00:00:00.000Z",
+    createdBy: ID.USER.platformAdmin,
+  },
+  {
+    // Authored by planning in brief 06 (D-58 item 2). The statement is the
+    // version's payload, verbatim — it is written nowhere in application code.
+    id: ID.RULE_VERSION.federalShipperCertification2026,
+    jurisdictionRuleId: ID.JURISDICTION_RULE.federalShipperCertification,
+    versionLabel: "2026",
+    effectiveOn: "2026-01-01",
+    expiresOn: null,
+    citation: "49 CFR 172.204(a)",
+    citationUrl: null,
+    sourceDocumentRef: "BRIEF_b1a-06-documents.md, outcome 9",
+    payload: {
+      statement:
+        "This is to certify that the above-named materials are properly classified, described, packaged, marked and labeled, and are in proper condition for transportation according to the applicable regulations of the Department of Transportation.",
+    },
+    payloadSchemaKey: "transport.shipper_certification.v1",
+    supersedesRuleVersionId: null,
+    status: "active",
+    publishedAt: RULES_AUTHORED_B1A_06,
+    publishedBy: ID.USER.platformAdmin,
+    createdAt: RULES_AUTHORED_B1A_06,
+    createdBy: ID.USER.platformAdmin,
+  },
+  {
+    // The owner's call in b1a-06: the wording the sound drum's label already
+    // carries, as data. Printed verbatim, its own casing included.
+    id: ID.RULE_VERSION.waContainerLabel2026,
+    jurisdictionRuleId: ID.JURISDICTION_RULE.waContainerLabel,
+    versionLabel: "2026",
+    effectiveOn: "2026-01-01",
+    expiresOn: null,
+    citation: "40 CFR 273.14(a), as adopted by WAC 173-303-573",
+    citationUrl: null,
+    sourceDocumentRef: "b1a-06 owner decision (container label wording)",
+    payload: { phrase: "UNIVERSAL WASTE — BATTERIES" },
+    payloadSchemaKey: "storage.container_label.v1",
+    supersedesRuleVersionId: null,
+    status: "active",
+    publishedAt: RULES_AUTHORED_B1A_06,
+    publishedBy: ID.USER.platformAdmin,
+    createdAt: RULES_AUTHORED_B1A_06,
     createdBy: ID.USER.platformAdmin,
   },
 ];
