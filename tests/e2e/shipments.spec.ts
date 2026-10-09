@@ -238,11 +238,7 @@ test.describe("build a shipment from a container (Flow B; reviewer items 1, 3, 6
       "incomplete",
     );
     const unmet = (await checklist.getAttribute("data-unmet")) ?? "";
-    for (const id of [
-      "emergency_contact",
-      "shipping_identifiers",
-      "rule_data",
-    ]) {
+    for (const id of ["emergency_contact", "shipping_identifiers"]) {
       expect(unmet.split(",")).toContain(id);
     }
     const emergency = page.locator('[data-precondition="emergency_contact"]');
@@ -259,9 +255,10 @@ test.describe("build a shipment from a container (Flow B; reviewer items 1, 3, 6
     await expect(
       page.locator('[data-precondition="shipping_identifiers"]'),
     ).toContainText("BR-0002");
-    await expect(page.locator('[data-precondition="rule_data"]')).toContainText(
-      "transport.shipper_certification",
-    );
+    // The certification wording is on file since b1a-06 (D-58 item 2).
+    await expect(
+      page.locator('[data-precondition="rule_data"]'),
+    ).toHaveAttribute("data-precondition-met", "true");
     // A draft is never a document (Rule 5.28) — and generation is gated.
     await expect(page.locator('[data-document-marking="draft"]')).toBeVisible();
     await expect(page.locator("[data-generate-paper]")).toHaveAttribute(
