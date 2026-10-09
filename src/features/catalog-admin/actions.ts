@@ -4,6 +4,9 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import type { RequestContext } from "@/data/contracts";
+import { data } from "@/data";
+import { PACKING_GROUPS } from "@/domain/taxonomy/packing-group";
+import { UN_TRANSPORT_IDENTIFIERS } from "@/domain/taxonomy/un-transport-identifier";
 import type { RequestAttribution } from "@/features/intake/server/audit";
 import { requestAttribution } from "@/features/intake/server/session-action";
 import { firstIssue } from "@/features/intake/schemas";
@@ -16,7 +19,7 @@ import {
 import { requireWrite } from "@/lib/auth/guard";
 import { recordNotFound } from "@/lib/auth/record-denial";
 import { NotFoundError } from "@/lib/errors";
-import type { IsoTimestamp } from "@/types/common";
+import type { IsoTimestamp, Uuid } from "@/types/common";
 
 import {
   approveProposal,
@@ -131,4 +134,83 @@ export async function rejectCatalogProposal(
         attribution,
       ),
   );
+}
+
+/** Shape limits on typed text — not regulatory figures (Rule 1.23). */
+const MAX_IDENTITY_TEXT = 200;
+
+const identityText = z
+  .string()
+  .trim()
+  .max(MAX_IDENTITY_TEXT)
+  .nullable()
+  .transform((value) => (value === null || value === "" ? null : value));
+
+const identitySchema = z.object({
+  catalogEntryId: z.uuid(),
+  unIdentifier: z
+    .enum(UN_TRANSPORT_IDENTIFIERS, {
+      error: "Choose an identification number from the list.",
+    })
+    .nullable(),
+  properShippingName: identityText,
+  hazardClass: identityText,
+  packingGroup: z.enum(PACKING_GROUPS, {
+    error: "Choose a packing group from the list.",
+  }),
+  reason: z
+    .string()
+    .trim()
+    .min(1, "State the reason for this edit.")
+    .max(MAX_REASON_LENGTH),
+});
+
+/**
+ * **Edit shipping identity** — D-50. P6 only, with a reason, audited as
+ * `catalog_entry.updated`. A shipping identifier is never typed by a handler
+ * (Rule 5.9): the guard refuses every other role, and the adapter refuses
+ * them again.
+ */
+export async function editCatalogTransportIdentity(
+  input: unknown,
+): Promise<ActionResult<{ readonly catalogEntryId: Uuid }>> {
+  const guard = await requireWrite(ROUTE, "editCatalogTransportIdentity");
+  if (!guard.ok) return guard;
+  const { ctx } = guard;
+
+  const parsed = identitySchema.safeParse(input);
+  if (!parsed.success) {
+    const issue = firstIssue(parsed.error);
+    return actionFailed({
+      code: "VALIDATION",
+      message: issue.message,
+      ...(issue.field === undefined ? {} : { field: issue.field }),
+      correlationId: ctx.correlationId,
+    });
+  }
+
+  try {
+    const entry = await data.catalogEntries.editTransportIdentity(
+      ctx,
+      parsed.data.catalogEntryId,
+      {
+        unIdentifier: parsed.data.unIdentifier,
+        properShippingName: parsed.data.properShippingName,
+        hazardClass: parsed.data.hazardClass,
+        packingGroup: parsed.data.packingGroup,
+        reason: parsed.data.reason,
+        at: new Date().toISOString(),
+        attribution: await requestAttribution(),
+      },
+    );
+    revalidatePath(ROUTE);
+    revalidatePath("/catalog");
+    revalidatePath("/shipments", "layout");
+    return actionSucceeded({ catalogEntryId: entry.id });
+  } catch (error) {
+    if (error instanceof NotFoundError) {
+      await recordNotFound(ctx, "catalog_entry", parsed.data.catalogEntryId);
+    }
+    return actionFailedFrom(error, ctx.correlationId);
+  }
 }

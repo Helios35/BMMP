@@ -6,7 +6,6 @@ import { Check } from "lucide-react";
 
 import { GatedControl } from "@/components/access/gated-control";
 import { Progress } from "@/components/ui/progress";
-import type { IntakeStep } from "@/domain/taxonomy/intake-step";
 import { cn } from "@/lib/utils";
 
 /**
@@ -34,8 +33,9 @@ import { cn } from "@/lib/utils";
  */
 
 export interface StepperNavStep {
-  readonly id: IntakeStep;
-  /** From `INTAKE_STEP_LABELS` — never inline. */
+  /** The flow's own step identifier — T-53's for intake, the route's for a shipment. */
+  readonly id: string;
+  /** From the flow's own label lookup — never inline. */
   readonly label: string;
 }
 

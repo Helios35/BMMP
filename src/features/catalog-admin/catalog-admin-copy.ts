@@ -80,3 +80,24 @@ export function rematchAlertBody(entryTitle: string): string {
 export const OPEN_ENTRY = "Open the entry";
 export const PLATFORM_ENTRY = "Platform entry";
 export const ORGANIZATION_ENTRY = "This organization";
+
+// --- shipping identity (D-50) ----------------------------------------------------------
+
+export const IDENTITY_COLUMN = "Shipping identity";
+export const IDENTITY_NONE =
+  "No shipping identity — a paper naming this entry cannot be generated";
+export const IDENTITY_EDIT = "Edit shipping identity";
+export const IDENTITY_EDIT_TITLE = "Edit this entry's shipping identity";
+export const IDENTITY_EDIT_BODY =
+  "These are the identifiers every shipping paper naming this entry carries. A paper already issued is never changed; only papers generated from now read the new values. The edit and its reason are recorded.";
+export const IDENTITY_UN = "Identification number";
+export const IDENTITY_UN_UNSET = "Not set";
+export const IDENTITY_PSN = "Proper shipping name";
+export const IDENTITY_HAZARD_CLASS = "Hazard class";
+export const IDENTITY_PACKING_GROUP = "Packing group";
+export const IDENTITY_REASON = "Reason for this edit";
+export const IDENTITY_REASON_REQUIRED =
+  "A reason is required before the shipping identity can change.";
+export const IDENTITY_SAVE = "Save with this reason";
+export const IDENTITY_SAVING = "Saving…";
+export const IDENTITY_SAVED = "Shipping identity saved.";

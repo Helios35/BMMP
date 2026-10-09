@@ -12,10 +12,19 @@ import {
   DOCUMENT_TYPE_LABELS,
 } from "@/domain/taxonomy/document-type";
 import { readTaxonomyValue } from "@/domain/taxonomy/lookup";
+import {
+  readStoredPaperHeader,
+  type StoredPaperHeader,
+} from "@/domain/transport/stored-paper";
 import { absoluteInstant } from "@/features/battery-record/format-instant";
 import { resolveUserNames } from "@/features/battery-record/user-names";
 import type { TimeZone } from "@/types/common";
-import type { ContainerLabel, DocumentRender } from "@/types/documents";
+import type {
+  ContainerLabel,
+  DocumentRender,
+  Shipment,
+  ShippingPaper,
+} from "@/types/documents";
 import type { Container } from "@/types/storage";
 
 /**
@@ -40,6 +49,17 @@ export type DocumentPage =
       readonly label: ContainerLabel;
       readonly container: Container | null;
     }
+  /**
+   * A shipping paper — its lines from its own `shipping_paper` row, its header
+   * from the render's stored input, never today's shipment (Rules 5.12, 5.14).
+   */
+  | {
+      readonly kind: "shipping_paper";
+      readonly paper: ShippingPaper;
+      readonly header: StoredPaperHeader | null;
+      readonly shipment: Shipment | null;
+      readonly shipper: string;
+    }
   /** A type whose page arrives with its own unit — shown as the render's own record. */
   | { readonly kind: "render_record" };
 
@@ -60,11 +80,17 @@ export async function readDocument(
   ctx: RequestContext,
   render: DocumentRender,
 ): Promise<DocumentView> {
-  const [organization, labels, successors, container, shipment, names] =
+  const [organization, labels, papers, successors, container, shipment, names] =
     await Promise.all([
       data.organizations.get(ctx, ctx.organizationId),
       render.documentType === "container_label"
         ? data.containerLabels.list(ctx, {
+            documentRenderId: render.id,
+            limit: 1,
+          })
+        : Promise.resolve(null),
+      render.documentType === "shipping_paper"
+        ? data.shippingPapers.list(ctx, {
             documentRenderId: render.id,
             limit: 1,
           })
@@ -119,10 +145,22 @@ export async function readDocument(
         : { label: "Not recorded", href: null };
 
   const label = labels?.items[0] ?? null;
+  const paper = papers?.items[0] ?? null;
   const page: DocumentPage =
     render.documentType === "container_label" && label !== null
       ? { kind: "container_label", label, container }
-      : { kind: "render_record" };
+      : render.documentType === "shipping_paper" && paper !== null
+        ? {
+            kind: "shipping_paper",
+            paper,
+            header: readStoredPaperHeader(render.inputSnapshot),
+            shipment,
+            shipper:
+              organization === null
+                ? "Not recorded"
+                : (organization.legalName ?? organization.name),
+          }
+        : { kind: "render_record" };
 
   return {
     render,

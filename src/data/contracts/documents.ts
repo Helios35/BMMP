@@ -1,4 +1,5 @@
 import type { RequestContext } from "./context";
+import type { StorageWriteAttribution } from "./storage";
 import type {
   AppendInput,
   AppendOnlyRepository,
@@ -20,7 +21,10 @@ import type { DocumentType } from "@/domain/taxonomy/document-type";
 import type { ShipmentStatus } from "@/domain/taxonomy/shipment-status";
 import type { TransportMode } from "@/domain/taxonomy/transport-mode";
 import type { WasteClassification } from "@/domain/taxonomy/waste-classification";
-import type { IsoTimestamp, Sha256, Uuid } from "@/types/common";
+import type { RuleOutcome } from "@/domain/rules/outcome";
+import type { ResolvedRule } from "@/domain/rules/resolve";
+import type { ShippingPaperPayload } from "@/domain/transport/shipping-paper";
+import type { IsoTimestamp, PostalAddress, Sha256, Uuid } from "@/types/common";
 
 /** Classification and document contracts — `ERD.md` §7. */
 
@@ -106,6 +110,14 @@ export interface ShipmentQuery extends BaseQuery {
   readonly transportMode?: TransportMode;
   readonly shippedAfter?: IsoTimestamp;
   readonly shippedBefore?: IsoTimestamp;
+  /** Exact `destination_facility_name` — the `/shipments` destination filter. */
+  readonly destinationFacilityName?: string;
+  /**
+   * Any record in any of the shipment's containers carries a DDR flag or the
+   * air prohibition — the containing-damaged-records filter (`UX_SPEC.md`
+   * §3.11). Membership derives through the container (`ERD.md` §11.1).
+   */
+  readonly holdsDamagedRecord?: boolean;
 }
 
 export interface OfferShipment {
@@ -136,6 +148,187 @@ export interface ShipmentRepository extends Repository<
     shipmentId: Uuid,
     input: OfferShipment,
   ): Promise<Shipment>;
+
+  /**
+   * **Assemble a shipment** from containers, with its transport details — one
+   * operation, all or nothing (Flow B1–B2).
+   *
+   * The adapter re-runs step 1's refusals on every container
+   * (`admitContainerToShipment`: Rules 4.19, 4.22, 5.2, 5.24, 5.25, 6.1, 6.13)
+   * and the air block (Rules 6.7, 6.8) against the rows it holds, creates the
+   * shipment at `draft`, links each container (`container.shipment_id`, the
+   * only membership link), and writes `shipment.created`. An air request
+   * holding a damaged, defective or recalled record is refused and the
+   * attempt is audited as `denial.recorded` (Rule 12.6).
+   */
+  assemble(ctx: RequestContext, input: ShipmentAssembly): Promise<Shipment>;
+
+  /**
+   * Replace a shipment's containers before departure. **Where a shipping paper
+   * is issued, the change voids it immediately** (Rule 5.13): the render is
+   * kept and marked void with the reason and the actor (Rule 5.14,
+   * `document_render.voided`), and the shipment returns to `draft` for
+   * regeneration. Added containers pass step 1's refusals again; an addition
+   * that would put a damaged record on an air shipment is refused (Rule 6.13).
+   */
+  changeContents(
+    ctx: RequestContext,
+    input: ShipmentContentsChange,
+  ): Promise<ShipmentContentsChangeResult>;
+
+  /**
+   * Record the mode, carrier and destination (Rules 5.10, 5.16). Frozen once
+   * documents are issued (T-18). **Air with a damaged, defective or recalled
+   * record in scope is refused, the refusal is recorded on the shipment
+   * (`air_transport_blocked_reason`) and audited** — there is no parameter
+   * that admits it, for any role (Rule 6.8).
+   */
+  recordTransport(
+    ctx: RequestContext,
+    input: ShipmentTransportChange,
+  ): Promise<Shipment>;
+
+  /**
+   * T-28's derived `ready`: move between `draft` and `ready` to match the
+   * Rule 5.3 precondition set the caller just evaluated with
+   * `buildShippingPaperPayload`. Refuses every other status. **Not a way to
+   * declare a shipment ready** — the caller passes the builder's answer.
+   */
+  settleReadiness(
+    ctx: RequestContext,
+    input: ShipmentReadiness,
+  ): Promise<Shipment>;
+
+  /**
+   * **Issue the shipping paper** — write the `document_render` and the
+   * `shipping_paper` from the builder's complete outcome, and move the
+   * shipment to `documents_issued`, as one operation (Flow B4).
+   *
+   * The payload is the builder's, recomputed server-side at commit; the
+   * adapter refuses one that no longer describes the shipment's contents
+   * (Rule 5.13), names a different shipment, or carries a number the
+   * organization no longer holds, and re-checks the air block. A paper is
+   * never edited and never re-issued over a current one (Rule 5.12) — a
+   * correction follows a void and references what it replaces (Rule 5.15).
+   */
+  issueShippingPaper(
+    ctx: RequestContext,
+    input: ShippingPaperIssue,
+  ): Promise<IssuedShippingPaper>;
+
+  /**
+   * **Departure** (Rule 5.17) — one operation: the shipment to `dispatched`
+   * with its retention date stamped from the resolved rule (Rule 5.18), every
+   * container to `shipped`, **the storage clocks of what left stopped** (Rule
+   * 4.7) and their open clock alerts resolved, and every record to `shipped`.
+   * Refused, stated, by `admitDeparture` (Rules 5.13, 5.16, 6.7, 6.16).
+   */
+  recordDeparture(
+    ctx: RequestContext,
+    input: ShipmentDeparture,
+  ): Promise<ShipmentDepartureResult>;
+
+  /**
+   * **Arrival** (Rule 5.26) — the shipment closes, through `delivered`, and
+   * its records move to closed out, which is terminal.
+   */
+  recordArrival(ctx: RequestContext, input: ShipmentArrival): Promise<Shipment>;
+}
+
+/** Destination and transporter details a person records — Rules 5.2, 5.10, 5.16. */
+export interface ShipmentTransportDetails {
+  readonly transportMode: TransportMode;
+  readonly destinationFacilityName: string;
+  readonly destinationAddress: PostalAddress;
+  /** Receiving facility regulatory identifier, where one applies. */
+  readonly destinationIdentifier: string | null;
+  readonly carrierName: string;
+  /** Any required transporter identifier. */
+  readonly transporterIdentifier: string | null;
+}
+
+export interface ShipmentAssembly {
+  readonly containerIds: readonly Uuid[];
+  readonly transport: ShipmentTransportDetails;
+  readonly at: IsoTimestamp;
+  readonly attribution: StorageWriteAttribution;
+}
+
+export interface ShipmentContentsChange {
+  readonly shipmentId: Uuid;
+  /** The shipment's containers after the change — the whole set, not a delta. */
+  readonly containerIds: readonly Uuid[];
+  /**
+   * Why. **Required where the change voids an issued paper** — a void
+   * records its reason and its actor (Rule 5.14).
+   */
+  readonly reason: string | null;
+  readonly at: IsoTimestamp;
+  readonly attribution: StorageWriteAttribution;
+}
+
+export interface ShipmentContentsChangeResult {
+  readonly shipment: Shipment;
+  readonly addedContainerIds: readonly Uuid[];
+  readonly removedContainerIds: readonly Uuid[];
+  /** The render this change voided, where a paper was issued (Rule 5.13). */
+  readonly voidedDocumentRenderId: Uuid | null;
+}
+
+export interface ShipmentTransportChange {
+  readonly shipmentId: Uuid;
+  readonly transport: ShipmentTransportDetails;
+  readonly at: IsoTimestamp;
+  readonly attribution: StorageWriteAttribution;
+}
+
+export interface ShipmentReadiness {
+  readonly shipmentId: Uuid;
+  /** `buildShippingPaperPayload`'s checklist, as `preDocumentStatus` reads it. */
+  readonly readiness: Extract<ShipmentStatus, "draft" | "ready">;
+  readonly at: IsoTimestamp;
+  readonly attribution: StorageWriteAttribution;
+}
+
+export interface ShippingPaperIssue {
+  readonly shipmentId: Uuid;
+  /** The builder's complete outcome, computed at commit from the rows. */
+  readonly paper: RuleOutcome<ShippingPaperPayload>;
+  readonly at: IsoTimestamp;
+  readonly attribution: StorageWriteAttribution;
+}
+
+export interface IssuedShippingPaper {
+  readonly shipment: Shipment;
+  readonly shippingPaper: ShippingPaper;
+  readonly documentRender: DocumentRender;
+}
+
+export interface ShipmentDeparture {
+  readonly shipmentId: Uuid;
+  /**
+   * The shipment-record retention rule in force at the site on the ship date
+   * (Rules 5.18, 12.20). The caller resolves it; the adapter refuses one not
+   * in force on the date it computes, and refuses departure with none.
+   */
+  readonly retentionRule: ResolvedRule | null;
+  readonly at: IsoTimestamp;
+  readonly attribution: StorageWriteAttribution;
+}
+
+export interface ShipmentDepartureResult {
+  readonly shipment: Shipment;
+  /** Every clock departure stopped — the departing containers' and records', and no other. */
+  readonly stoppedClockIds: readonly Uuid[];
+  readonly shippedRecordIds: readonly Uuid[];
+}
+
+export interface ShipmentArrival {
+  readonly shipmentId: Uuid;
+  /** The receiving facility's receipt reference, where one was given. */
+  readonly receivedConfirmationRef: string | null;
+  readonly at: IsoTimestamp;
+  readonly attribution: StorageWriteAttribution;
 }
 
 // --- shipping_paper ---------------------------------------------------------

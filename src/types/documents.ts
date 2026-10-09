@@ -23,6 +23,7 @@ import type { TransportMode } from "@/domain/taxonomy/transport-mode";
 import type { UnTransportIdentifier } from "@/domain/taxonomy/un-transport-identifier";
 import type { WasteClassification } from "@/domain/taxonomy/waste-classification";
 import type { AppliedRuleVersion } from "@/domain/rules/outcome";
+import type { ShippingPaperLine } from "@/domain/transport/shipping-paper";
 
 /**
  * Classification and documents — `ERD.md` §7.
@@ -208,6 +209,19 @@ export interface ShippingPaper extends TenantScoped, Created {
   readonly supersedesShippingPaperId: Uuid | null;
   readonly generatedAt: IsoTimestamp;
   readonly generatedBy: Uuid;
+  /**
+   * **Every line the paper carries.** `ERD.md` §7.3 gives `shipping_paper` one
+   * line's columns, and T-17 says a shipment carrying more than one identifier
+   * produces more than one line — a vehicle pack and a laptop cell on one
+   * shipment are two lines on one paper. **No column holds the second**, so
+   * the lines ride here and every surface reads them; the single-line columns
+   * above carry the first line only so the row satisfies the ERD's NOT NULLs.
+   * Reported in `b1a-05-shipments`' build-notes as an ERD finding (a
+   * `shipping_paper_line` child table). Optional so no fixture row has to
+   * change — the precedent is `CatalogEntry.proposedFromIntakeSessionId` —
+   * and absent reads as the single-line columns.
+   */
+  readonly lines?: readonly ShippingPaperLine[];
 }
 
 /**

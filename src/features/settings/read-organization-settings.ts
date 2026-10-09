@@ -17,7 +17,7 @@ import type { IsoDate, IsoTimestamp, Uuid } from "@/types/common";
 import {
   emergencyVerification,
   type EmergencyVerification,
-} from "./emergency-verification";
+} from "@/domain/transport/emergency-verification";
 import { organizationSites, type OrganizationSite } from "./sites";
 
 /**

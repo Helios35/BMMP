@@ -90,6 +90,13 @@ export interface EntryRowView {
   /** T-61 as stored — `CatalogSourceType` renders an unrecognised value as stored. */
   readonly sourceType: string;
   readonly isPlatformEntry: boolean;
+  /** D-50 — the transport identity a shipping paper reads (Rule 5.9), as stored. */
+  readonly identity: {
+    readonly unIdentifier: string | null;
+    readonly properShippingName: string | null;
+    readonly hazardClass: string | null;
+    readonly packingGroup: string;
+  };
 }
 
 function labelOf<T extends string>(
@@ -214,6 +221,12 @@ export async function readCatalogEntries(
       statusValue: entry.status,
       sourceType: entry.sourceType,
       isPlatformEntry: entry.organizationId === null,
+      identity: {
+        unIdentifier: entry.unIdentifier,
+        properShippingName: entry.properShippingName,
+        hazardClass: entry.hazardClass,
+        packingGroup: entry.packingGroup,
+      },
     }));
 }
 

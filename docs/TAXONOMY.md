@@ -1,5 +1,5 @@
 # Taxonomy — BMMP
-**Version:** 1.4 · **Date:** 2026-09-25 · **Owner:** Nathan Ivy / Next Sketch LLC
+**Version:** 1.5 · **Date:** 2026-10-09 · **Owner:** Nathan Ivy / Next Sketch LLC
 **Answers:** How is everything in this product classified?
 **Reads from:** `_ANCHORS.md` · `PRD.md` · `BUSINESS_RULES.md` · `PROJECT_SETUP_BMMP.md`  ·  **Feeds:** `TECHNICAL_SPEC.md` · `ERD.md` · `UX_SPEC.md` · `SITE_ARCHITECTURE.md` · every builder brief
 
@@ -9,6 +9,10 @@
 ---
 
 ## Changelog
+
+**v1.5 · 2026-10-09 — three audit event types for shipments and catalog editing (approved by the owner in `b1a-05-shipments`)**
+
+- **T-43 gains `catalog_entry.updated`, `shipment.created` and `document_render.voided`.** Approved by the owner in session and transcribed by `b1a-05-shipments`; planning logs the decision. Without them a P6 edit of an entry's shipping identity (D-50), a shipment's creation and a paper voided by a contents change (Rules 5.13, 5.14) either wrote nothing or wrote under a near neighbour — `catalog_entry.status_changed` is a T-07 move, `document_render.superseded` is a replacement, and a void is neither. The other T-43 gaps stay open.
 
 **v1.4 · 2026-09-25 — the storage clock's provenance (`Decision Log.md` D-55)**
 
@@ -1343,6 +1347,7 @@ Two citations in this document are deliberately **not** numbered, because what t
 | `catalog_entry.matched` | Catalog matched | A catalog entry was proposed for a record. |
 | `catalog_entry.proposed` | Catalog entry proposed | A person proposed a new catalog entry from a catalog miss; it waits as `proposed` (T-07) for P6 at `/settings/catalog` and is not available for matching (**Rule 2.20**; Flow F). **Not `catalog_entry.matched`**, which is the match step proposing an existing entry for a record. |
 | `catalog_entry.status_changed` | Catalog entry status changed | The entry moved between values of T-07 — P6 approving a proposal to `published` or rejecting it — with the stated reason (Flow F). An approval lists the records it raised on `/review` for a person to confirm; it changes none of them. |
+| `catalog_entry.updated` | Catalog entry edited | P6 edited an entry's shipping identity — identification number, proper shipping name, hazard class, packing group — with the stated reason (D-50). The before and after values are on the event. **Only P6 edits the catalog; a handler never types a shipping identifier** (**Rule 5.9**). |
 | `battery_record.routed_to_review` | Routed to review | A gated field below band placed the record in the review queue. |
 | `battery_record.confirmed` | Identification confirmed | A human confirmed identification, including chemistry. |
 | `battery_record.status_changed` | Record status changed | The record moved between values of T-22. |
@@ -1353,9 +1358,11 @@ Two citations in this document are deliberately **not** numbered, because what t
 | `storage_event.recorded` | Storage event recorded | A handling activity was recorded against stored material. |
 | `storage_clock.status_changed` | Storage clock changed | A clock started, entered a band, expired or stopped. |
 | `alert.resolved` | Alert resolved | A person resolved an open alert, with the stated reason. For a Flow F re-match raise, written on both of its exits — the match confirmed, or the record kept as identified (D-48). An alert is never deleted; resolving it is its one closing act (Rule 12.9). |
+| `shipment.created` | Shipment created | P1 or P6 assembled a shipment from containers. It starts at `draft` (T-28); every later move is `shipment.status_changed`. |
 | `shipment.status_changed` | Shipment status changed | The shipment moved between values of T-28. |
 | `document_render.issued` | Document issued | A document was rendered and issued. |
 | `document_render.superseded` | Document superseded | An issued document was replaced. |
+| `document_render.voided` | Document voided | An issued document was voided — a shipping paper whose shipment's contents changed after it was generated (**Rule 5.13**). Retained in full and marked void, with the reason and the actor on the event (**Rule 5.14**). **Not `document_render.superseded`**: a void ends a document without replacing it; the regenerated paper references the voided one (**Rule 5.15**). |
 | `document.render_failed` | Document render failed | A render could not complete, so no `document_render` row exists. The event carries the full input snapshot, the error code and the correlation id, which is what makes a failed render as auditable as a successful one (`TECHNICAL_SPEC.md` §10.4). |
 | `document.viewed` | Document viewed | An issued document's stored bytes were streamed to a reader. |
 | `document.reprinted` | Document reprinted | An issued document's stored bytes were streamed again for print. **A reprint never re-renders** — the bytes are the ones that were issued (`TECHNICAL_SPEC.md` §8.4). |

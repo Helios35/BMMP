@@ -4,7 +4,7 @@ import { render, screen } from "@testing-library/react";
 
 import * as fixtures from "@/data/mock/fixtures";
 import * as ID from "@/data/mock/fixtures/ids";
-import { emergencyVerification } from "@/features/settings/emergency-verification";
+import { emergencyVerification } from "@/domain/transport/emergency-verification";
 import {
   EMERGENCY_UNVERIFIED_BODY,
   EMERGENCY_UNVERIFIED_HEADLINE,

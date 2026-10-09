@@ -1,8 +1,11 @@
 import type { ReactElement } from "react";
 
 import { ContainerLabelDocument } from "@/components/documents/container-label-document";
+import { ShippingPaperDocument } from "@/components/documents/shipping-paper-document";
 import { DocumentStatusMarking } from "@/components/documents/document-viewer";
 import { snapshotEntries } from "@/features/battery-record/json-text";
+import { issuedPaperProps } from "@/features/shipments/paper-view";
+import { PAPER_GAP } from "@/features/shipments/shipment-copy";
 
 import type { DocumentView } from "./server/read-document";
 
@@ -11,10 +14,11 @@ import type { DocumentView } from "./server/read-document";
  * render's own frozen rows (Rules 4.20, 5.12).
  *
  * A `container_label` is its label: the phrase, the contents and the start
- * date as printed. **Every other type's page arrives with the unit that
- * generates it** (unit 06); until then the page is the render's own record —
- * what it was rendered from, under which rule versions, and its verification
- * code — never an invented document.
+ * date as printed. A `shipping_paper` is its paper: the lines, the verified
+ * number and the certification as issued (`b1a-05`). **Every other type's
+ * page arrives with the unit that generates it** (unit 06); until then the
+ * page is the render's own record — what it was rendered from, under which
+ * rule versions, and its verification code — never an invented document.
  *
  * A render that is not the live document carries its marking **on the page**,
  * so it prints (§3.14).
@@ -69,6 +73,22 @@ export function DocumentPageContent({
         containerCode={container?.containerCode ?? "Not recorded"}
         handlerIdentifier={label.handlerIdentifier}
         verificationCode={render.verificationCode}
+        marking={marking}
+      />
+    );
+  }
+
+  if (view.page.kind === "shipping_paper") {
+    const { paper, header, shipment, shipper } = view.page;
+    return (
+      <ShippingPaperDocument
+        {...issuedPaperProps({
+          paper,
+          header,
+          shipment,
+          shipper,
+          gap: PAPER_GAP,
+        })}
         marking={marking}
       />
     );

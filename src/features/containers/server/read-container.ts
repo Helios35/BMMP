@@ -4,6 +4,11 @@ import { data } from "@/data";
 import type { RequestContext } from "@/data/contracts";
 import { canReadRoute } from "@/domain/access/route-capability";
 import type { MoveContainerFacts } from "@/domain/storage/accumulation";
+import {
+  containerLabelFlags,
+  labelInForce,
+  type ContainerLabelFlags,
+} from "@/domain/storage/container-label-flags";
 import { resolveUserNames } from "@/features/battery-record/user-names";
 import type { AuditEvent } from "@/types/audit";
 import type { BatteryRecord } from "@/types/battery-record";
@@ -50,14 +55,11 @@ export interface MoveTarget {
   readonly facts: MoveContainerFacts;
 }
 
-export interface ContainerFlags {
-  /** Holds contents with no label in force (Rule 4.22). */
-  readonly noCurrentLabel: boolean;
-  /** The printed start differs from the container's current start (Rule 4.19). */
-  readonly mislabelled: {
-    readonly printed: string;
-    readonly current: string;
-  } | null;
+/**
+ * The label flags are `containerLabelFlags` — the one derivation the shipment
+ * builder and its adapter re-check read too (Rules 4.19, 4.22).
+ */
+export interface ContainerFlags extends ContainerLabelFlags {
   /** Any content carries a DDR flag (Flow D3). */
   readonly damagedContents: boolean;
 }
@@ -132,12 +134,10 @@ export async function readContainer(
 
   // The label in force is the one the container names; failing that, the
   // newest printed for it. Superseded labels stay readable on their own render.
-  const label =
-    labelsPage.items.find(
-      (row) => row.id === container.currentContainerLabelId,
-    ) ??
-    labelsPage.items[0] ??
-    null;
+  const label = labelInForce(
+    container.currentContainerLabelId,
+    labelsPage.items,
+  );
   const labelRender =
     label === null
       ? null
@@ -145,18 +145,12 @@ export async function readContainer(
 
   const contents = contentsPage.items;
   const flags: ContainerFlags = {
-    noCurrentLabel:
-      contents.length > 0 && container.currentContainerLabelId === null,
-    mislabelled:
-      label !== null &&
-      container.accumulationStartedAt !== null &&
-      Date.parse(label.accumulationStartedAt) !==
-        Date.parse(container.accumulationStartedAt)
-        ? {
-            printed: label.accumulationStartedAt,
-            current: container.accumulationStartedAt,
-          }
-        : null,
+    ...containerLabelFlags({
+      contentCount: contents.length,
+      currentContainerLabelId: container.currentContainerLabelId,
+      accumulationStartedAt: container.accumulationStartedAt,
+      label,
+    }),
     damagedContents: contents.some((record) => record.ddrFlags.length > 0),
   };
 

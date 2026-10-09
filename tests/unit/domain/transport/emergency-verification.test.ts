@@ -5,7 +5,7 @@ import * as ID from "@/data/mock/fixtures/ids";
 import {
   addWholeMonths,
   emergencyVerification,
-} from "@/features/settings/emergency-verification";
+} from "@/domain/transport/emergency-verification";
 
 /**
  * The 24-hour emergency number's verification — D-32, Rules 5.6, 5.7, E-11.

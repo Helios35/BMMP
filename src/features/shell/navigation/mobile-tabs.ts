@@ -4,6 +4,7 @@ import {
   Camera,
   LayoutDashboard,
   TriangleAlert,
+  Truck,
   type LucideIcon,
 } from "lucide-react";
 
@@ -106,6 +107,15 @@ const LOG_A_BATTERY: MobileTabSlot = {
   requires: "write",
 };
 
+/** §2.2's raised centre for P3, P4 and P5 — the shipment ledger. */
+const SHIPMENTS: MobileTabSlot = {
+  route: "/shipments",
+  query: "",
+  label: "Shipments",
+  icon: Truck,
+  requires: "read",
+};
+
 /** §2.2's slots 1, 2 and 4 for P1, P6, P3, P4 and P5. */
 const BATTERIES_THEN_CONTAINERS: readonly MobileTabSlot[] = [
   HOME,
@@ -118,9 +128,7 @@ const BATTERIES_THEN_CONTAINERS: readonly MobileTabSlot[] = [
  *
  * P2 works out of her containers first, so her slot 2 is Containers and slot
  * 4 Batteries, and her raised centre is the alerting filter. The centre for
- * P3, P4 and P5 is `/shipments`, which `b1a-05` builds; until then it is
- * `null` rather than substituted — a raised primary §2.2 never put there would
- * be the strongest placement in the product.
+ * P3, P4 and P5 is `/shipments`, restored by `b1a-05`.
  */
 export const MOBILE_TAB_SLOTS: Readonly<Record<RoleCode, MobileTabSlots>> = {
   compliance_handler: {
@@ -133,19 +141,15 @@ export const MOBILE_TAB_SLOTS: Readonly<Record<RoleCode, MobileTabSlots>> = {
   },
   producer_compliance_officer: {
     destinations: BATTERIES_THEN_CONTAINERS,
-    // §2.2: `/shipments`, label "Shipments", icon Truck, requires "read".
-    // Restored by b1a-05 with `/shipments`.
-    centre: null,
+    centre: SHIPMENTS,
   },
   mobility_supplier_technician: {
     destinations: BATTERIES_THEN_CONTAINERS,
-    // §2.2: `/shipments`. Restored by b1a-05.
-    centre: null,
+    centre: SHIPMENTS,
   },
   auditor: {
     destinations: BATTERIES_THEN_CONTAINERS,
-    // §2.2: `/shipments`. Restored by b1a-05.
-    centre: null,
+    centre: SHIPMENTS,
   },
   platform_admin: {
     destinations: BATTERIES_THEN_CONTAINERS,
