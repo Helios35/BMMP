@@ -24,6 +24,9 @@ import { ROLE_LABELS } from "@/domain/taxonomy/role";
  */
 export const ORGANIZATION_SETTINGS_ACTORS = `a ${ROLE_LABELS.facility_manager} or a ${ROLE_LABELS.platform_admin}`;
 
+/** The same, opening a sentence. */
+const ORGANIZATION_SETTINGS_ACTORS_SENTENCE = `A ${ROLE_LABELS.facility_manager} or a ${ROLE_LABELS.platform_admin}`;
+
 // --- E-11 — the 24-hour emergency contact number ----------------------------
 
 /**
@@ -41,7 +44,7 @@ export const EMERGENCY_UNVERIFIED_HEADLINE = "This number isn't verified.";
 export const EMERGENCY_UNVERIFIED_BODY =
   "A 24-hour emergency contact number has to be verified before it can go on a shipping paper. No verification is in force for this organization.";
 
-export const EMERGENCY_UNVERIFIED_REMEDY = `${ORGANIZATION_SETTINGS_ACTORS} records the verification. Verifying is a recorded act with a date and a person attached to it.`;
+export const EMERGENCY_UNVERIFIED_REMEDY = `${ORGANIZATION_SETTINGS_ACTORS_SENTENCE} records the verification. Verifying is a recorded act with a date and a person attached to it.`;
 
 /** Rendered where no number has been supplied at all. */
 export const EMERGENCY_NO_NUMBER = "No number recorded.";
@@ -93,7 +96,7 @@ export const RETURN_TO_SHIPMENT = "Back to the shipment draft";
 
 export const CLOCK_METHOD_NOT_RECORDED = "Not recorded";
 
-export const CLOCK_METHOD_REMEDY = `${ORGANIZATION_SETTINGS_ACTORS} records this, per site, with its effective date.`;
+export const CLOCK_METHOD_REMEDY = `${ORGANIZATION_SETTINGS_ACTORS_SENTENCE} records this, per site, with its effective date.`;
 
 /**
  * **Do not infer it.** Container-marking evidence exists in the data and
@@ -123,7 +126,7 @@ export const NO_JURISDICTION_HEADLINE =
  * citation — every one of those would put a number the law never supplied onto a
  * document.
  */
-export const NO_JURISDICTION_BODY = `Nothing is classified for this site until a jurisdiction is recorded for it. ${ORGANIZATION_SETTINGS_ACTORS} can supply it. No default is assumed in the meantime.`;
+export const NO_JURISDICTION_BODY = `Nothing is classified for this site until a jurisdiction is recorded for it. ${ORGANIZATION_SETTINGS_ACTORS_SENTENCE} can supply it. No default is assumed in the meantime.`;
 
 // --- §3.6.4 — the jurisdiction profile --------------------------------------
 
