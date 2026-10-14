@@ -199,7 +199,7 @@ function withUniqueChunk(png: Buffer): Buffer {
  * the fixture label reader keys its scenario on it (never rename a fixture
  * image), and by default a byte-unique copy of its contents.
  */
-async function fixturePayload(
+export async function fixturePayload(
   image: IntakeFixtureImage,
   options: SendOptions,
 ): Promise<{ name: string; mimeType: string; buffer: Buffer }> {
