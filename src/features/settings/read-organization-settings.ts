@@ -213,6 +213,8 @@ export async function readOrganizationSettings(
     });
   }
 
+  const contactConfiguration =
+    await data.platformConfiguration.readEmergencyContactConfiguration(ctx);
   const verification = emergencyVerification(
     {
       phone: organization.emergencyResponsePhone,
@@ -220,6 +222,9 @@ export async function readOrganizationSettings(
       verifiedBy: organization.emergencyVerifiedBy,
       reverificationIntervalMonths:
         organization.emergencyReverificationIntervalMonths,
+      // D-32 — `null` on the organization reads the platform default.
+      platformDefaultIntervalMonths:
+        contactConfiguration.reverificationIntervalMonths,
     },
     asOf,
   );
@@ -237,4 +242,36 @@ export async function readOrganizationSettings(
     gate: await readIntakeGate(ctx),
     asOf,
   };
+}
+
+/**
+ * Whether the active organization's 24-hour number stands right now — D-32,
+ * Rules 5.6, 5.7. The same reads and the same domain function the settings
+ * page and step 3 use, for a page that only needs the one fact (E-11 on
+ * `/shipments/[id]`).
+ */
+export async function readEmergencyStanding(
+  ctx: RequestContext,
+  asOf: IsoTimestamp = new Date().toISOString(),
+): Promise<EmergencyVerification> {
+  const [organization, configuration] = await Promise.all([
+    data.organizations.get(ctx, ctx.organizationId),
+    data.platformConfiguration.readEmergencyContactConfiguration(ctx),
+  ]);
+  if (organization === null) {
+    throw new Error(
+      `The active organization has no row (correlationId=${ctx.correlationId}).`,
+    );
+  }
+  return emergencyVerification(
+    {
+      phone: organization.emergencyResponsePhone,
+      verifiedAt: organization.emergencyVerifiedAt,
+      verifiedBy: organization.emergencyVerifiedBy,
+      reverificationIntervalMonths:
+        organization.emergencyReverificationIntervalMonths,
+      platformDefaultIntervalMonths: configuration.reverificationIntervalMonths,
+    },
+    asOf,
+  );
 }

@@ -11,6 +11,7 @@ import {
   EMERGENCY_UNVERIFIED_HEADLINE,
   EMERGENCY_UNVERIFIED_REMEDY,
 } from "../copy";
+import { EmergencyContactControls } from "./emergency-contact-controls";
 import type { EmergencyContactView } from "../read-organization-settings";
 import {
   Field,
@@ -35,9 +36,11 @@ import {
  * not "in a year". A number typed into a component here is the same defect class
  * as a hard-coded jurisdiction threshold (Rule 1.23).
  *
- * **No "Verify this number" control renders in this unit.** Verification is a
- * recorded act with a date and a person (Rule 5.6); the unit that writes it adds
- * the control.
+ * **Editing and verifying are two acts** (D-63): the form below saves the
+ * number and the reference, and any change clears the verification in the same
+ * write; **Verify this number** is a button, then a confirm, and the server
+ * stamps the date and the person. Both render only for a role holding `write`
+ * on this route — P2 and P6, the only roles that reach it.
  */
 
 export const EMERGENCY_CONTACT_SECTION_ID = "emergency-contact";
@@ -79,9 +82,15 @@ export function EmergencyContactUnverifiedAlert({
 export function EmergencyContactCard({
   contact,
   timeZone,
+  editable,
+  returnTo,
 }: {
   readonly contact: EmergencyContactView;
   readonly timeZone: TimeZone;
+  /** `canWriteRoute(role, "/settings/organization")` — never re-derived here. */
+  readonly editable: boolean;
+  /** E-11 — the shipment draft to land back on after verifying. */
+  readonly returnTo: string | null;
 }) {
   return (
     <SettingsSection
@@ -134,7 +143,11 @@ export function EmergencyContactCard({
             )}
           </Field>
           <Field label={contact.isInForce ? "Lapses on" : "Lapsed on"}>
-            {contact.lapsesAt === null ? (
+            {contact.verifiedAt === null ? (
+              <span className="text-body text-muted-foreground">
+                Never verified, so there is no lapse date.
+              </span>
+            ) : contact.lapsesAt === null ? (
               // Rule 1.23. The interval is unknown, so there is no date — and
               // a component does not supply one of its own.
               <span className="text-body text-muted-foreground">
@@ -146,6 +159,15 @@ export function EmergencyContactCard({
           </Field>
         </FieldList>
       </SectionCard>
+      {editable ? (
+        <SectionCard>
+          <EmergencyContactControls
+            phone={contact.phone}
+            contractRef={contact.contractRef}
+            returnTo={returnTo}
+          />
+        </SectionCard>
+      ) : null}
     </SettingsSection>
   );
 }

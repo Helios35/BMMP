@@ -46,6 +46,49 @@ export const EMERGENCY_UNVERIFIED_REMEDY = `${ORGANIZATION_SETTINGS_ACTORS} reco
 /** Rendered where no number has been supplied at all. */
 export const EMERGENCY_NO_NUMBER = "No number recorded.";
 
+// --- D-63 — editing and verifying the 24-hour number --------------------------
+
+export const EMERGENCY_PHONE_LABEL = "24-hour emergency contact number";
+export const EMERGENCY_REF_LABEL = "Emergency response information reference";
+export const EMERGENCY_PHONE_HINT =
+  "Digits, with a leading + if the number has one.";
+
+/** §3.17's primary action. */
+export const EMERGENCY_SAVE = "Save changes";
+export const EMERGENCY_SAVING = "Saving…";
+
+/**
+ * D-63 #2, at the point of change — **any change clears the verification.**
+ * Stated before the person saves, not discovered afterwards.
+ */
+export const EMERGENCY_SAVE_CLEARS =
+  "Saving a change to either value clears the verification. The number then has to be verified again before it can go on a shipping paper.";
+
+export const EMERGENCY_SAVED = "Emergency contact saved";
+export const EMERGENCY_SAVED_DETAIL =
+  "The verification was cleared. Verify the number before it goes on a shipping paper.";
+export const EMERGENCY_UNCHANGED = "Nothing changed, so nothing was saved.";
+
+/** D-63 #3 — the attestation is its own act: a button, then a confirm. */
+export const EMERGENCY_VERIFY = "Verify this number";
+export const EMERGENCY_VERIFYING = "Recording…";
+export const EMERGENCY_VERIFY_TITLE = "Verify the 24-hour number?";
+/** The sentence the person confirms, exactly as D-63 and brief 07 author it. */
+export const EMERGENCY_ATTESTATION =
+  "I called this number and it reaches our 24-hour emergency response provider.";
+export const EMERGENCY_VERIFY_DETAIL =
+  "Your name and today's date are recorded against the number. Nobody can enter either by hand.";
+export const EMERGENCY_VERIFY_CONFIRM = "Verify";
+export const EMERGENCY_CANCEL = "Cancel";
+export const EMERGENCY_VERIFIED = "Verification recorded";
+export const EMERGENCY_VERIFY_NEEDS_NUMBER =
+  "Record a number before verifying it.";
+export const EMERGENCY_VERIFY_UNSAVED =
+  "Save or undo your change first. The number you verify is the number on file.";
+
+/** E-11's way back to the draft the person left. */
+export const RETURN_TO_SHIPMENT = "Back to the shipment draft";
+
 // --- §3.6.3 — clock demonstration method, per site --------------------------
 
 export const CLOCK_METHOD_NOT_RECORDED = "Not recorded";
@@ -119,7 +162,7 @@ export const TOS_PRIOR_VERSION_NOTE =
  * and the drift would be a silent jump under the reader rather than a failure.
  */
 export const ORGANIZATION_PAGE_DESCRIPTION =
-  "Everything on this page is read-only in this release.";
+  "The 24-hour emergency contact is edited and verified here. Everything else on this page is read-only in this release.";
 
 export const MEMBERS_PAGE_DESCRIPTION =
   "Who is in this organization and what each of them can do. Everything on this page is read-only in this release.";
