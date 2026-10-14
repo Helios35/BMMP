@@ -1631,10 +1631,12 @@ const intakePhotos = tenantAppendOnlyRepository<
       isCrop?: boolean;
       parentIntakePhotoId?: Uuid;
       photoType?: string;
+      contentHash?: Sha256;
       search?: string;
     },
   ) =>
     eq(query.intakeSessionId, row.intakeSessionId) &&
+    eq(query.contentHash, row.contentHash) &&
     eq(query.parentIntakePhotoId, row.parentIntakePhotoId ?? undefined) &&
     eq(query.photoType, row.photoType) &&
     (query.isCrop === undefined ||

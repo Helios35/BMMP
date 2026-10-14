@@ -31,7 +31,7 @@ import type { IntakeSessionStatus } from "@/domain/taxonomy/intake-session-statu
 import type { LabelFieldCode } from "@/domain/taxonomy/label-field-code";
 import type { PackingGroup } from "@/domain/taxonomy/packing-group";
 import type { UnTransportIdentifier } from "@/domain/taxonomy/un-transport-identifier";
-import type { Decimal, IsoTimestamp, Uuid } from "@/types/common";
+import type { Decimal, IsoTimestamp, Sha256, Uuid } from "@/types/common";
 
 /** Battery, catalog and intake contracts — `ERD.md` §5. */
 
@@ -405,6 +405,14 @@ export interface IntakePhotoQuery extends BaseQuery {
   readonly isCrop?: boolean;
   readonly parentIntakePhotoId?: Uuid;
   readonly photoType?: string;
+  /**
+   * The fingerprint — every photo **in this organization** whose stored bytes
+   * hash to this value (D-56 level 1, D-63 #5). Tenant-scoped like every
+   * other read here, so it can never answer with another tenant's photo;
+   * cross-organization matching needs a definer function and is `b1a-08`'s.
+   * Wants `index(organization_id, content_hash)` on `intake_photo`.
+   */
+  readonly contentHash?: Sha256;
 }
 
 export type IntakePhotoRepository = AppendOnlyRepository<
