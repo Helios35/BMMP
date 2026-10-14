@@ -1,5 +1,5 @@
 # Taxonomy — BMMP
-**Version:** 1.5 · **Date:** 2026-10-09 · **Owner:** Nathan Ivy / Next Sketch LLC
+**Version:** 1.6 · **Date:** 2026-10-14 · **Owner:** Nathan Ivy / Next Sketch LLC
 **Answers:** How is everything in this product classified?
 **Reads from:** `_ANCHORS.md` · `PRD.md` · `BUSINESS_RULES.md` · `PROJECT_SETUP_BMMP.md`  ·  **Feeds:** `TECHNICAL_SPEC.md` · `ERD.md` · `UX_SPEC.md` · `SITE_ARCHITECTURE.md` · every builder brief
 
@@ -9,6 +9,10 @@
 ---
 
 ## Changelog
+
+**v1.6 · 2026-10-14 — the 24-hour number's edit and verification, and the duplicate-photo check (`Decision Log.md` D-63)**
+
+- **T-43 gains `organization.emergency_contact_updated` and `organization.emergency_contact_verified`; T-52 gains `duplicate_photo`.** Authored by planning as D-63, transcribed by `b1a-07-hardening`. Without the two event types the 24-hour number's edit and its verification (Rule 5.6) had no audit type; without the review reason a photo already used on another record (D-56 level 1) could not say why it sent a record to review.
 
 **v1.5 · 2026-10-09 — three audit event types for shipments and catalog editing (approved by the owner in `b1a-05-shipments`)**
 
@@ -1367,6 +1371,8 @@ Two citations in this document are deliberately **not** numbered, because what t
 | `document.viewed` | Document viewed | An issued document's stored bytes were streamed to a reader. |
 | `document.reprinted` | Document reprinted | An issued document's stored bytes were streamed again for print. **A reprint never re-renders** — the bytes are the ones that were issued (`TECHNICAL_SPEC.md` §8.4). |
 | `membership.role_changed` | Role changed | A member's role was changed. |
+| `organization.emergency_contact_updated` | Emergency contact changed | The 24-hour number or the emergency response reference changed; before and after on the event. Clears the verification (Rule 5.6; D-32). |
+| `organization.emergency_contact_verified` | Emergency contact verified | A person recorded that the 24-hour number reaches the provider. Stamps the date and the person (Rule 5.6). |
 | `jurisdiction_rule.version_activated` | Rule version activated | A rule version became active for a jurisdiction and domain. |
 | `override.recorded` | Override recorded | A P6 override was applied, with its stated reason. |
 | `denial.recorded` | Action denied | An action was blocked or denied — a blocked air-transport selection, a rejected P5 write, a prohibited-activity attempt, a permission denial. Required by **Rule 12.6**: attempted actions are evidence. |
@@ -1618,6 +1624,7 @@ Severity is set by the code that raises the alert, from the condition that raise
 | `field_validation_failed` | Value failed validation | An extracted value failed its expected shape and was presented as unread, with the raw text retained (**Rule 2.12**). |
 | `extraction_failed` | Extraction did not complete | The provider errored, timed out or returned a malformed response. **The confidence gate is never relaxed to clear a backlog** (**D-25**; **EC-14**). |
 | `session_abandoned` | Left unfinished | The handler explicitly abandoned the session (T-08 `abandoned`). The session, its photos and its extraction are retained, and no battery record is created. **It is not on the queue**: a closed session has no exit a person can take (Rule 2.23; D-53). A session merely left mid-flow — tab closed, phone locked — stays open and stays on the queue under its gate reasons (Flow A-a(3)). **Work is never lost and never silently committed.** |
+| `duplicate_photo` | Photo already on another record | An intake photo's content hash matches a photo on another battery record in this organization. The whole record routes to review (Rule 2.14). A reason to look, never a verdict: no score or probability is shown (Rule 1.25; D-56). |
 
 **Rules**
 
