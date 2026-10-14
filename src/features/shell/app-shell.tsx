@@ -6,7 +6,6 @@ import type { RoleCode } from "@/domain/taxonomy/role";
 import type { IsoTimestamp } from "@/types/common";
 
 import type { AlertBellProps } from "./chrome/alert-bell";
-import { MockDataBanner } from "./chrome/mock-data-banner";
 import type { OrganizationSwitcherProps } from "./chrome/organization-switcher";
 import { RouteAnnouncer } from "./chrome/route-announcer";
 import { RouteDenialToast } from "./chrome/route-denial-toast";
@@ -77,7 +76,8 @@ export function AppShell({
         Skip to content
       </a>
 
-      <MockDataBanner />
+      {/* The mock-data banner sits above both route groups, in the root
+          layout (RUNBOOK.md §1.4) — not here. */}
 
       <div className="flex min-h-dvh">
         <DesktopSidebar
