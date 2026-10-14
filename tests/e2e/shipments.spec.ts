@@ -6,10 +6,7 @@ import {
   IDENTITY_REASON,
   IDENTITY_SAVED,
 } from "@/features/catalog-admin/catalog-admin-copy";
-import {
-  PRECONDITION_TITLES,
-  whoCanFix,
-} from "@/features/shipments/shipment-copy";
+import { PRECONDITION_TITLES } from "@/features/shipments/shipment-copy";
 
 import { tap } from "./support/intake-flow";
 import { fixtureIds, storageStateFor } from "./support/roles";
@@ -19,14 +16,12 @@ import { fixtureIds, storageStateFor } from "./support/roles";
  * `/settings/catalog` — `b1a-05-shipments`' reviewer checklist, driven from
  * the outside (`UX_SPEC.md` §3.11–§3.13, §3.19).
  *
- * **What the running app can prove, it proves here; the rest is proven in
- * `tests/integration/shipment-writes.test.ts`.** No fixture organization holds
- * a verified 24-hour number, no shipper certification rule is on file, and
- * the only labelled container holds a pack with no shipping identifiers — so
- * in the app every paper stops at a checklist that names each gap, and that
- * is what this spec asserts. Generating, voiding, departing and the
- * server-side air refusal run against in-memory test data in the integration
- * suite (the owner's call, recorded in the build-notes).
+ * **What the running app can prove about building, it proves here.** The
+ * only labelled fixture container holds a pack with no shipping identifiers,
+ * so a paper built from it stops at a checklist that names each gap. Issuing,
+ * voiding and departing a paper — and E-11, the 24-hour number — are proven
+ * in `papers.spec.ts` on a container that spec creates (b1a-07); the
+ * server-side air refusal stays in the integration suite.
  *
  * **The store is shared.** The one write here — a draft shipment holding the
  * sound drum — is released before the test ends, and released first if a
@@ -237,21 +232,23 @@ test.describe("build a shipment from a container (Flow B; reviewer items 1, 3, 6
       "data-precondition-checklist",
       "incomplete",
     );
+    // The pack without shipping identifiers blocks whatever else is true.
+    // Whether the 24-hour number blocks too depends on whether
+    // `papers.spec.ts` has verified it yet — E-11 is proven there, in order,
+    // and nothing here reads it (b1a-07: the store is shared and the suite is
+    // fully parallel).
     const unmet = (await checklist.getAttribute("data-unmet")) ?? "";
-    for (const id of ["emergency_contact", "shipping_identifiers"]) {
-      expect(unmet.split(",")).toContain(id);
-    }
+    expect(unmet.split(",")).toContain("shipping_identifiers");
     const emergency = page.locator('[data-precondition="emergency_contact"]');
     await expect(emergency).toContainText(
       PRECONDITION_TITLES.emergency_contact,
     );
-    await expect(emergency).toContainText(
-      whoCanFix(["facility_manager", "platform_admin"]),
-    );
-    // E-11 — P1 cannot reach the settings route, so no dead link is offered.
+    // E-11 — P1 cannot reach the settings route, so no dead link is offered,
+    // met or not.
     await expect(
       emergency.locator('[data-precondition-fix="emergency_contact"]'),
     ).toHaveCount(0);
+    await expect(page.locator("[data-e11-set-it-now]")).toHaveCount(0);
     await expect(
       page.locator('[data-precondition="shipping_identifiers"]'),
     ).toContainText("BR-0002");

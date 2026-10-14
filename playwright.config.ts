@@ -1,5 +1,7 @@
 import { defineConfig, devices } from "@playwright/test";
 
+import { E2E_CRON_SECRET } from "./tests/e2e/support/cron";
+
 /**
  * The e2e suite is stack-critical here. It runs against DATA_ADAPTER=mock from
  * day one and against DATA_ADAPTER=supabase after migration, and the same suite
@@ -108,6 +110,11 @@ export default defineConfig({
       MOCK_LATENCY_MS: "",
       MOCK_SEEDED_FAILURES: "",
       NEXT_PUBLIC_APP_URL: baseURL,
+      // The job routes' bearer (`POST /api/jobs/*`). A test value for the
+      // server this suite starts, so `jobs.spec.ts` can prove a wrong secret
+      // is refused and a second run fires nothing. Unset is `503`, proven in
+      // `tests/integration/storage-clock-alerts.test.ts`.
+      CRON_SECRET: E2E_CRON_SECRET,
       PORT: String(PORT),
     },
   },
