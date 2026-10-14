@@ -280,7 +280,7 @@ function decisionRow(
  * Where the record lands once the decision is in — T-22.
  *
  * A placed record is `stored`, or `quarantined` while it carries a DDR flag
- * (Rule 6.17 — the routing requirement is stated by `DdrBlockAlert`; moving it
+ * (Rule 6.17 — the routing requirement is stated by `DdrBlockNotice`; moving it
  * between containers is `/containers`' write path, unit 04). An unplaced
  * record is `classified` on a decided outcome and `confirmed` on a blocked
  * one — its identification stands, its classification does not.

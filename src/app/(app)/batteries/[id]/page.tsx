@@ -12,7 +12,10 @@ import { showsReadOnlyBanner } from "@/domain/access/control-treatment";
 import { canWriteRoute } from "@/domain/access/route-capability";
 import { APP_ROUTE_NAMES } from "@/domain/access/routes";
 import { resolveIntakeStep } from "@/domain/intake/steps";
-import { DdrBlockAlert } from "@/features/battery-record/ddr-block-alert";
+import {
+  DdrBlockNotice,
+  RECORD_ACTIONS_ANCHOR,
+} from "@/features/battery-record/ddr-block-notice";
 import { DocumentsTab } from "@/features/battery-record/documents-tab";
 import { UNPLACED_RECORD_TIME_ZONE } from "@/features/battery-record/format-instant";
 import { HistoryTab } from "@/features/battery-record/history-tab";
@@ -138,6 +141,26 @@ export default async function BatteryRecordPage({
     .filter((assessment) => assessment.status !== "superseded")
     .sort((a, b) => b.assessedAt.localeCompare(a.assessedAt))[0];
 
+  // Rule 6.9 — the citation the record's condition rule version carries, read
+  // only where there is a block to cite it on.
+  const blocked = record.ddrFlags.length > 0 || record.isAirTransportProhibited;
+  const conditionCitation =
+    blocked && record.conditionRuleVersionId !== null
+      ? ((await data.ruleVersions.get(ctx, record.conditionRuleVersionId))
+          ?.citation ?? null)
+      : null;
+
+  const canReassess = canWriteRoute(ctx.role, "/batteries/[id]");
+  const recordActions = (
+    <RecordActions
+      role={ctx.role}
+      capability={capability}
+      recordId={record.id}
+      record={record}
+      {...(currentAssessment === undefined ? {} : { currentAssessment })}
+    />
+  );
+
   const documentsHref = encodeListQuery(
     basePath,
     query,
@@ -182,21 +205,25 @@ export default async function BatteryRecordPage({
 
             {/* Persistent on every tab, and non-dismissible for every role
                 including P6 (Rules 6.8, 6.17). */}
-            <DdrBlockAlert record={record} assessment={currentAssessment} />
+            <DdrBlockNotice
+              record={record}
+              assessment={currentAssessment}
+              citation={conditionCitation}
+              canReassess={canReassess}
+            />
 
             {/* E-8a's disabled controls sit inside the header rather than in a
                 row of their own between the block and the tabs. Every mutating
                 affordance on this record is then in one place, which is what an
                 auditor is on this screen to find. */}
-            <RecordActions
-              role={ctx.role}
-              capability={capability}
-              recordId={record.id}
-              record={record}
-              {...(currentAssessment === undefined
-                ? {}
-                : { currentAssessment })}
-            />
+            {canReassess ? (
+              // The DDR notice's re-assess path scrolls here (P1, P6).
+              <div id={RECORD_ACTIONS_ANCHOR} className="scroll-mt-24">
+                {recordActions}
+              </div>
+            ) : (
+              recordActions
+            )}
           </>
         }
       />
