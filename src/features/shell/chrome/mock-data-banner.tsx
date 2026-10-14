@@ -4,6 +4,8 @@ import { INTENT_SURFACE_CLASSES } from "@/components/status/intent-classes";
 import { activeAdapterName } from "@/data";
 import { cn } from "@/lib/utils";
 
+import { MOCK_DATA_BANNER_TEXT } from "./mock-data-banner-copy";
+
 /**
  * The mock-data banner — `RUNBOOK.md` §1.4's third place the adapter guard
  * lives: **a persistent banner on every screen when the mock adapter is
@@ -27,10 +29,6 @@ import { cn } from "@/lib/utils";
  * `alert`: it is a standing fact about the build, not something that just
  * went wrong — and it is not `ReadOnlyBanner`, which is P5's alone.
  */
-
-/** Brief 07 outcome 7, verbatim. */
-export const MOCK_DATA_BANNER_TEXT =
-  "Prototype — sample data. Anything entered here is not kept.";
 
 export function MockDataBanner() {
   if (activeAdapterName === "supabase") return null;
