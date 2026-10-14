@@ -87,7 +87,11 @@ export const supabaseAdapter: DataAdapter = {
     "resolveSession",
     "listSessionMemberships",
   ]),
-  organizations: unimplemented("organizations", CRUD),
+  organizations: unimplemented("organizations", [
+    ...CRUD,
+    "updateEmergencyContact",
+    "verifyEmergencyContact",
+  ]),
   users: unimplemented("users", CRUD),
   memberships: unimplemented("memberships", CRUD),
   tosAcceptances: unimplemented("tosAcceptances", [
@@ -97,6 +101,7 @@ export const supabaseAdapter: DataAdapter = {
 
   platformConfiguration: unimplemented("platformConfiguration", [
     "readIntakeGateConfiguration",
+    "readEmergencyContactConfiguration",
   ]),
 
   jurisdictions: unimplemented("jurisdictions", [...CRUD, "chainFrom"]),

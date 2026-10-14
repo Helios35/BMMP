@@ -14,9 +14,11 @@ import type { IsoTimestamp } from "@/types/common";
  *
  * **No interval is a literal here or anywhere else in `src/`.** The
  * re-verification interval is organization configuration with a platform
- * default; where the effective interval is unknown the lapse date is `null` and
- * renders as nothing at all. A duration typed into a component is the same
- * defect class as a hard-coded jurisdiction threshold (Rule 1.23).
+ * default (D-32, D-63 #4): the organization's own interval where it set one,
+ * else the platform default read through `src/data` and handed in. Where both
+ * are unknown the lapse date is `null` and renders as nothing at all. A
+ * duration typed into a component is the same defect class as a hard-coded
+ * jurisdiction threshold (Rule 1.23).
  *
  * Pure. The instant and the configuration arrive as arguments; nothing here
  * reads a clock or the data layer.
@@ -30,13 +32,23 @@ export interface EmergencyVerificationInput {
   /** Rule 5.6 wants a person. A verification nobody is attached to is not one. */
   readonly verifiedBy: string | null;
   /**
-   * Whole months a verification stands for.
+   * Whole months a verification stands for — the organization's own setting.
    *
    * Null means the platform default applies — it does **not** mean "never
    * lapses", and no screen may substitute a number of its own.
    */
   readonly reverificationIntervalMonths: number | null;
+  /**
+   * The platform default, read from platform configuration
+   * (`platformConfiguration.readEmergencyContactConfiguration`) and handed in.
+   * Required rather than optional so that no caller can leave it out and
+   * silently read every `null` organization as unverifiable.
+   */
+  readonly platformDefaultIntervalMonths: number | null;
 }
+
+/** Where the interval a verification is measured against came from. */
+export type ReverificationIntervalSource = "organization" | "platform_default";
 
 export const EMERGENCY_VERIFICATION_LAPSE_REASONS = [
   "no_number",
@@ -66,6 +78,34 @@ export interface EmergencyVerification {
    * number a component chose.
    */
   readonly lapsesAt: IsoTimestamp | null;
+  /** The interval applied, in whole months, or `null` where none is known. */
+  readonly intervalMonths: number | null;
+  /** Whose interval that is. `null` exactly when `intervalMonths` is. */
+  readonly intervalSource: ReverificationIntervalSource | null;
+}
+
+/**
+ * The interval a verification is measured against: the organization's own,
+ * else the platform default (D-32). Neither known → `null`, never a number of
+ * this function's own.
+ */
+export function effectiveReverificationInterval(
+  organizationIntervalMonths: number | null,
+  platformDefaultIntervalMonths: number | null,
+): {
+  readonly months: number;
+  readonly source: ReverificationIntervalSource;
+} | null {
+  if (organizationIntervalMonths !== null) {
+    return { months: organizationIntervalMonths, source: "organization" };
+  }
+  if (platformDefaultIntervalMonths !== null) {
+    return {
+      months: platformDefaultIntervalMonths,
+      source: "platform_default",
+    };
+  }
+  return null;
 }
 
 /**
@@ -113,14 +153,24 @@ export function emergencyVerification(
   input: EmergencyVerificationInput,
   at: IsoTimestamp,
 ): EmergencyVerification {
-  const { phone, verifiedAt, verifiedBy, reverificationIntervalMonths } = input;
+  const { phone, verifiedAt, verifiedBy } = input;
+  const interval = effectiveReverificationInterval(
+    input.reverificationIntervalMonths,
+    input.platformDefaultIntervalMonths,
+  );
 
   const lapsesAt =
-    verifiedAt !== null && reverificationIntervalMonths !== null
-      ? addWholeMonths(verifiedAt, reverificationIntervalMonths)
+    verifiedAt !== null && interval !== null
+      ? addWholeMonths(verifiedAt, interval.months)
       : null;
 
-  const base = { verifiedAt, verifiedBy, lapsesAt } as const;
+  const base = {
+    verifiedAt,
+    verifiedBy,
+    lapsesAt,
+    intervalMonths: interval?.months ?? null,
+    intervalSource: interval?.source ?? null,
+  } as const;
 
   if (phone === null || phone.trim() === "") {
     return { ...base, isInForce: false, notInForceReason: "no_number" };
@@ -137,4 +187,54 @@ export function emergencyVerification(
   }
 
   return { ...base, isInForce: true, notInForceReason: null };
+}
+
+// --- platform configuration ---------------------------------------------------------------
+
+/**
+ * The platform's emergency-contact configuration — D-32, D-63 #4.
+ *
+ * The D-40 pattern: platform configuration read through `src/data`, validated
+ * on every read, and handed to this module as an argument. **This file holds
+ * the shape and the validation, never the value.** The interval is not
+ * editable in B1a; an organization's own setting, where present, wins.
+ */
+export interface EmergencyContactConfiguration {
+  readonly configurationVersion: string;
+  /** Whole months a verification stands for when the organization set none. */
+  readonly reverificationIntervalMonths: number;
+}
+
+export type EmergencyContactConfigurationValidation =
+  | {
+      readonly ok: true;
+      readonly configuration: EmergencyContactConfiguration;
+    }
+  | { readonly ok: false; readonly issues: readonly string[] };
+
+/** A malformed row is refused, never patched and never defaulted. */
+export function validateEmergencyContactConfiguration(
+  value: unknown,
+): EmergencyContactConfigurationValidation {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return { ok: false, issues: ["configuration is not an object"] };
+  }
+  const row = value as Record<string, unknown>;
+  const issues: string[] = [];
+  const version = row.configurationVersion;
+  if (typeof version !== "string" || version.trim() === "") {
+    issues.push("configurationVersion must be a non-empty string");
+  }
+  const months = row.reverificationIntervalMonths;
+  if (typeof months !== "number" || !Number.isInteger(months) || months < 1) {
+    issues.push("reverificationIntervalMonths must be a positive whole number");
+  }
+  if (issues.length > 0) return { ok: false, issues };
+  return {
+    ok: true,
+    configuration: {
+      configurationVersion: version as string,
+      reverificationIntervalMonths: months as number,
+    },
+  };
 }

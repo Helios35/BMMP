@@ -53,6 +53,7 @@ import {
   shipmentRetention,
 } from "@/domain/transport/departure";
 import { emergencyVerification } from "@/domain/transport/emergency-verification";
+import { mockPlatformConfiguration } from "./platform-configuration";
 import { SHIPMENT_RETENTION_RULE_KEY } from "@/domain/transport/rule-data";
 import type { ShippingPaperPayload } from "@/domain/transport/shipping-paper";
 import { addDecimal } from "@/domain/units";
@@ -924,6 +925,10 @@ export async function issueShippingPaper(
   // Rules 5.6, 5.7 — the number on the paper is the organization's, and its
   // verification still stands at the moment of issue.
   const organization = organizationOf(ctx);
+  // D-32 — the organization's interval, else the platform default, read
+  // through the same configuration door every screen reads.
+  const contactConfiguration =
+    await mockPlatformConfiguration.readEmergencyContactConfiguration(ctx);
   const verification = emergencyVerification(
     {
       phone: organization.emergencyResponsePhone,
@@ -931,6 +936,8 @@ export async function issueShippingPaper(
       verifiedBy: organization.emergencyVerifiedBy,
       reverificationIntervalMonths:
         organization.emergencyReverificationIntervalMonths,
+      platformDefaultIntervalMonths:
+        contactConfiguration.reverificationIntervalMonths,
     },
     input.at,
   );

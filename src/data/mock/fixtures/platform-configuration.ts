@@ -48,3 +48,15 @@ export const PLATFORM_INTAKE_GATE_CONFIGURATION = {
     numericAgreementBonus: 0.05,
   },
 } as const;
+
+/**
+ * The platform default for re-verifying the 24-hour emergency contact number
+ * — D-32's twelve months, D-63 #4. **The only place in `src/` that interval
+ * exists.** An organization's own setting wins where present; `null` there
+ * reads this row. Not editable in B1a. Validated on every read by
+ * `validateEmergencyContactConfiguration`.
+ */
+export const PLATFORM_EMERGENCY_CONTACT_CONFIGURATION = {
+  configurationVersion: "platform-default-2026-10",
+  reverificationIntervalMonths: 12,
+} as const;

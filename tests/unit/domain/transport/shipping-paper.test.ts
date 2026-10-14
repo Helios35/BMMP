@@ -95,6 +95,7 @@ function complete(
       verifiedAt: "2026-09-01T00:00:00.000Z",
       verifiedBy: "user-1",
       reverificationIntervalMonths: 12,
+      platformDefaultIntervalMonths: null,
     },
     rules: {
       basicDescription: BASIC_DESCRIPTION,
@@ -278,7 +279,13 @@ describe("every Rule 5.3 precondition is named when it is the one unmet", () => 
     ["missing", { phone: null }],
     ["never verified", { verifiedAt: null }],
     ["lapsed", { verifiedAt: "2025-03-14T17:40:00.000Z" }],
-    ["interval unknown", { reverificationIntervalMonths: null }],
+    [
+      "interval unknown",
+      {
+        reverificationIntervalMonths: null,
+        platformDefaultIntervalMonths: null,
+      },
+    ],
   ])(
     "a %s 24-hour number blocks with one sentence, and names who can fix it (Rules 5.6, 5.7; D-32)",
     (_label, change) => {
