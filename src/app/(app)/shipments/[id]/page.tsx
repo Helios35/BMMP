@@ -46,7 +46,9 @@ import { absoluteInstant } from "@/features/battery-record/format-instant";
 import { CopyButton } from "@/features/battery-record/copy-button";
 import { DocumentPanel } from "@/features/documents/document-page";
 import { readDocument } from "@/features/documents/server/read-document";
+import { EmergencyContactNotice } from "@/features/shipments/components/emergency-contact-notice";
 import { ShipmentActions } from "@/features/shipments/components/shipment-actions";
+import { readEmergencyStanding } from "@/features/settings/read-organization-settings";
 import {
   activeShipmentTab,
   SHIPMENT_TABS,
@@ -340,25 +342,39 @@ async function PaperTab({
 }): Promise<ReactElement> {
   const { current, shipment } = detail;
   if (current === null || current.render === null) {
-    const canBuild =
-      canWriteRoute(ctx.role, "/shipments/new") &&
-      (shipment.status === "draft" || shipment.status === "ready");
+    const open = shipment.status === "draft" || shipment.status === "ready";
+    const canBuild = canWriteRoute(ctx.role, "/shipments/new") && open;
+    // E-11 for the roles that fix the 24-hour number. P2 cannot reach step 3
+    // (`SITE_ARCHITECTURE.md` §5.2), so the draft P2 can see — this page — is
+    // where **Set it now** starts, and where it lands back.
+    const offersSetItNow =
+      open &&
+      canReadRoute(ctx.role, "/settings/organization") &&
+      !(await readEmergencyStanding(ctx)).isInForce;
     return (
-      <EmptyState
-        icon={FileText}
-        title={NO_PAPER_TITLE}
-        description={NO_PAPER_BODY}
-        {...(canBuild
-          ? {
-              action: {
-                label: REVIEW_CHECKLIST,
-                href: `/shipments/new?shipment=${shipment.id}&step=3`,
-                dataAttributes: { "data-review-checklist": "true" },
-              },
-            }
-          : {})}
-        dataAttributes={{ "data-no-paper": "true" }}
-      />
+      <div className="flex flex-col gap-6">
+        {offersSetItNow ? (
+          <EmergencyContactNotice
+            role={ctx.role}
+            returnTo={`/shipments/${shipment.id}`}
+          />
+        ) : null}
+        <EmptyState
+          icon={FileText}
+          title={NO_PAPER_TITLE}
+          description={NO_PAPER_BODY}
+          {...(canBuild
+            ? {
+                action: {
+                  label: REVIEW_CHECKLIST,
+                  href: `/shipments/new?shipment=${shipment.id}&step=3`,
+                  dataAttributes: { "data-review-checklist": "true" },
+                },
+              }
+            : {})}
+          dataAttributes={{ "data-no-paper": "true" }}
+        />
+      </div>
     );
   }
   const view = await readDocument(ctx, current.render);

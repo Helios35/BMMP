@@ -167,6 +167,20 @@ export function whoCanFix(roles: readonly RoleCode[]): string {
   return `${joined?.charAt(0).toUpperCase()}${joined?.slice(1)} can fix this.`;
 }
 export const FIX_IN_SETTINGS = "Open organization settings";
+
+// --- E-11 — the 24-hour emergency contact number ----------------------------------
+
+/** `UX_SPEC.md` E-11, verbatim. One state for missing, unverified and lapsed (D-32). */
+export const E11_TITLE =
+  "A 24-hour emergency contact number is required on every shipping paper.";
+export const E11_BODY = "It isn't set for this organization yet.";
+/** E-11 — P2 and P6 follow it to `/settings/organization` and land back here. */
+export const E11_SET_IT_NOW = "Set it now";
+/**
+ * E-11 — **P1 cannot reach that route**, so P1 is told who can, never offered
+ * a link they would be redirected away from. Role names from `ROLE_LABELS`.
+ */
+export const E11_ASK_WHO = `Ask your ${ROLE_LABELS.facility_manager} or a ${ROLE_LABELS.platform_admin} to add it in Organization settings.`;
 export const FIX_IN_CATALOG = "Open catalog administration";
 export const FIX_ON_REVIEW = "Open the review queue";
 export const FIX_TRANSPORT = "Edit transport details";
