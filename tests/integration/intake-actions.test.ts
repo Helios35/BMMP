@@ -1028,3 +1028,140 @@ describe("Enter details manually — the way on when the read cannot happen (E-4
     );
   });
 });
+
+describe("the duplicate-photo check (D-56 level 1, D-63 #5)", () => {
+  /** The same PNG with one more byte after it — the same image, other bytes. */
+  const OTHER_BYTES = Uint8Array.from([...PNG_640_480, 0x00]);
+
+  async function uploadBytes(
+    sessionId: string,
+    fileName: string,
+    bytes: Uint8Array,
+  ): Promise<string> {
+    const response = await POST(uploadRequest(sessionId, fileName, { bytes }));
+    expect(response.status).toBe(201);
+    return ((await response.json()) as { intakePhotoId: string }).intakePhotoId;
+  }
+
+  async function logged(bytes: Uint8Array = PNG_640_480) {
+    const started = ok(await actions.startIntakeSession({}));
+    const labelPhotoId = await uploadBytes(
+      started.sessionId,
+      "label-clean.png",
+      bytes,
+    );
+    return { ...started, labelPhotoId };
+  }
+
+  it("routes the second record to review, names the first, and shows no score", async () => {
+    const first = await logged();
+    ok(
+      await actions.runLabelExtraction({
+        sessionId: first.sessionId,
+        labelPhotoId: first.labelPhotoId,
+        labelFileName: "label-clean.png",
+      }),
+    );
+    const firstRecord = await data.batteryRecords.get(
+      HANDLER,
+      first.batteryRecordId,
+    );
+
+    const second = await logged();
+    const read = ok(
+      await actions.runLabelExtraction({
+        sessionId: second.sessionId,
+        labelPhotoId: second.labelPhotoId,
+        labelFileName: "label-clean.png",
+      }),
+    );
+    if (read.kind !== "reviewed") throw new Error("expected a read");
+    expect(read.isReviewRequired).toBe(true);
+    expect(read.reasonCodes).toContain("duplicate_photo");
+
+    // Rule 2.14 — the whole record is in review.
+    const record = await data.batteryRecords.get(
+      HANDLER,
+      second.batteryRecordId,
+    );
+    expect(record?.status).toBe("pending_review");
+
+    // The card links the record the photo is already on.
+    const view = await readIntakeStepView(HANDLER, second.sessionId);
+    if (view === null) throw new Error("the session did not read back");
+    const card = reviewCardView(view);
+    expect(card.gate.duplicateRecords).toEqual([
+      {
+        id: first.batteryRecordId,
+        recordNumber: firstRecord?.recordNumber,
+        href: `/batteries/${first.batteryRecordId}`,
+      },
+    ]);
+    // A reason to look, never a verdict (Rule 1.25).
+    expect(JSON.stringify(card.gate)).not.toMatch(/probab|likel|percent/i);
+  });
+
+  it("does not match its own session or the crop a read made of the photo", async () => {
+    const only = await logged();
+    ok(
+      await actions.runLabelExtraction({
+        sessionId: only.sessionId,
+        labelPhotoId: only.labelPhotoId,
+        labelFileName: "label-clean.png",
+      }),
+    );
+    // A re-read: the session now holds the photo and a crop carrying the
+    // photo's own hash (intake-pipeline.ts), and neither is another record.
+    const read = ok(
+      await actions.runLabelExtraction({
+        sessionId: only.sessionId,
+        labelPhotoId: only.labelPhotoId,
+        labelFileName: "label-clean.png",
+      }),
+    );
+    if (read.kind !== "reviewed") throw new Error("expected a read");
+    expect(read.reasonCodes).not.toContain("duplicate_photo");
+  });
+
+  it("is not a duplicate when the bytes differ, whatever the file is called", async () => {
+    await logged();
+    const second = await logged(OTHER_BYTES);
+    const read = ok(
+      await actions.runLabelExtraction({
+        sessionId: second.sessionId,
+        labelPhotoId: second.labelPhotoId,
+        labelFileName: "label-clean.png",
+      }),
+    );
+    if (read.kind !== "reviewed") throw new Error("expected a read");
+    expect(read.reasonCodes).not.toContain("duplicate_photo");
+  });
+
+  it("routes the manual path too", async () => {
+    await logged();
+    const second = await logged();
+    ok(await actions.enterDetailsManually({ sessionId: second.sessionId }));
+    const session = await data.intakeSessions.get(HANDLER, second.sessionId);
+    expect(session?.isReviewRequired).toBe(true);
+    expect(session?.reviewReasonCodes).toContain("duplicate_photo");
+  });
+
+  it("never matches a photo in another organization", async () => {
+    await logged();
+    const rainier = ctx({
+      userId: ID.USER.joRainierHandler,
+      organizationId: ID.ORG.rainier,
+    });
+    guardState.ctx = rainier;
+    const elsewhere = await logged();
+    const read = ok(
+      await actions.runLabelExtraction({
+        sessionId: elsewhere.sessionId,
+        labelPhotoId: elsewhere.labelPhotoId,
+        labelFileName: "label-clean.png",
+      }),
+    );
+    if (read.kind !== "reviewed") throw new Error("expected a read");
+    expect(read.reasonCodes).not.toContain("duplicate_photo");
+  });
+});

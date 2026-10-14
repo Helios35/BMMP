@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import type { ReactElement } from "react";
 import { Clock } from "lucide-react";
 
@@ -12,6 +13,8 @@ import {
 } from "@/domain/taxonomy/review-reason-code";
 import { cn } from "@/lib/utils";
 import {
+  DUPLICATE_PHOTO_AFTER,
+  DUPLICATE_PHOTO_BEFORE,
   needsReviewTitle,
   NEEDS_REVIEW_TITLE_NO_FIELDS,
   RESOLVE_NOW,
@@ -80,6 +83,30 @@ export function GateBanner({
           : NEEDS_REVIEW_TITLE_NO_FIELDS}
       </AlertTitle>
       <AlertDescription className="grid gap-3 text-body text-current">
+        {(gate.duplicateRecords ?? []).length === 0 ? null : (
+          <ul data-duplicate-photo="true" className="grid gap-1">
+            {(gate.duplicateRecords ?? []).map((record) => (
+              <li
+                key={record.id}
+                data-duplicate-record={record.id}
+                className="max-w-[72ch] text-body"
+              >
+                {DUPLICATE_PHOTO_BEFORE}
+                {record.href === null ? (
+                  <span className="font-mono">{record.recordNumber}</span>
+                ) : (
+                  <Link
+                    href={record.href}
+                    className="font-mono underline underline-offset-4"
+                  >
+                    {record.recordNumber}
+                  </Link>
+                )}
+                {DUPLICATE_PHOTO_AFTER}
+              </li>
+            ))}
+          </ul>
+        )}
         {reasons.length === 0 ? null : (
           <ul data-gate-reasons="true" className="flex flex-wrap gap-2">
             {reasons.map((reason) => (

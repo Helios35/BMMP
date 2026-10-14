@@ -104,6 +104,7 @@ import {
   draftForSession,
   loadOpenIntake,
 } from "./server/read-intake";
+import { readDuplicatePhotos } from "./server/duplicate-photos";
 import { sessionAction } from "./server/session-action";
 
 /**
@@ -688,7 +689,9 @@ export async function rejectExtraction(
  * from the gate, and it is kept. A session that was never read gains none —
  * `no_fields_extracted` is "extraction returned no readable field", and no
  * extraction ran; T-52 has no value for a person choosing the manual path
- * before a read, and one is not invented here.
+ * before a read, and one is not invented here. A photo on the session that is
+ * already on another record adds T-52 `duplicate_photo` here exactly as it
+ * does at the gate (D-56 level 1).
  */
 export async function enterDetailsManually(
   input: unknown,
@@ -726,11 +729,22 @@ export async function enterDetailsManually(
         extractionRunId: null,
       });
 
+      // D-56 level 1 — the manual path routes on a duplicate photo exactly
+      // as a read does. The check has no off switch on either path.
+      const duplicates = await readDuplicatePhotos(ctx, session);
+      // Stored codes are kept exactly as stored, unknown ones included; the
+      // one this path supplies is appended (T-52 is multi-select).
+      const duplicatePhoto: ReviewReasonCode = "duplicate_photo";
+      const stored = session.reviewReasonCodes;
+      const reviewReasonCodes =
+        duplicates.matches.length === 0 || stored?.includes(duplicatePhoto)
+          ? stored
+          : [...(stored ?? []), duplicatePhoto];
       const updated = await data.intakeSessions.update(ctx, session.id, {
         status: "awaiting_confirmation",
         currentStep: "extraction_review",
         isReviewRequired: true,
-        reviewReasonCodes: session.reviewReasonCodes,
+        reviewReasonCodes,
         draft: next,
       });
       // TODO(T-43): choosing the manual path is a person's act on the session

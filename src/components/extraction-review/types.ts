@@ -155,6 +155,19 @@ export interface ExtractionReviewGate {
   readonly fieldsBelowThreshold: number;
   /** T-52 as stored. An unrecognised code renders as stored, in mono. */
   readonly reasonCodes: readonly string[];
+  /**
+   * T-52 `duplicate_photo` — the other records a photo on this session is
+   * already on (D-56 level 1), each linked where the role can open it. Absent
+   * or empty renders nothing. **Never a score** (Rule 1.25).
+   */
+  readonly duplicateRecords?: readonly DuplicatePhotoRecordView[];
+}
+
+export interface DuplicatePhotoRecordView {
+  readonly id: Uuid;
+  readonly recordNumber: string;
+  /** `/batteries/[id]`, or `null` where the role cannot open it. */
+  readonly href: string | null;
 }
 
 export interface ExtractionReviewCardProps {
