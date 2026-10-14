@@ -191,6 +191,7 @@ import {
   changeStatus,
   moveContents,
   recordStorageEvent,
+  runStorageClockAlerts,
 } from "./storage-writes";
 import {
   assemble,
@@ -2552,6 +2553,8 @@ export const mockAdapter: DataAdapter = {
   auditEvents,
 
   objects,
+
+  jobs: { runStorageClockAlerts },
 };
 
 /** Re-exported for tests: `Page` and `PageRequest` are the shapes every list returns. */

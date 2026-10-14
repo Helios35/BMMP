@@ -1,5 +1,9 @@
 import type { RequestContext } from "@/data/contracts/context";
 import type {
+  ScheduledJobContext,
+  StorageClockAlertRun,
+} from "@/data/contracts/jobs";
+import type {
   ContainerContentsMove,
   ContainerContentsMoveResult,
   ContainerStatusChange,
@@ -46,7 +50,7 @@ import {
   ValidationError,
 } from "@/lib/errors";
 
-import { writeTriggerAudit as audit } from "./audit-row";
+import { writeJobAudit, writeTriggerAudit as audit } from "./audit-row";
 import { now } from "./factory";
 import { nextId } from "./ids";
 import { assertPolicy } from "./policy";
@@ -199,14 +203,14 @@ async function appendEvent(
  * dedupe key, and through the trigger's door: `alert` INSERT belongs to no
  * tenant role (`ERD.md` §6.5), because nobody types an alert.
  */
-async function raiseClockAlert(
+export async function raiseClockAlert(
   ctx: RequestContext,
   container: Container,
   clock: StorageClock,
   evaluation: ClockEvaluation,
   at: IsoTimestamp,
-): Promise<void> {
-  if (!evaluation.changed || evaluation.alertBand === "none") return;
+): Promise<boolean> {
+  if (!evaluation.changed || evaluation.alertBand === "none") return false;
   const draft = storageClockAlert({
     containerCode: container.containerCode,
     containerId: container.id,
@@ -227,7 +231,7 @@ async function raiseClockAlert(
         alert.dedupeKey === draft.dedupeKey &&
         alert.resolvedAt === null,
     );
-  if (existing !== undefined) return;
+  if (existing !== undefined) return false;
   const row: Alert = {
     ...draft,
     id: nextId(),
@@ -250,6 +254,51 @@ async function raiseClockAlert(
     updatedAt: now(),
   };
   await store().alerts.insertAsDefiner(ctx, row);
+  return true;
+}
+
+/**
+ * **Who is writing** a clock evaluation: a person whose request moved
+ * batteries (policy-checked writes, audited as them), or the scheduled alert
+ * job (the trigger's door, audited as T-60 `scheduled_job` with no person).
+ */
+export type ClockWriter =
+  { readonly kind: "person" } | { readonly kind: "scheduled_job" };
+
+/**
+ * The evaluation, written — **the one path both the on-write re-tier and the
+ * alert job take** (`TECHNICAL_SPEC.md` §11.2, brief 07 outcome 6).
+ *
+ * `evaluateStorageClock` decides; this stores its answer on the clock — band,
+ * status and `nextAlertAt`, nothing else. A clock is never paused, extended
+ * or restarted here (Rule 4.6): the dates that define it — start, due,
+ * schedule — are not touched. (A move that re-dates a clock earlier, Rule
+ * 4.10, does that before calling this; the job never does.)
+ */
+export async function storeClockEvaluation(
+  ctx: RequestContext,
+  writer: ClockWriter,
+  clock: StorageClock,
+  at: IsoTimestamp,
+): Promise<{
+  readonly clock: StorageClock;
+  readonly evaluation: ClockEvaluation;
+}> {
+  const evaluation = evaluateStorageClock(clock, at);
+  if (!evaluation.changed && evaluation.nextAlertAt === clock.nextAlertAt) {
+    return { clock, evaluation };
+  }
+  const patch = {
+    status: evaluation.status,
+    alertBand: evaluation.alertBand,
+    nextAlertAt: evaluation.nextAlertAt,
+    updatedAt: now(),
+  };
+  const updated =
+    writer.kind === "person"
+      ? await store().storageClocks.update(ctx, clock.id, patch)
+      : await store().storageClocks.updateAsDefiner(ctx, clock.id, patch);
+  return { clock: updated, evaluation };
 }
 
 function refuseMove(
@@ -436,16 +485,16 @@ export async function moveContents(
     }
 
     // The job's evaluation, now, so receipt that makes a container overdue
-    // shows it at the moment of the move (Rule 4.10; E-6).
-    const evaluation = evaluateStorageClock(clock, at);
-    if (evaluation.changed || evaluation.nextAlertAt !== clock.nextAlertAt) {
-      clock = await s.storageClocks.update(ctx, clock.id, {
-        status: evaluation.status,
-        alertBand: evaluation.alertBand,
-        nextAlertAt: evaluation.nextAlertAt,
-        updatedAt: now(),
-      });
-    }
+    // shows it at the moment of the move (Rule 4.10; E-6) — through the same
+    // write the alert job uses.
+    const stored = await storeClockEvaluation(
+      ctx,
+      { kind: "person" },
+      clock,
+      at,
+    );
+    clock = stored.clock;
+    const evaluation = stored.evaluation;
 
     assertNeverLater(target.accumulationStartedAt, plan.accumulationStartedAt);
     const becameOverdue =
@@ -784,4 +833,147 @@ export async function changeStatus(
     // near neighbour is worse than none (TAXONOMY.md §1.1). Build-notes.
     return updated;
   });
+}
+
+// --- the storage-clock alert job ----------------------------------------------------------
+
+const JOB_LABEL = "storage-clock-alerts";
+
+/**
+ * The tenant scope a job writes under, for one organization.
+ *
+ * **No person.** Every write on this path goes through the trigger's door and
+ * every audit row names the job, so `userId` is never written anywhere — it
+ * is the nil UUID, and the role is the auditor's: if a policy-checked write
+ * ever crept onto this path it would be **refused**, not silently allowed
+ * (P5 holds no write anywhere, Rule 1.14).
+ */
+function jobScope(organizationId: Uuid, correlationId: string): RequestContext {
+  return {
+    userId: "00000000-0000-0000-0000-000000000000",
+    organizationId,
+    role: "auditor",
+    isPlatformAdmin: false,
+    correlationId,
+  };
+}
+
+/**
+ * `POST /api/jobs/storage-clock-alerts` — `TECHNICAL_SPEC.md` §7.2, §11.2;
+ * Rules 4.6, 4.13–4.15.
+ *
+ * Picks every clock with `stoppedAt` null and `nextAlertAt <= at`, groups
+ * them by organization, and for each runs **the on-write re-tier's own path**:
+ * `storeClockEvaluation` (the evaluation and the clock write), the container
+ * becoming overdue, the T-43 rows the re-tier writes, and `raiseClockAlert`
+ * (idempotent on its dedupe key). Each clock is one operation, all or nothing.
+ *
+ * **A second run fires nothing**: the evaluation moves `nextAlertAt` past
+ * `at` (or clears it), so the clock is not picked again, and the alert is
+ * deduplicated even if it were.
+ */
+export async function runStorageClockAlerts(
+  job: ScheduledJobContext,
+  at: IsoTimestamp,
+): Promise<StorageClockAlertRun> {
+  const due = store()
+    .storageClocks.all()
+    .filter(
+      (clock) =>
+        clock.stoppedAt === null &&
+        clock.nextAlertAt !== null &&
+        clock.nextAlertAt <= at,
+    );
+
+  const byOrganization = new Map<Uuid, StorageClock[]>();
+  for (const clock of due) {
+    const clocks = byOrganization.get(clock.organizationId) ?? [];
+    clocks.push(clock);
+    byOrganization.set(clock.organizationId, clocks);
+  }
+
+  let fired = 0;
+  for (const [organizationId, clocks] of byOrganization) {
+    const ctx = jobScope(organizationId, job.correlationId);
+    for (const clock of clocks) {
+      const raised = await atomically(() =>
+        reTierForJob(ctx, job.job, clock, at),
+      );
+      if (raised) fired += 1;
+    }
+  }
+  return { evaluated: due.length, fired };
+}
+
+async function reTierForJob(
+  ctx: RequestContext,
+  jobLabel: string,
+  clock: StorageClock,
+  at: IsoTimestamp,
+): Promise<boolean> {
+  const { clock: updated, evaluation } = await storeClockEvaluation(
+    ctx,
+    { kind: "scheduled_job" },
+    clock,
+    at,
+  );
+  // Rule 4.6 — the job only ever moves the next alert forward, or clears it.
+  // Unreachable through `evaluateStorageClock`, whose bands only move one way;
+  // refused (and rolled back) rather than written if it ever were not.
+  if (
+    updated.nextAlertAt !== null &&
+    clock.nextAlertAt !== null &&
+    updated.nextAlertAt <= clock.nextAlertAt
+  ) {
+    throw new DataIntegrityError({
+      userMessage:
+        "The alert job would not have moved a clock's next alert forward. Nothing was changed.",
+      correlationId: ctx.correlationId,
+      context: { storageClockId: clock.id, rule: "4.6" },
+    });
+  }
+  if (updated.containerId === null) return false;
+  const container = await store().containers.getOrThrow(
+    ctx,
+    updated.containerId,
+  );
+
+  const becameOverdue =
+    evaluation.status === "overdue" && container.status !== "overdue";
+  const current = becameOverdue
+    ? await store().containers.updateAsDefiner(ctx, container.id, {
+        status: "overdue",
+        updatedAt: now(),
+        updatedBy: null,
+      })
+    : container;
+
+  if (evaluation.changed) {
+    await writeJobAudit(ctx, at, jobLabel, {
+      eventType: "storage_clock.status_changed",
+      entityTable: "storage_clock",
+      entityId: clock.id,
+      beforeState: { status: clock.status, alertBand: clock.alertBand },
+      afterState: {
+        status: updated.status,
+        alertBand: updated.alertBand,
+        containerId: container.id,
+      },
+      changedFields: ["status", "alertBand", "nextAlertAt"],
+      governingRuleVersionId: clock.governingRuleVersionId,
+    });
+  }
+  if (becameOverdue) {
+    await writeJobAudit(ctx, at, jobLabel, {
+      eventType: "container.status_changed",
+      entityTable: "container",
+      entityId: container.id,
+      beforeState: { status: container.status },
+      afterState: { status: "overdue" },
+      changedFields: ["status"],
+      governingRuleVersionId: clock.governingRuleVersionId,
+    });
+  }
+
+  return raiseClockAlert(ctx, current, updated, evaluation, at);
 }

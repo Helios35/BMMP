@@ -178,4 +178,6 @@ export const supabaseAdapter: DataAdapter = {
   auditEvents: unimplemented("auditEvents", [...APPEND_ONLY, "write"]),
 
   objects: unimplemented("objects", ["put", "get", "signedUrl"]),
+
+  jobs: unimplemented("jobs", ["runStorageClockAlerts"]),
 };
