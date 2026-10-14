@@ -229,6 +229,73 @@ describe("IntakeStart — step 1", () => {
     expect(push).toHaveBeenCalledWith("/batteries/new?session=s-1&step=2");
   });
 
+  it("row 21 — with a reading in hand, asks before reading again: Keep this reading reads nothing, Read again reads", async () => {
+    const { container } = renderStart({
+      sessionId: "s-1",
+      reachedStep: "extraction_review",
+    });
+    const input = container.querySelector(
+      "[data-capture-variant='shutter'] input[type='file']",
+    ) as HTMLInputElement;
+    fireEvent.change(input, {
+      target: {
+        files: [
+          new File([new Uint8Array([1])], "label-manualcrop.png", {
+            type: "image/png",
+          }),
+        ],
+      },
+    });
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: "Read label" }),
+      ).not.toHaveAttribute("aria-disabled");
+    });
+    actions.runLabelExtraction.mockClear();
+    push.mockClear();
+
+    fireEvent.click(screen.getByRole("button", { name: "Read label" }));
+    expect(
+      await screen.findByText(
+        "Reading the label again replaces what's on this screen, including your changes.",
+      ),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Keep this reading" }));
+    expect(actions.runLabelExtraction).not.toHaveBeenCalled();
+    expect(push).toHaveBeenCalledWith("/batteries/new?session=s-1&step=2");
+
+    fireEvent.click(screen.getByRole("button", { name: "Read label" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Read again" }));
+    await waitFor(() => {
+      expect(actions.runLabelExtraction).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it("reads straight away when no reading is in hand", async () => {
+    const { container } = renderStart({ sessionId: "s-1" });
+    const input = container.querySelector(
+      "[data-capture-variant='shutter'] input[type='file']",
+    ) as HTMLInputElement;
+    fireEvent.change(input, {
+      target: {
+        files: [
+          new File([new Uint8Array([1])], "label-manualcrop.png", {
+            type: "image/png",
+          }),
+        ],
+      },
+    });
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: "Read label" }),
+      ).not.toHaveAttribute("aria-disabled");
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Read label" }));
+    expect(
+      container.ownerDocument.querySelector("[data-reread-dialog]"),
+    ).toBeNull();
+  });
+
   it("offers the whole photo as the label region when the provider finds none, with the photo's own geometry", async () => {
     actions.runLabelExtraction.mockResolvedValueOnce({
       ok: true,

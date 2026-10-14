@@ -15,6 +15,16 @@ import {
 import { ACTION_BUTTON_CLASS } from "@/components/page";
 import { INTENT_SURFACE_CLASSES } from "@/components/status/intent-classes";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import type { IntakeFlowStep } from "@/domain/intake/steps";
 import type { IntakeSessionStatus } from "@/domain/taxonomy/intake-session-status";
@@ -122,6 +132,16 @@ export interface IntakeStartProps {
 }
 
 const READ_LABEL = "Read label";
+
+/**
+ * Sprint plan row 21, folded into brief 07 (D-63 #9): **a re-read replaces the
+ * draft**, and it used to do so silently. The sentence is the brief's.
+ */
+const REREAD_TITLE = "Read the label again?";
+const REREAD_WARNING =
+  "Reading the label again replaces what's on this screen, including your changes.";
+const REREAD_CONFIRM = "Read again";
+const REREAD_KEEP = "Keep this reading";
 
 const CROP_NEEDED_TITLE =
   "We couldn't find the label automatically. Choose the label region.";
@@ -283,6 +303,30 @@ export function IntakeStart({
     router.push(intakeStepHref(session, "extraction_review"));
   }
 
+  /**
+   * Row 21 — a reading is already in hand when the session has been past
+   * capture: running the pipeline again re-seeds the draft, every
+   * confirmation and correction on it included. Ask first; **Keep this
+   * reading** goes back to it untouched.
+   */
+  const readingInHand = activeSessionId !== null && reachedStep !== "capture";
+  const [confirmReread, setConfirmReread] = useState(false);
+
+  async function requestRead(): Promise<void> {
+    if (readingInHand) {
+      setConfirmReread(true);
+      return;
+    }
+    await readLabel();
+  }
+
+  function keepReading(): void {
+    setConfirmReread(false);
+    if (activeSessionId !== null) {
+      router.push(intakeStepHref(activeSessionId, "extraction_review"));
+    }
+  }
+
   const sizeKnown = label !== null && label.width > 0 && label.height > 0;
   const showFailure = failure !== null || sessionStatus === "failed";
 
@@ -363,6 +407,38 @@ export function IntakeStart({
         </Alert>
       ) : null}
 
+      <AlertDialog open={confirmReread} onOpenChange={setConfirmReread}>
+        <AlertDialogContent data-reread-dialog="true">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-h2">
+              {REREAD_TITLE}
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-body">
+              {REREAD_WARNING}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              className={ACTION_BUTTON_CLASS}
+              onClick={(event) => {
+                event.preventDefault();
+                keepReading();
+              }}
+              data-reread-keep="true"
+            >
+              {REREAD_KEEP}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className={ACTION_BUTTON_CLASS}
+              onClick={() => void readLabel()}
+              data-reread-confirm="true"
+            >
+              {REREAD_CONFIRM}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <PhotoCaptureStep
         sessionId={activeSessionId}
         containerContext={containerContext}
@@ -370,7 +446,7 @@ export function IntakeStart({
         uploadUrl={uploadUrl}
         onLabelPhotoReady={onLabelPhotoReady}
         existingPhotos={existingPhotos}
-        primary={{ label: READ_LABEL, onContinue: readLabel }}
+        primary={{ label: READ_LABEL, onContinue: requestRead }}
         secondary={{
           label: ENTER_MANUALLY,
           pendingLabel: MANUAL_ENTRY_PENDING,
