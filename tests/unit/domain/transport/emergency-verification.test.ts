@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest";
 
 import * as fixtures from "@/data/mock/fixtures";
 import * as ID from "@/data/mock/fixtures/ids";
+import { PLATFORM_EMERGENCY_CONTACT_CONFIGURATION } from "@/data/mock/fixtures/platform-configuration";
 import {
   addWholeMonths,
   emergencyVerification,
+  validateEmergencyContactConfiguration,
 } from "@/domain/transport/emergency-verification";
 
 /**
@@ -20,6 +22,10 @@ import {
 
 const NOW = "2026-08-21T12:00:00.000Z";
 
+/** The platform row, read as the adapter reads it — never a literal here. */
+const PLATFORM_DEFAULT_MONTHS =
+  PLATFORM_EMERGENCY_CONTACT_CONFIGURATION.reverificationIntervalMonths;
+
 function organizationInput(id: string) {
   const org = fixtures.organizations.find((row) => row.id === id);
   if (org === undefined) throw new Error(`No organization fixture ${id}`);
@@ -28,6 +34,7 @@ function organizationInput(id: string) {
     verifiedAt: org.emergencyVerifiedAt,
     verifiedBy: org.emergencyVerifiedBy,
     reverificationIntervalMonths: org.emergencyReverificationIntervalMonths,
+    platformDefaultIntervalMonths: PLATFORM_DEFAULT_MONTHS,
   };
 }
 
@@ -76,6 +83,7 @@ describe("emergencyVerification", () => {
         verifiedAt: "2026-08-01T00:00:00.000Z",
         verifiedBy: ID.USER.martaManager,
         reverificationIntervalMonths: 12,
+        platformDefaultIntervalMonths: PLATFORM_DEFAULT_MONTHS,
       },
       NOW,
     );
@@ -85,6 +93,68 @@ describe("emergencyVerification", () => {
     expect(result.lapsesAt).toBe("2027-08-01T00:00:00.000Z");
   });
 
+  it("measures an organization with no interval of its own against the platform default (D-32)", () => {
+    const result = emergencyVerification(
+      {
+        phone: "+1-800-555-0197",
+        verifiedAt: "2026-08-01T00:00:00.000Z",
+        verifiedBy: ID.USER.rosaOlympicManager,
+        reverificationIntervalMonths: null,
+        platformDefaultIntervalMonths: PLATFORM_DEFAULT_MONTHS,
+      },
+      NOW,
+    );
+    expect(result.isInForce).toBe(true);
+    expect(result.intervalSource).toBe("platform_default");
+    expect(result.intervalMonths).toBe(PLATFORM_DEFAULT_MONTHS);
+    expect(result.lapsesAt).toBe(
+      addWholeMonths("2026-08-01T00:00:00.000Z", PLATFORM_DEFAULT_MONTHS),
+    );
+  });
+
+  it("prefers the organization's own interval over the platform default", () => {
+    const result = emergencyVerification(
+      {
+        phone: "+1-800-555-0142",
+        verifiedAt: "2026-08-01T00:00:00.000Z",
+        verifiedBy: ID.USER.martaManager,
+        reverificationIntervalMonths: 1,
+        platformDefaultIntervalMonths: PLATFORM_DEFAULT_MONTHS,
+      },
+      NOW,
+    );
+    expect(result.intervalSource).toBe("organization");
+    expect(result.lapsesAt).toBe("2026-09-01T00:00:00.000Z");
+  });
+
+  it("blocks a verification lapsed under the platform default exactly as an absent one", () => {
+    const verifiedAt = "2024-01-01T00:00:00.000Z";
+    const lapsed = emergencyVerification(
+      {
+        phone: "+1-800-555-0197",
+        verifiedAt,
+        verifiedBy: ID.USER.rosaOlympicManager,
+        reverificationIntervalMonths: null,
+        platformDefaultIntervalMonths: PLATFORM_DEFAULT_MONTHS,
+      },
+      NOW,
+    );
+    const absent = emergencyVerification(
+      {
+        phone: null,
+        verifiedAt: null,
+        verifiedBy: null,
+        reverificationIntervalMonths: null,
+        platformDefaultIntervalMonths: PLATFORM_DEFAULT_MONTHS,
+      },
+      NOW,
+    );
+    // One state (D-32): the same `isInForce`, whichever door it came through.
+    expect(lapsed.isInForce).toBe(false);
+    expect(absent.isInForce).toBe(false);
+    expect(lapsed.isInForce).toBe(absent.isInForce);
+  });
+
   it("fails closed when the interval is unknown, and shows no date of its own", () => {
     const result = emergencyVerification(
       {
@@ -92,6 +162,7 @@ describe("emergencyVerification", () => {
         verifiedAt: "2026-08-01T00:00:00.000Z",
         verifiedBy: ID.USER.martaManager,
         reverificationIntervalMonths: null,
+        platformDefaultIntervalMonths: null,
       },
       NOW,
     );
@@ -112,6 +183,7 @@ describe("emergencyVerification", () => {
         verifiedAt: "2026-01-01T00:00:00.000Z",
         verifiedBy: ID.USER.martaManager,
         reverificationIntervalMonths: 12,
+        platformDefaultIntervalMonths: PLATFORM_DEFAULT_MONTHS,
       },
       at,
     );
@@ -135,5 +207,34 @@ describe("addWholeMonths", () => {
     expect(addWholeMonths("2026-11-15T09:00:00.000Z", 3)).toBe(
       "2027-02-15T09:00:00.000Z",
     );
+  });
+});
+
+describe("validateEmergencyContactConfiguration", () => {
+  it("accepts the platform row", () => {
+    expect(
+      validateEmergencyContactConfiguration(
+        PLATFORM_EMERGENCY_CONTACT_CONFIGURATION,
+      ).ok,
+    ).toBe(true);
+  });
+
+  it.each([
+    ["no version", { reverificationIntervalMonths: 12 }],
+    [
+      "a zero interval",
+      { configurationVersion: "v", reverificationIntervalMonths: 0 },
+    ],
+    [
+      "a fractional interval",
+      { configurationVersion: "v", reverificationIntervalMonths: 1.5 },
+    ],
+    [
+      "a string interval",
+      { configurationVersion: "v", reverificationIntervalMonths: "12" },
+    ],
+    ["not an object", null],
+  ])("refuses %s rather than defaulting", (_name, row) => {
+    expect(validateEmergencyContactConfiguration(row).ok).toBe(false);
   });
 });

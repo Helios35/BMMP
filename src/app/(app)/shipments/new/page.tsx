@@ -40,6 +40,8 @@ import { ContentsStep } from "@/features/shipments/components/contents-step";
 import { GenerateControl } from "@/features/shipments/components/generate-control";
 import { DraftPaperControls } from "@/features/shipments/components/draft-controls";
 import { PreconditionChecklist } from "@/features/shipments/components/precondition-checklist";
+import { EmergencyContactNotice } from "@/features/shipments/components/emergency-contact-notice";
+import { shipmentStepThreeHref } from "@/features/settings/return-to";
 import { ShipmentStepper } from "@/features/shipments/components/shipment-stepper";
 import {
   TransportStep,
@@ -597,6 +599,13 @@ async function StepThree({
   return (
     <div className="flex flex-col gap-6" data-review-step="true">
       <h2 className="text-h2">{REVIEW_TITLE}</h2>
+
+      {build.checklist.unmet.includes("emergency_contact") ? (
+        <EmergencyContactNotice
+          role={ctx.role}
+          returnTo={shipmentStepThreeHref(shipment.id)}
+        />
+      ) : null}
 
       <PreconditionChecklist
         checklist={build.checklist}

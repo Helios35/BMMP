@@ -174,6 +174,13 @@ export function reviewCardView(view: IntakeStepView): ReviewCardView {
       isReviewRequired: view.session.isReviewRequired,
       fieldsBelowThreshold,
       reasonCodes: view.session.reviewReasonCodes ?? [],
+      // D-56 level 1 — the card links each record a photo is already on.
+      // Only P1 and P6 render the card, and both open `/batteries/[id]`.
+      duplicateRecords: view.duplicatePhotos.records.map((record) => ({
+        id: record.id,
+        recordNumber: record.recordNumber,
+        href: `/batteries/${record.id}`,
+      })),
     },
     fields: view.fields,
     candidates,

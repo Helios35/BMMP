@@ -1,8 +1,11 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 
-import { CONTAINER_TYPE_LABELS } from "@/domain/taxonomy/container-type";
-
-import { logCleanBattery, tap } from "./support/intake-flow";
+import {
+  createContainer,
+  expectDrawnPdf,
+  generateLabel,
+} from "./support/documents-flow";
+import { logCleanBattery } from "./support/intake-flow";
 import { fixtureIds, storageStateFor } from "./support/roles";
 
 /**
@@ -12,60 +15,12 @@ import { fixtureIds, storageStateFor } from "./support/roles";
  * **The e2e store is shared**, so every container labelled here is one this
  * spec created, at a run-unique location, holding a battery it logged
  * itself. No fixture container is labelled: the quarantine drum's missing
- * label is another spec's assertion. **No paper is reachable on fixtures**
- * (no verified 24-hour number, D-58 item 1), so issue, void and departure
- * are proven in `tests/integration/document-engine.test.ts`; here the draft
- * is the paper the screens can reach.
+ * label is another spec's assertion. Issuing, voiding and departing a paper,
+ * and printing a draft, are in `papers.spec.ts` (b1a-07), the one spec that
+ * changes the 24-hour number's state.
  */
 
 const { CONTAINER, DOCUMENT_RENDER } = fixtureIds;
-
-function runLocation(tag: string): string {
-  return `e2e documents ${tag} ${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
-}
-
-function runFacility(): string {
-  return `e2e facility ${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
-}
-
-/** **New container** on `/containers`; resolves to the new container's id. */
-async function createContainer(page: Page, tag: string): Promise<string> {
-  await page.goto("/containers");
-  await tap(page.locator("[data-create-container]").first(), "New container");
-  const dialog = page.locator("[data-create-container-dialog]");
-  await dialog.locator("[data-create-container-type]").click();
-  await page
-    .getByRole("option", { name: CONTAINER_TYPE_LABELS.light_category_sound })
-    .click();
-  await dialog.getByLabel("Storage location").fill(runLocation(tag));
-  await dialog.locator("[data-create-container-submit]").click();
-  await page.waitForURL((url) => /^\/containers\/[^/]+$/.test(url.pathname));
-  return new URL(page.url()).pathname.replace("/containers/", "");
-}
-
-/** Generate the label from the Label tab; resolves to the new render's id. */
-async function generateLabel(page: Page, containerId: string): Promise<string> {
-  await page.goto(`/containers/${containerId}?tab=label`);
-  await tap(page.locator("[data-generate-label]"), "Generate label");
-  await page.locator("[data-generate-label-confirm]").click();
-  await page.waitForURL(/\/documents\/[^/]+$/);
-  return new URL(page.url()).pathname.replace("/documents/", "");
-}
-
-/** The issued PDF drawn on the page, from its stored bytes. */
-async function expectDrawnPdf(page: Page): Promise<void> {
-  const pages = page.locator('[data-pdf-pages="ready"]');
-  await expect(pages).toBeVisible();
-  await expect(pages).toHaveAttribute("data-page-count", "1");
-  await expect
-    .poll(() =>
-      page
-        .locator("[data-pdf-page] canvas")
-        .first()
-        .evaluate((canvas: HTMLCanvasElement) => canvas.width),
-    )
-    .toBeGreaterThan(0);
-}
 
 test.describe("a new container is labelled, and then it ships (reviewer items 1–3)", () => {
   test.use({ storageState: storageStateFor("p1") });
@@ -158,63 +113,9 @@ test.describe("a new container is labelled, and then it ships (reviewer items 1�
   });
 });
 
-test.describe("a draft is never a document (reviewer item 6; D-58 item 9)", () => {
-  test.use({ storageState: storageStateFor("p1") });
-
-  test("printing a draft stores it watermarked, and the checklist is unchanged", async ({
-    page,
-  }) => {
-    test.slow();
-    const containerId = await createContainer(page, "draft");
-    await logCleanBattery(page, { containerId });
-    await generateLabel(page, containerId);
-
-    await page.goto(`/shipments/new?containers=${containerId}`);
-    await page.locator("[data-contents-continue]").click();
-    await page.waitForURL(/step=2/);
-    const fields: Readonly<Record<string, string>> = {
-      destinationFacilityName: runFacility(),
-      line1: "77 Terminal Road",
-      city: "Moses Lake",
-      region: "WA",
-      postalCode: "98837",
-      carrierName: "Coleridge Hauling",
-    };
-    for (const [name, value] of Object.entries(fields)) {
-      await page.locator(`[data-transport-field="${name}"]`).fill(value);
-    }
-    await page.locator("[data-transport-save]").click();
-    await page.waitForURL(/shipment=.*step=3/);
-    const step3 = page.url();
-
-    const checklist = page.locator("[data-precondition-checklist]");
-    const before = await checklist.getAttribute("data-unmet");
-    // No verified 24-hour number on fixtures: the paper is blocked.
-    expect(before?.split(",")).toContain("emergency_contact");
-
-    await tap(page.locator("[data-print-draft]"), "Open the draft to print");
-    await page.waitForURL(/\/documents\/[^/]+$/);
-    await expect(page.locator('[data-document-marking="draft"]')).toBeVisible();
-    await expectDrawnPdf(page);
-    // Draft or not, Print streams the stored bytes and records the print.
-    await page.addInitScript(() => {
-      window.print = () => {
-        document.body.dataset.printed = "true";
-      };
-    });
-    await page.reload();
-    await expectDrawnPdf(page);
-    await page.locator("[data-document-print]").click();
-    await expect(page.locator("body")).toHaveAttribute("data-printed", "true");
-
-    await page.goto(step3);
-    await expect(checklist).toHaveAttribute("data-unmet", before ?? "");
-    await expect(page.locator("[data-generate-paper]")).toHaveAttribute(
-      "aria-disabled",
-      "true",
-    );
-  });
-});
+// "A draft is never a document" (reviewer item 6; D-58 item 9) moved to
+// `papers.spec.ts` in b1a-07: it reads the 24-hour number's state, which that
+// spec changes, in order.
 
 test.describe("who generates a label (§5.5)", () => {
   test.describe("p2", () => {

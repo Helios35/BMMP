@@ -1,8 +1,9 @@
 import { z } from "zod";
 
 /**
- * Input parsing for the `/settings/users` write paths — **written now, before
- * the form exists.**
+ * Input parsing for the settings write paths.
+ *
+ * ## `/settings/users` — **written before the form exists.**
  *
  * D-31 ships P5 enforcement in B1a and leaves the grant-management workflow to
  * B1b, so this unit renders the grants read-only. The **constraint** is what
@@ -37,3 +38,50 @@ export const auditorGrantSchema = z.object({
 });
 
 export type AuditorGrantInput = z.infer<typeof auditorGrantSchema>;
+
+// --- `/settings/organization` — the 24-hour emergency contact (D-63) ----------
+
+/** Separators a person types in a phone number. Everything else is refused. */
+const PHONE_CHARACTERS = /^\+?[\d\s().-]+$/;
+/** E.164 allows at most 15 digits; fewer than 7 is not a reachable number. */
+const PHONE_DIGITS = { min: 7, max: 15 } as const;
+
+function phoneDigitCount(value: string): number {
+  return value.replace(/\D/g, "").length;
+}
+
+/**
+ * The number and the emergency response reference, as typed.
+ *
+ * **No date and no person.** A change is never a verification (D-63 #2, #3):
+ * the adapter clears the stamp in the same write, and a verification is its
+ * own act with its own action. Blank is allowed and is stored as absent —
+ * which is the state that blocks a shipping paper (Rule 5.7).
+ */
+export const emergencyContactSchema = z.object({
+  phone: z
+    .string()
+    .trim()
+    .refine(
+      (value) =>
+        value === "" ||
+        (PHONE_CHARACTERS.test(value) &&
+          phoneDigitCount(value) >= PHONE_DIGITS.min &&
+          phoneDigitCount(value) <= PHONE_DIGITS.max),
+      "Enter the number as digits, with a leading + if it has one — for example +1-800-555-0142.",
+    ),
+  contractRef: z
+    .string()
+    .trim()
+    .max(120, "Keep the reference to 120 characters or fewer."),
+});
+
+export type EmergencyContactInput = z.infer<typeof emergencyContactSchema>;
+
+/**
+ * The attestation — the number the person called, and nothing else. The date
+ * comes from the server's clock and the person from the session (D-63 #3).
+ */
+export const verifyEmergencyContactSchema = z.object({
+  phone: z.string().trim().min(1, "There is no number to verify."),
+});

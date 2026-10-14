@@ -37,6 +37,7 @@ import type { DamageAssessmentRepository } from "./condition";
 import type { AuditEventRepository } from "./audit";
 import type { IdentityRepository } from "./identity";
 import type { PlatformConfigurationRepository } from "./platform-configuration";
+import type { ScheduledJobRepository } from "./jobs";
 
 /**
  * The contract every data adapter satisfies.
@@ -151,6 +152,13 @@ export interface DataAdapter {
 
   /** Object storage. Same seam — **no bucket name reaches a feature file.** */
   readonly objects: ObjectStore;
+
+  /**
+   * Scheduled jobs — `TECHNICAL_SPEC.md` §7.2. The one door that acts across
+   * organizations, and it takes a job's context, never a person's. See
+   * `./jobs.ts`.
+   */
+  readonly jobs: ScheduledJobRepository;
 }
 
 export type AdapterName = "mock" | "supabase";
@@ -178,3 +186,4 @@ export * from "./documents";
 export * from "./condition";
 export * from "./audit";
 export * from "./platform-configuration";
+export * from "./jobs";

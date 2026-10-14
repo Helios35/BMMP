@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "@/styles/globals.css";
 import { inter } from "@/styles/fonts";
 import { ThemeProvider } from "@/components/theme/theme-provider";
+import { MockDataBanner } from "@/features/shell/chrome/mock-data-banner";
 import { ShellToaster } from "@/features/shell/chrome/shell-toaster";
 
 // No next/font/google import. It makes every production build depend on a live
@@ -40,6 +41,8 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     >
       <body className="flex min-h-full flex-col">
         <ThemeProvider>
+          {/* RUNBOOK.md §1.4 — every screen, `(app)` and `(auth)` alike. */}
+          <MockDataBanner />
           {children}
           <ShellToaster />
         </ThemeProvider>

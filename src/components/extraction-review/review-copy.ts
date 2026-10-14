@@ -112,6 +112,15 @@ export function needsReviewTitle(fieldsBelowThreshold: number): string {
 /** When no field is below threshold and the reasons are elsewhere (a weak match, say). */
 export const NEEDS_REVIEW_TITLE_NO_FIELDS =
   "Needs review. Nothing is saved until you confirm.";
+/**
+ * T-52 `duplicate_photo` — brief 07's sentence, split around the record code
+ * so the code can be a link. A reason to look, never a verdict: no score, no
+ * probability, nothing blocked by it alone (D-56; Rule 1.25).
+ */
+export const DUPLICATE_PHOTO_BEFORE = "This photo is already on battery ";
+export const DUPLICATE_PHOTO_AFTER =
+  ". Check this is a different battery before you confirm.";
+
 export const RESOLVE_NOW = "Resolve now";
 export const SAVE_TO_QUEUE = "Save to review queue";
 export const SAVING_TO_QUEUE = "Saving…";

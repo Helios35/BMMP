@@ -63,6 +63,13 @@ export interface GateInput {
   readonly match: GateMatchInput;
   /** The provider call did not complete. A failure queues; it never relaxes (D-25). */
   readonly extractionFailed: boolean;
+  /**
+   * A photo on this session is already on another battery record in the
+   * organization (`findDuplicatePhotos`; D-56 level 1). **Required, with no
+   * default** — the check has no off switch, so every caller states what it
+   * found.
+   */
+  readonly duplicatePhoto: boolean;
 }
 
 export interface GateVerdict {
@@ -96,7 +103,9 @@ const PASSING_BAND: ConfidenceBand = "high";
  * - no catalog candidate → `no_catalog_match`; the top candidate under
  *   `minMatchScore` → `catalog_match_score_below_threshold`; the top two closer
  *   than `minMatchSeparation` → `catalog_match_ambiguous` (Rule 2.19);
- * - a provider failure → `extraction_failed`.
+ * - a provider failure → `extraction_failed`;
+ * - a photo already on another record → `duplicate_photo` (D-56, D-63) — a
+ *   reason to look, never a score.
  *
  * `isReviewRequired` is exactly "at least one reason". Rule 2.14 — one field
  * below threshold routes the whole record, never the field alone.
@@ -152,6 +161,7 @@ export function evaluateConfidenceGate(
   }
 
   if (input.extractionFailed) reasons.add("extraction_failed");
+  if (input.duplicatePhoto) reasons.add("duplicate_photo");
 
   // Stored in T-52's order so two runs with the same reasons write the same
   // array, whatever order the checks above ran in.

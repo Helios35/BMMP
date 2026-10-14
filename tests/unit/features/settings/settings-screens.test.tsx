@@ -1,11 +1,13 @@
 // @vitest-environment jsdom
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 
 import * as fixtures from "@/data/mock/fixtures";
 import * as ID from "@/data/mock/fixtures/ids";
+import { PLATFORM_EMERGENCY_CONTACT_CONFIGURATION } from "@/data/mock/fixtures/platform-configuration";
 import { emergencyVerification } from "@/domain/transport/emergency-verification";
 import {
+  EMERGENCY_SAVE_CLEARS,
   EMERGENCY_UNVERIFIED_BODY,
   EMERGENCY_UNVERIFIED_HEADLINE,
 } from "@/features/settings/copy";
@@ -19,6 +21,10 @@ import type { EmergencyContactView } from "@/features/settings/read-organization
 import type { MemberRow } from "@/features/settings/read-members";
 import type { Jurisdiction } from "@/types/rules-as-data";
 import type { Membership, User } from "@/types/tenancy";
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ refresh: vi.fn(), push: vi.fn(), replace: vi.fn() }),
+}));
 
 /**
  * The two settings surfaces, rendered.
@@ -47,6 +53,8 @@ function contactFor(organizationId: string): EmergencyContactView {
         verifiedAt: org.emergencyVerifiedAt,
         verifiedBy: org.emergencyVerifiedBy,
         reverificationIntervalMonths: org.emergencyReverificationIntervalMonths,
+        platformDefaultIntervalMonths:
+          PLATFORM_EMERGENCY_CONTACT_CONFIGURATION.reverificationIntervalMonths,
       },
       NOW,
     ),
@@ -93,6 +101,8 @@ describe("E-11 — the 24-hour emergency contact", () => {
       <EmergencyContactCard
         contact={contactFor(ID.ORG.cascade)}
         timeZone={TIME_ZONE}
+        editable={false}
+        returnTo={null}
       />,
     );
 
@@ -104,16 +114,78 @@ describe("E-11 — the 24-hour emergency contact", () => {
     );
   });
 
-  it("shows no lapse date where the interval is unknown, rather than one of its own", () => {
+  it("shows no lapse date for a number nobody has verified", () => {
     render(
       <EmergencyContactCard
         contact={contactFor(ID.ORG.olympic)}
         timeZone={TIME_ZONE}
+        editable={false}
+        returnTo={null}
+      />,
+    );
+    expect(
+      screen.getByText(/Never verified, so there is no lapse date/i),
+    ).toBeInTheDocument();
+  });
+
+  it("shows no lapse date where the interval is unknown, rather than one of its own", () => {
+    const contact: EmergencyContactView = {
+      ...emergencyVerification(
+        {
+          phone: "+1-800-555-0197",
+          verifiedAt: "2026-08-01T00:00:00.000Z",
+          verifiedBy: ID.USER.rosaOlympicManager,
+          reverificationIntervalMonths: null,
+          platformDefaultIntervalMonths: null,
+        },
+        NOW,
+      ),
+      phone: "+1-800-555-0197",
+      contractRef: null,
+      verifiedByName: "Rosa Delgado",
+    };
+    render(
+      <EmergencyContactCard
+        contact={contact}
+        timeZone={TIME_ZONE}
+        editable={false}
+        returnTo={null}
       />,
     );
     expect(
       screen.getByText(/No re-verification interval is configured/i),
     ).toBeInTheDocument();
+  });
+
+  it("offers P2 and P6 the edit form and Verify, and states that a change clears the verification (D-63)", () => {
+    const { container } = render(
+      <EmergencyContactCard
+        contact={contactFor(ID.ORG.cascade)}
+        timeZone={TIME_ZONE}
+        editable
+        returnTo={null}
+      />,
+    );
+    expect(
+      container.querySelector('[data-emergency-field="phone"]'),
+    ).toHaveValue("+1-800-555-0142");
+    expect(container.querySelector("[data-emergency-save]")).not.toBeNull();
+    expect(container.querySelector("[data-emergency-verify]")).not.toBeNull();
+    expect(screen.getByText(EMERGENCY_SAVE_CLEARS)).toBeInTheDocument();
+    // No field carries a date or a person: the server stamps both.
+    expect(container.querySelectorAll("form input")).toHaveLength(2);
+  });
+
+  it("renders no control where the role cannot write", () => {
+    const { container } = render(
+      <EmergencyContactCard
+        contact={contactFor(ID.ORG.cascade)}
+        timeZone={TIME_ZONE}
+        editable={false}
+        returnTo={null}
+      />,
+    );
+    expect(container.querySelector("[data-emergency-controls]")).toBeNull();
   });
 });
 

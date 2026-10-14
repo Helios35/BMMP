@@ -88,6 +88,7 @@ import type {
   CreateUser,
   MembershipQuery,
   OrganizationQuery,
+  OrganizationRepository,
   TosAcceptanceQuery,
   TosAcceptanceRepository,
   UpdateMembership,
@@ -149,7 +150,6 @@ import type {
   RuleVersionCandidate,
 } from "@/domain/rules/resolve";
 import { resolveRules } from "@/domain/rules/resolve";
-import { validateIntakeGateConfiguration } from "@/domain/intake/thresholds";
 import {
   placementRequired,
   requiredContainerType,
@@ -172,7 +172,7 @@ import {
   PermissionError,
   ValidationError,
 } from "@/lib/errors";
-import { PLATFORM_INTAKE_GATE_CONFIGURATION } from "./fixtures/platform-configuration";
+import { mockPlatformConfiguration } from "./platform-configuration";
 import { assertPolicy } from "./policy";
 import { mockStore, type TenantAuditEvent } from "./store";
 import {
@@ -191,6 +191,7 @@ import {
   changeStatus,
   moveContents,
   recordStorageEvent,
+  runStorageClockAlerts,
 } from "./storage-writes";
 import {
   assemble,
@@ -205,6 +206,10 @@ import {
   voidShippingPaper,
 } from "./shipment-writes";
 import { issueContainerLabel, storeDraftRender } from "./document-writes";
+import {
+  updateEmergencyContact,
+  verifyEmergencyContact,
+} from "./organization-writes";
 import { mockObjects } from "./object-store";
 import { canonicalJson, verificationCodeOf } from "@/domain/documents/snapshot";
 import { sha256Hex, sha256HexOfText } from "@/lib/hash/sha256";
@@ -324,8 +329,12 @@ const organizations = platformRepository<
  * it. Reads are narrowed here instead: a member sees their own organization and
  * nothing else.
  */
-const scopedOrganizations: typeof organizations = {
+const scopedOrganizations: OrganizationRepository = {
   ...organizations,
+  // D-63 — the only two doors the 24-hour number and its verification move
+  // through. See `./organization-writes.ts`.
+  updateEmergencyContact,
+  verifyEmergencyContact,
   async get(ctx, id) {
     if (id !== ctx.organizationId && !ctx.isPlatformAdmin) return null;
     return organizations.get(ctx, id);
@@ -1623,10 +1632,12 @@ const intakePhotos = tenantAppendOnlyRepository<
       isCrop?: boolean;
       parentIntakePhotoId?: Uuid;
       photoType?: string;
+      contentHash?: Sha256;
       search?: string;
     },
   ) =>
     eq(query.intakeSessionId, row.intakeSessionId) &&
+    eq(query.contentHash, row.contentHash) &&
     eq(query.parentIntakePhotoId, row.parentIntakePhotoId ?? undefined) &&
     eq(query.photoType, row.photoType) &&
     (query.isCrop === undefined ||
@@ -2422,31 +2433,9 @@ const damageAssessments: DamageAssessmentRepository = {
   },
 };
 
-/**
- * Platform configuration — D-22, D-40.
- *
- * Reads the mock's own row and validates it on every read, exactly as the
- * Supabase adapter will validate a platform table row: an invalid set is a
- * `DataIntegrityError`, never a default and never a partial. **There is no
- * tenant override in B1a** — the platform floor is what every organisation
- * reads, and raising it is P6's platform table to add when a tenant asks.
- */
-const platformConfiguration: PlatformConfigurationRepository = {
-  async readIntakeGateConfiguration(ctx) {
-    const validation = validateIntakeGateConfiguration(
-      PLATFORM_INTAKE_GATE_CONFIGURATION,
-    );
-    if (!validation.ok) {
-      throw new DataIntegrityError({
-        userMessage:
-          "The label-reading configuration could not be loaded. Nothing was changed — ask an Admin.",
-        correlationId: ctx.correlationId,
-        context: { issues: validation.issues },
-      });
-    }
-    return validation.configuration;
-  },
-};
+/** Platform configuration — D-22, D-40, D-63 #4. See `./platform-configuration.ts`. */
+const platformConfiguration: PlatformConfigurationRepository =
+  mockPlatformConfiguration;
 
 function matchesAuditEvent(
   row: TenantAuditEvent,
@@ -2564,6 +2553,8 @@ export const mockAdapter: DataAdapter = {
   auditEvents,
 
   objects,
+
+  jobs: { runStorageClockAlerts },
 };
 
 /** Re-exported for tests: `Page` and `PageRequest` are the shapes every list returns. */

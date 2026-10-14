@@ -140,9 +140,10 @@ export async function readShippingPaperBuild(
   shipment: Shipment,
   at: IsoTimestamp,
 ): Promise<ShippingPaperRead> {
-  const [organization, containers] = await Promise.all([
+  const [organization, containers, contactConfiguration] = await Promise.all([
     activeOrganization(ctx),
     shipmentContainers(ctx, shipment.id),
+    data.platformConfiguration.readEmergencyContactConfiguration(ctx),
   ]);
   const scope = await readContainerScope(ctx, containers);
   const rules = await resolveTransportRules(ctx, organization, containers, at);
@@ -175,6 +176,9 @@ export async function readShippingPaperBuild(
       verifiedBy: organization.emergencyVerifiedBy,
       reverificationIntervalMonths:
         organization.emergencyReverificationIntervalMonths,
+      // D-32 — `null` on the organization reads the platform default.
+      platformDefaultIntervalMonths:
+        contactConfiguration.reverificationIntervalMonths,
     },
     rules: rules.paper,
     at,

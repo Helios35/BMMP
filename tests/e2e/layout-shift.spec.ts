@@ -257,6 +257,11 @@ test.describe("a skeleton's dimensions match the content that replaces it", () =
     test(`every route with a loading boundary, at ${viewport.name}`, async ({
       page,
     }) => {
+      // Eleven journeys, each a navigation there and back. b1a-07's specs
+      // made the parallel suite heavier and the walk outran the default 30s
+      // budget twice without a single shift measured; the budget moved, the
+      // assertion did not.
+      test.slow();
       await page.setViewportSize(viewport);
       for (const journey of JOURNEYS) {
         expectNoShift(journey, viewport.name, await measure(page, journey));

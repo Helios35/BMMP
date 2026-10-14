@@ -90,6 +90,7 @@ import {
   PHOTO_NOT_ON_INTAKE,
 } from "../copy";
 import { systemStepEvent } from "./audit";
+import { readDuplicatePhotos } from "./duplicate-photos";
 
 /**
  * The intake pipeline — `TECHNICAL_SPEC.md` §11.1 steps 2–5; Rules 2.2–2.4,
@@ -573,11 +574,15 @@ async function recordExtractionFailure(
     })),
   );
 
+  // D-56 level 1 — a failed read still routes on a duplicate photo; the
+  // reviewer sees both reasons.
+  const duplicates = await readDuplicatePhotos(ctx, session);
   const verdict = evaluateConfidenceGate(
     {
       fields: gateFields(fields),
       match: { candidates: [] },
       extractionFailed: true,
+      duplicatePhoto: duplicates.matches.length > 0,
     },
     configuration.thresholds,
   );
@@ -889,12 +894,16 @@ export async function runIntakePipeline(
           civilDateInZone(now, organization?.timeZone ?? "UTC"),
         );
 
-  // 5 · gate (Rules 2.13–2.16)
+  // 5 · gate (Rules 2.13–2.16). A photo already on another record in this
+  // organization routes the whole record too (D-56 level 1, Rule 2.14) — a
+  // reason to look, never a verdict and never a score.
+  const duplicates = await readDuplicatePhotos(ctx, session);
   const verdict = evaluateConfidenceGate(
     {
       fields: gateFields(fields),
       match: { candidates: ranked },
       extractionFailed: false,
+      duplicatePhoto: duplicates.matches.length > 0,
     },
     configuration.thresholds,
   );
@@ -939,6 +948,13 @@ export async function runIntakePipeline(
           reasonCodes: [...verdict.reasonCodes],
           fieldsBelowThreshold: [...verdict.fieldsBelowThreshold],
           thresholdsApplied: { ...verdict.thresholdsApplied },
+          ...(duplicates.records.length === 0
+            ? {}
+            : {
+                duplicatePhotoOf: duplicates.records.map(
+                  (duplicate) => duplicate.recordNumber,
+                ),
+              }),
         },
         changedFields: ["status"],
         reason: verdict.reasonCodes.join(","),

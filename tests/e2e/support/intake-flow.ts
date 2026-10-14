@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import path from "node:path";
 
 import { expect, type Locator, type Page } from "@playwright/test";
@@ -24,10 +25,14 @@ const { CONTAINER } = fixtureIds;
  * The fixture label reader (`src/lib/vision/providers/fixture.ts`) picks its
  * scenario from the **last hyphen token of the uploaded file's name** —
  * `label-low.png` reads as the low-confidence label, `label-fail.png` makes the
- * provider refuse. So every upload here goes through `setInputFiles` with the
- * real path under `tests/e2e/fixtures/intake/`, never a renamed copy, and the
- * name travels from the upload reply through `runLabelExtraction` to the
- * provider. A spec that lands on the wrong branch should look at that hand-off
+ * provider refuse. So every upload here goes through `setInputFiles` under the
+ * fixture's real name, never a renamed copy, and the name travels from the
+ * upload reply through `runLabelExtraction` to the provider.
+ *
+ * **The bytes are a copy with one unique `tEXt` chunk** (b1a-07): the store
+ * is shared across specs, and the duplicate-photo check (D-56 level 1) rightly
+ * routes the second upload of the same bytes in one organization to review.
+ * Only the spec that proves that check sends the exact bytes. A spec that lands on the wrong branch should look at that hand-off
  * before it looks here.
  *
  * ## Structural selectors only
@@ -137,6 +142,75 @@ export function stepFromUrl(page: Page): number | null {
   return step === null ? null : Number(step);
 }
 
+/* ------------------------------------------------- the bytes that are sent */
+
+export interface SendOptions {
+  /**
+   * Send the fixture's bytes exactly as they sit on disk. **Only the spec that
+   * proves the duplicate-photo check sets this** (D-56 level 1): every other
+   * upload sends a byte-unique copy, because the e2e store is shared and the
+   * second upload of the same bytes in one organization is, correctly, a
+   * duplicate.
+   */
+  readonly exactBytes?: boolean;
+}
+
+/** CRC-32 (ISO-HDLC), the checksum every PNG chunk carries. */
+function crc32(bytes: Uint8Array): number {
+  let crc = 0xffffffff;
+  for (const byte of bytes) {
+    crc ^= byte;
+    for (let bit = 0; bit < 8; bit += 1) {
+      crc = (crc >>> 1) ^ (0xedb88320 & -(crc & 1));
+    }
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+/**
+ * The fixture with one `tEXt` chunk inserted before `IEND` — the same image,
+ * the same dimensions, a different SHA-256. A valid PNG, so every reader
+ * that measures it measures the original.
+ */
+function withUniqueChunk(png: Buffer): Buffer {
+  const iend = png.lastIndexOf(Buffer.from("IEND", "ascii")) - 4;
+  if (iend < 8) throw new Error("not a PNG with an IEND chunk");
+  const text = Buffer.from(
+    `e2e\0${Date.now().toString(36)}${Math.random().toString(36).slice(2)}`,
+    "latin1",
+  );
+  const type = Buffer.from("tEXt", "ascii");
+  const length = Buffer.alloc(4);
+  length.writeUInt32BE(text.length);
+  const crc = Buffer.alloc(4);
+  crc.writeUInt32BE(crc32(Buffer.concat([type, text])));
+  return Buffer.concat([
+    png.subarray(0, iend),
+    length,
+    type,
+    text,
+    crc,
+    png.subarray(iend),
+  ]);
+}
+
+/**
+ * What `setInputFiles` receives: **always the fixture's own name**, because
+ * the fixture label reader keys its scenario on it (never rename a fixture
+ * image), and by default a byte-unique copy of its contents.
+ */
+export async function fixturePayload(
+  image: IntakeFixtureImage,
+  options: SendOptions,
+): Promise<{ name: string; mimeType: string; buffer: Buffer }> {
+  const original = await readFile(fixtureImage(image));
+  return {
+    name: image,
+    mimeType: "image/png",
+    buffer: options.exactBytes === true ? original : withUniqueChunk(original),
+  };
+}
+
 /**
  * Open `/batteries/new` and send one label photo.
  *
@@ -148,12 +222,15 @@ export function stepFromUrl(page: Page): number | null {
 export async function sendLabelPhoto(
   page: Page,
   image: IntakeFixtureImage,
+  options: SendOptions = {},
 ): Promise<void> {
   await page.goto("/batteries/new");
   await expect(page).toHaveURL("/batteries/new");
   await expect(page.locator("#page-title")).toBeVisible();
 
-  await labelFileInput(page).setInputFiles(fixtureImage(image));
+  await labelFileInput(page).setInputFiles(
+    await fixturePayload(image, options),
+  );
 
   await expect(
     page.locator(
@@ -195,8 +272,9 @@ export async function readLabel(page: Page): Promise<string> {
 export async function openReview(
   page: Page,
   image: IntakeFixtureImage,
+  options: SendOptions = {},
 ): Promise<string> {
-  await sendLabelPhoto(page, image);
+  await sendLabelPhoto(page, image, options);
   return readLabel(page);
 }
 
@@ -333,10 +411,14 @@ export interface LoggedRecord {
  */
 export async function logCleanBattery(
   page: Page,
-  options: { readonly containerId?: string } = {},
+  options: { readonly containerId?: string } & SendOptions = {},
 ): Promise<LoggedRecord> {
   const containerId = options.containerId ?? CONTAINER.soundDrum;
-  const sessionId = await openReview(page, "label-clean.png");
+  const sessionId = await openReview(page, "label-clean.png", {
+    ...(options.exactBytes === undefined
+      ? {}
+      : { exactBytes: options.exactBytes }),
+  });
 
   await confirmRow(page, "model");
   const catalogEntryId = await selectTopCandidate(page);

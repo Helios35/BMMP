@@ -79,3 +79,41 @@ export async function writeTriggerAudit(
     buildAuditEvent(ctx, row, nextId()),
   );
 }
+
+/**
+ * A scheduled job's row — T-60 `scheduled_job`, **no actor user**, the job
+ * named in `actorLabel` (Rule 12.5: automated steps are recorded as the step
+ * that ran, never attributed to a person). Same `security definer` door,
+ * same tenant scope from `ctx`.
+ */
+export async function writeJobAudit(
+  ctx: RequestContext,
+  at: IsoTimestamp,
+  jobLabel: string,
+  body: TriggerAuditBody,
+): Promise<void> {
+  const row: CreateAuditEvent = {
+    actorUserId: null,
+    actorType: "scheduled_job",
+    actorLabel: jobLabel,
+    eventType: body.eventType,
+    entityTable: body.entityTable,
+    entityId: body.entityId,
+    occurredAt: at,
+    recordedAt: at,
+    beforeState: body.beforeState,
+    afterState: body.afterState,
+    changedFields: body.changedFields ?? null,
+    governingRuleVersionId: body.governingRuleVersionId ?? null,
+    ruleVersionsApplied: body.ruleVersionsApplied ?? null,
+    correlationId: ctx.correlationId,
+    requestId: null,
+    ipAddress: null,
+    userAgent: null,
+    reason: body.reason ?? null,
+  };
+  await mockStore().auditEvents.insertAsDefiner(
+    ctx,
+    buildAuditEvent(ctx, row, nextId()),
+  );
+}

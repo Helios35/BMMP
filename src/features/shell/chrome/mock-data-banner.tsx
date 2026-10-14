@@ -4,23 +4,32 @@ import { INTENT_SURFACE_CLASSES } from "@/components/status/intent-classes";
 import { activeAdapterName } from "@/data";
 import { cn } from "@/lib/utils";
 
+import { MOCK_DATA_BANNER_TEXT } from "./mock-data-banner-copy";
+
 /**
- * The mock-data banner — `RUNBOOK.md` §2.1's fourth layer against a
- * `DATA_ADAPTER` misconfiguration, and the one that needed a UI shell.
+ * The mock-data banner — `RUNBOOK.md` §1.4's third place the adapter guard
+ * lives: **a persistent banner on every screen when the mock adapter is
+ * active.** Not a console log — a banner a person cannot miss.
  *
- * Three layers already exist: the selector throws on an unset or misspelled
- * value, refuses `mock` outright when `VERCEL_ENV=production`, and the health
- * endpoint reports which adapter is live. This is the fourth — the one a person
- * sees.
+ * The other two places already exist: the selector throws on an unset or
+ * misspelled value and refuses `mock` outright when `VERCEL_ENV=production`,
+ * and `GET /api/health` reports which adapter is live.
+ *
+ * **Every screen** means both route groups, so it is mounted once in the root
+ * layout, above `(app)` and `(auth)` alike — the sign-in page of a prototype
+ * says it is a prototype before anyone types into it.
  *
  * **A server component, deliberately.** `activeAdapterName` comes from `@/data`,
  * which imports `server-only`; importing it into a client component would be the
- * exact trap `RUNBOOK.md` §2.1 names, silently selecting the mock inside the
- * browser bundle.
+ * exact trap the runbook names, silently selecting the mock inside the browser
+ * bundle.
  *
  * Not dismissible. A banner a user can close is a banner nobody sees on the
- * screenshot that ends up in a compliance file.
+ * screenshot that ends up in a compliance file. `role="status"`, never
+ * `alert`: it is a standing fact about the build, not something that just
+ * went wrong — and it is not `ReadOnlyBanner`, which is P5's alone.
  */
+
 export function MockDataBanner() {
   if (activeAdapterName === "supabase") return null;
 
@@ -34,10 +43,7 @@ export function MockDataBanner() {
       )}
     >
       <TriangleAlert aria-hidden="true" className="size-4 shrink-0" />
-      <p>
-        <strong>Mock data.</strong> Every record on this screen is invented.
-        Nothing here describes anything real.
-      </p>
+      <p>{MOCK_DATA_BANNER_TEXT}</p>
     </div>
   );
 }

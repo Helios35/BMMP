@@ -1,5 +1,6 @@
 import type { RequestContext } from "./context";
 import type { IntakeGateConfiguration } from "@/domain/intake/thresholds";
+import type { EmergencyContactConfiguration } from "@/domain/transport/emergency-verification";
 
 /**
  * Platform configuration — the values P6 owns that are neither jurisdiction
@@ -33,4 +34,19 @@ export interface PlatformConfigurationRepository {
   readIntakeGateConfiguration(
     ctx: RequestContext,
   ): Promise<IntakeGateConfiguration>;
+
+  /**
+   * The platform default for how long a verification of the 24-hour number
+   * stands — D-32, D-63 #4. **Read here and nowhere else**, beside the gate
+   * thresholds and for the same reason (D-40): an interval in a TypeScript
+   * conditional is a rule in code.
+   *
+   * An organization's own `emergencyReverificationIntervalMonths` wins where it
+   * is set; `null` there means this value applies. Not editable in B1a. The
+   * adapter validates the shape with `validateEmergencyContactConfiguration`
+   * and throws `DataIntegrityError` on an invalid row — never a default.
+   */
+  readEmergencyContactConfiguration(
+    ctx: RequestContext,
+  ): Promise<EmergencyContactConfiguration>;
 }

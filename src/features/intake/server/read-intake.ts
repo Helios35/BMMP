@@ -58,6 +58,10 @@ import {
   resolveIntakeRules,
   type IntakeRuleContext,
 } from "./classification-preview";
+import {
+  readDuplicatePhotos,
+  type DuplicatePhotoFinding,
+} from "./duplicate-photos";
 import { readGateConfiguration } from "./intake-pipeline";
 
 /**
@@ -362,6 +366,8 @@ export interface IntakeStepView {
   /** Before **Confirm and log battery** may act. Empty means the commit may proceed. */
   readonly commitOutstanding: readonly OutstandingItem[];
   readonly viewer: { readonly userId: Uuid; readonly fullName: string | null };
+  /** D-56 level 1 — the other records a photo here is already on. */
+  readonly duplicatePhotos: DuplicatePhotoFinding;
 }
 
 /**
@@ -572,6 +578,7 @@ export async function readIntakeStepView(
       userId: ctx.userId,
       fullName: viewer?.fullName ?? viewer?.email ?? null,
     },
+    duplicatePhotos: await readDuplicatePhotos(ctx, session, photos),
   };
 }
 

@@ -236,3 +236,52 @@ describe("GET /api/documents/[id]/verify", () => {
     });
   });
 });
+
+describe("/api/documents/* for every role (Rule 5.27; brief 07 security sweep)", () => {
+  // `SITE_ARCHITECTURE.md` §5.2: `/documents/[id]` is R for all six — print
+  // and download are never disabled for a role that can reach it.
+  const ROLES = [
+    { role: "compliance_handler", userId: ID.USER.danaHandler },
+    { role: "facility_manager", userId: ID.USER.martaManager },
+    { role: "producer_compliance_officer", userId: ID.USER.priyaProducer },
+    { role: "mobility_supplier_technician", userId: ID.USER.omarTechnician },
+    { role: "auditor", userId: ID.USER.samAuditor },
+    { role: "platform_admin", userId: ID.USER.platformAdmin },
+  ] as const;
+
+  it.each(ROLES)(
+    "$role reads the bytes and the proof of its own organization's document",
+    async ({ role, userId }) => {
+      const { documentRender } = await issuedLabel();
+      sessionState.current = ctx({
+        userId,
+        role,
+        isPlatformAdmin: role === "platform_admin",
+      });
+      expect((await pdfRequest(documentRender.id)).status).toBe(200);
+      expect((await verifyRequest(documentRender.id)).status).toBe(200);
+    },
+  );
+
+  it.each(ROLES)(
+    "$role in another organization finds nothing, and the attempt is recorded",
+    async ({ role }) => {
+      const { documentRender } = await issuedLabel();
+      sessionState.current = ctx({
+        userId: ID.USER.joRainierHandler,
+        organizationId: ID.ORG.rainier,
+        role,
+      });
+      expect((await pdfRequest(documentRender.id)).status).toBe(404);
+      expect((await verifyRequest(documentRender.id)).status).toBe(404);
+      expect(recordNotFound).toHaveBeenCalledTimes(2);
+    },
+  );
+
+  it("refuses both routes without a session", async () => {
+    const { documentRender } = await issuedLabel();
+    sessionState.current = null;
+    expect((await pdfRequest(documentRender.id)).status).toBe(401);
+    expect((await verifyRequest(documentRender.id)).status).toBe(401);
+  });
+});

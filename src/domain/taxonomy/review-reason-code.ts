@@ -28,6 +28,11 @@
  * owns no transition: `BUSINESS_RULES.md` owns what triggers a move between
  * values.
  *
+ * **`duplicate_photo` is D-63** (D-56 level 1), added at TAXONOMY.md v1.6: an
+ * intake photo whose content hash matches a photo on another battery record in
+ * the organization. A reason to look, never a verdict — no score or
+ * probability is shown with it (Rule 1.25).
+ *
  * **Never invent a value.** If one is needed and is not here, it does not exist
  * yet — raise it to P6 (TAXONOMY.md §1.1).
  */
@@ -41,6 +46,7 @@ export const REVIEW_REASON_CODES = [
   "field_validation_failed",
   "extraction_failed",
   "session_abandoned",
+  "duplicate_photo",
 ] as const;
 
 export type ReviewReasonCode = (typeof REVIEW_REASON_CODES)[number];
@@ -66,4 +72,5 @@ export const REVIEW_REASON_CODE_LABELS: Readonly<
   field_validation_failed: "Value failed validation",
   extraction_failed: "Extraction did not complete",
   session_abandoned: "Left unfinished",
+  duplicate_photo: "Photo already on another record",
 };

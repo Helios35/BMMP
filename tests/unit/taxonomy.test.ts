@@ -324,6 +324,28 @@ describe("the storage clock's provenance (D-55, TAXONOMY.md v1.4)", () => {
   });
 });
 
+describe("the 24-hour number and the duplicate-photo check (D-63, TAXONOMY.md v1.6)", () => {
+  it("gives T-43 the two emergency-contact events, labelled as authored", () => {
+    expect(
+      taxonomy.AUDIT_EVENT_TYPE_LABELS[
+        "organization.emergency_contact_updated"
+      ],
+    ).toBe("Emergency contact changed");
+    expect(
+      taxonomy.AUDIT_EVENT_TYPE_LABELS[
+        "organization.emergency_contact_verified"
+      ],
+    ).toBe("Emergency contact verified");
+  });
+
+  it("appends T-52 duplicate_photo after the original eight, so no stored order moves", () => {
+    expect(taxonomy.REVIEW_REASON_CODES.at(-1)).toBe("duplicate_photo");
+    expect(taxonomy.REVIEW_REASON_CODE_LABELS.duplicate_photo).toBe(
+      "Photo already on another record",
+    );
+  });
+});
+
 describe("reading a stored value", () => {
   it("recognises a live value and returns its label", () => {
     const read = readTaxonomyValue(

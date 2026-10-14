@@ -15,6 +15,8 @@ import type {
 import type { RoleCode } from "@/domain/taxonomy/role";
 import type { TosAcceptanceStatus } from "@/domain/taxonomy/tos-acceptance-status";
 import type { Uuid } from "@/types/common";
+import type { RequestContext } from "./context";
+import type { StorageWriteAttribution } from "./storage";
 
 /** Tenancy and identity contracts — `ERD.md` §3. */
 
@@ -39,12 +41,17 @@ export type CreateOrganization = CreateInput<
  * for a different reason: **verification is a recorded act, not a field**
  * (D-32, Rule 5.6). A profile edit that can stamp its own verification date is
  * not a verification, and the actor has to come from `ctx` the way `createdBy`
- * does rather than from whatever the caller sent. They move through a dedicated
- * method, which the unit that builds the write path adds — **so nothing in this
- * unit can set them, which is correct: every organization reads as unverified
- * and that is exactly the state D-32 defines the behaviour for.**
- * `emergencyReverificationIntervalMonths` stays settable: it is configuration,
- * not evidence.
+ * does rather than from whatever the caller sent. They move only through
+ * {@link OrganizationRepository.verifyEmergencyContact}.
+ *
+ * `emergencyResponsePhone` and `emergencyResponseContractRef` are absent from
+ * the update for the mirror-image reason: **any change to either clears the
+ * verification in the same write** (D-63 #2). A general update that could
+ * change the number and leave the stamp standing would put an unchecked number
+ * on a shipping paper under someone else's attestation, so they move only
+ * through {@link OrganizationRepository.updateEmergencyContact}.
+ * `emergencyReverificationIntervalMonths` stays settable here: it is
+ * configuration, not evidence (and no screen edits it in B1a).
  */
 export type UpdateOrganization = UpdateInput<
   Organization,
@@ -56,7 +63,37 @@ export type UpdateOrganization = UpdateInput<
   | "shipmentSeq"
   | "emergencyVerifiedAt"
   | "emergencyVerifiedBy"
+  | "emergencyResponsePhone"
+  | "emergencyResponseContractRef"
 >;
+
+/**
+ * A change to the 24-hour emergency contact — D-63 #2, Rules 5.5, 5.6.
+ *
+ * Both values are the whole new state, not a patch: a blank or whitespace
+ * value is `null`, never an empty string on a document. **No date and no
+ * person travel with it** — a change is never a verification.
+ */
+export interface EmergencyContactChange {
+  readonly phone: string | null;
+  readonly contractRef: string | null;
+  readonly attribution: StorageWriteAttribution;
+}
+
+/**
+ * A person's attestation that the 24-hour number reaches the provider —
+ * D-63 #3, Rule 5.6.
+ *
+ * **It carries no date and no verifier.** The adapter stamps the instant from
+ * its own clock and the person from `ctx`; nothing a form sends can set
+ * either. `phone` is the number the person called: if the number on file is
+ * no longer that number, the attestation is about a different number and is
+ * refused rather than stamped onto it.
+ */
+export interface EmergencyContactAttestation {
+  readonly phone: string;
+  readonly attribution: StorageWriteAttribution;
+}
 
 export interface OrganizationQuery extends BaseQuery {
   readonly slug?: string;
@@ -177,7 +214,7 @@ export interface TosAcceptanceRepository extends AppendOnlyRepository<
    * (Rules 1.19, 7.4).
    */
   setStatus(
-    ctx: import("./context").RequestContext,
+    ctx: RequestContext,
     id: Uuid,
     input: {
       readonly status: TosAcceptanceStatus;
@@ -187,12 +224,42 @@ export interface TosAcceptanceRepository extends AppendOnlyRepository<
   ): Promise<TosAcceptance>;
 }
 
-export type OrganizationRepository = Repository<
+/**
+ * The organization, plus the two writes the 24-hour number moves through —
+ * D-32, D-63, Rules 5.6, 5.7.
+ *
+ * Both act on the **active** organization (`ctx.organizationId`); neither
+ * takes an id, so neither can reach another tenant. Both are P2 and P6 only
+ * (the `organization` UPDATE policy) and each is audited in the same write.
+ */
+export interface OrganizationRepository extends Repository<
   Organization,
   CreateOrganization,
   UpdateOrganization,
   OrganizationQuery
->;
+> {
+  /**
+   * Change the number and the emergency response reference. **Any change
+   * clears the verification in the same write** (D-63 #2) and is audited as
+   * T-43 `organization.emergency_contact_updated` with before and after. A
+   * save that changes nothing writes nothing and clears nothing.
+   */
+  updateEmergencyContact(
+    ctx: RequestContext,
+    change: EmergencyContactChange,
+  ): Promise<Organization>;
+
+  /**
+   * Record the verification — T-43 `organization.emergency_contact_verified`.
+   * Stamps `emergencyVerifiedAt` with the adapter's own clock and
+   * `emergencyVerifiedBy` with `ctx.userId`. Refused when no number is on
+   * file, or when the number on file is not the one attested.
+   */
+  verifyEmergencyContact(
+    ctx: RequestContext,
+    attestation: EmergencyContactAttestation,
+  ): Promise<Organization>;
+}
 
 export type UserRepository = Repository<
   User,

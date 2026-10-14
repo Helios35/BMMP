@@ -723,6 +723,35 @@ describe("ExtractionReviewCard — the gate banner (§2.1.4(5))", () => {
     const { container } = renderCard();
     expect(container.querySelector("[data-gate-banner]")).toBeNull();
   });
+
+  it("D-56 — names and links the record a photo is already on, with no score", () => {
+    const { container } = renderCard({
+      gate: {
+        isReviewRequired: true,
+        fieldsBelowThreshold: 0,
+        reasonCodes: ["duplicate_photo"],
+        duplicateRecords: [
+          {
+            id: "record-1",
+            recordNumber: "BR-0007",
+            href: "/batteries/record-1",
+          },
+        ],
+      },
+    });
+    const notice = container.querySelector(
+      "[data-duplicate-record='record-1']",
+    );
+    expect(notice?.textContent).toBe(
+      "This photo is already on battery BR-0007. Check this is a different battery before you confirm.",
+    );
+    expect(notice?.querySelector("a")).toHaveAttribute(
+      "href",
+      "/batteries/record-1",
+    );
+    expect(container.textContent).toContain("Photo already on another record");
+    expect(container.textContent).not.toMatch(/%|probab|likel/i);
+  });
 });
 
 describe("ExtractionReviewCard — states (§2.1.6)", () => {

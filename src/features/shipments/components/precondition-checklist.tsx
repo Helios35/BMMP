@@ -12,6 +12,10 @@ import type {
   ShippingPaperChecklist,
   ShippingPaperPrecondition,
 } from "@/domain/transport/shipping-paper";
+import {
+  emergencyContactSettingsHref,
+  shipmentStepThreeHref,
+} from "@/features/settings/return-to";
 import { cn } from "@/lib/utils";
 
 import {
@@ -81,9 +85,14 @@ function fixLink(
       label: target.label,
     };
   }
-  return canReadRoute(role, target.route)
-    ? { href: target.route, label: target.label }
-    : null;
+  if (!canReadRoute(role, target.route)) return null;
+  // E-11 — the way to settings carries the way back to this draft.
+  return item.id === "emergency_contact"
+    ? {
+        href: emergencyContactSettingsHref(shipmentStepThreeHref(shipmentId)),
+        label: target.label,
+      }
+    : { href: target.route, label: target.label };
 }
 
 export function PreconditionChecklist({

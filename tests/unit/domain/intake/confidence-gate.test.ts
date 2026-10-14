@@ -60,6 +60,7 @@ function input(patch: Partial<GateInput> = {}): GateInput {
       ],
     },
     extractionFailed: false,
+    duplicatePhoto: false,
     ...patch,
   };
 }
@@ -254,6 +255,17 @@ describe("evaluateConfidenceGate", () => {
       "field_validation_failed",
       "extraction_failed",
     ]);
+  });
+
+  it("D-56 — a photo already on another record routes a clean read to review, with no score", () => {
+    const verdict = evaluateConfidenceGate(
+      input({ duplicatePhoto: true }),
+      THRESHOLDS,
+    );
+    expect(verdict.isReviewRequired).toBe(true);
+    expect(verdict.reasonCodes).toEqual(["duplicate_photo"]);
+    // A reason to look — never a number attached to it (Rule 1.25).
+    expect(JSON.stringify(verdict)).not.toMatch(/probab|likel|percent|chance/i);
   });
 
   it("Rule 2.17 — moving the thresholds moves the verdict; nothing is fixed in the module", () => {

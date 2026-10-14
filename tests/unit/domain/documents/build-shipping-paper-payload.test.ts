@@ -92,6 +92,7 @@ function buildInput(): ShippingPaperBuildInput {
       verifiedAt: "2026-09-01T00:00:00.000Z",
       verifiedBy: "user-1",
       reverificationIntervalMonths: 12,
+      platformDefaultIntervalMonths: null,
     },
     rules: {
       basicDescription: BASIC_DESCRIPTION,

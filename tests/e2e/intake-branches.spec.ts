@@ -384,7 +384,7 @@ test.describe("the branches off Flow A", () => {
     // Rules 6.8, 6.17 — persistent, non-dismissible, and the record is where
     // the routing requirement says it must be.
     await expect(page).toHaveURL(new RegExp(`/batteries/${recordId}`));
-    const block = page.locator('[data-hard-block="ddr"]');
+    const block = page.locator('[data-hard-block-notice="ddr"]');
     await expect(block).toBeVisible();
     await expect(block).toHaveAttribute("role", "alert");
     await expect(page.locator("[data-page-header]").first()).toContainText(

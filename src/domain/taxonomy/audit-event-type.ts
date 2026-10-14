@@ -34,6 +34,11 @@
  * v1.5: a P6 edit of an entry's shipping identity with its reason (D-50), a
  * shipment's creation, and a shipping paper voided by a contents change
  * (Rules 5.13, 5.14).
+ * **`organization.emergency_contact_updated` and
+ * `organization.emergency_contact_verified` are D-63**, added at TAXONOMY.md
+ * v1.6: a change to the 24-hour number or its emergency response reference,
+ * which clears the verification, and a person's attestation that the number
+ * reaches the provider (Rule 5.6; D-32).
  *
  * **Never invent a value.** If one is needed and is not here, it does not exist
  * yet — raise it to P6 (TAXONOMY.md §1.1).
@@ -66,6 +71,8 @@ export const AUDIT_EVENT_TYPES = [
   "document.reprinted",
   "document.viewed",
   "membership.role_changed",
+  "organization.emergency_contact_updated",
+  "organization.emergency_contact_verified",
   "jurisdiction_rule.version_activated",
   "override.recorded",
   "denial.recorded",
@@ -112,6 +119,8 @@ export const AUDIT_EVENT_TYPE_LABELS: Readonly<Record<AuditEventType, string>> =
     "document.reprinted": "Document reprinted",
     "document.viewed": "Document viewed",
     "membership.role_changed": "Role changed",
+    "organization.emergency_contact_updated": "Emergency contact changed",
+    "organization.emergency_contact_verified": "Emergency contact verified",
     "jurisdiction_rule.version_activated": "Rule version activated",
     "override.recorded": "Override recorded",
     "denial.recorded": "Action denied",
