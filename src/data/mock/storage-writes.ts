@@ -837,8 +837,6 @@ export async function changeStatus(
 
 // --- the storage-clock alert job ----------------------------------------------------------
 
-const JOB_LABEL = "storage-clock-alerts";
-
 /**
  * The tenant scope a job writes under, for one organization.
  *
