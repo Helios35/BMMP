@@ -663,7 +663,7 @@ One per route in `_ANCHORS.md` §5. Access per `SITE_ARCHITECTURE.md` §5.2.
 | **On success** | Row opens `/batteries/[id]`. |
 | **On failure** | `RecordTable` error state; filters and count preserved. |
 
-**What's on it.** `RecordTable` (§2.7). Columns: Record ID (mono, primary) · Manufacturer + model · Chemistry · Form factor · Assessed condition (`StatusBadge`) · Container · Storage clock tier · Logged (relative + absolute on hover). Filters: condition, chemistry, container, clock tier, catalog-matched yes/no, date range. Search across ID, serial and model.
+**What's on it.** `RecordTable` (§2.7). Columns: Record ID (mono, primary) · Manufacturer + model · Chemistry · Form factor · Assessed condition (`StatusBadge`) · Container · Storage clock tier · Logged (relative + absolute on hover). Filters: condition, chemistry, container, clock tier, catalog-matched yes/no, date range, and **Recall** — possible match, confirmed (Rule 10.18). The filter lives in the URL. Search across ID, serial and model.
 
 **A small mobility-device pack and a vehicle traction pack render in the same table with no special case** (`PROJECT_SETUP_BMMP.md` §8.2). The mock fixtures must contain both from day one, sitting next to each other.
 
@@ -716,6 +716,12 @@ One per route in `_ANCHORS.md` §5. Access per `SITE_ARCHITECTURE.md` §5.2.
 
 Tabs:
 - **Overview** — identity fields with **each value's source retained and visible** (Read from label / Matched from catalog / Decoded / Detected from image / Entered by *name*). Specification. Classification outcome with its recorded reasoning. Placement and clock. `[B2]` reserves a section for `hazard_ranking` — **rendered as a relative ranking with a stated basis per factor when it arrives, never as a probability or percentage** (`_ANCHORS.md` §7.1).
+  - **Recalls** (Rules 10.10–10.18):
+    - **Standing line:** the T-35 label, the last checked time, and the source(s).
+    - **Each match row:** source; recall number, linked to the recall; title, published date and remedy; **"Matched on:"** in words; status, who, when and reason.
+    - **Actions, by role:** **Confirm** (P1/P2/P6) · **Dismiss** (P1/P6, needs a reason) · **Record a recall** (P1/P2/P6: source, reference, optional title) · **Check now** (P1/P2/P6).
+    - **Colors:** a possible match is `warning`. A confirmed recall is the existing `HardBlockNotice`, named as a recall (§2.6).
+    - **No match-strength wording anywhere.**
 - **Photos & extraction** — every `intake_photo`, the label crop, and the full `label_extraction` with per-field confidence and the extracted-vs-confirmed pair. Also shows the record's **training-eligible state** and the Terms of Service version in force at capture, so eligibility can be verified from outside the system rather than trusted (Rules 7.16, 7.22). Read-only after commit.
 - **Documents** — every `document_render` touching this record, each linking to `/documents/[id]`. Voided renders appear here, marked void, with their reason and actor (Rules 5.14, 5.15).
 - **History** — the `audit_event` trail, newest first, each with actor, time and what changed. Any superseded `damage_assessment` is displayed **alongside** the current one with its author, timestamp, indicators and evidence (Rule 6.12).

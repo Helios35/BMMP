@@ -1,5 +1,5 @@
 # Taxonomy — BMMP
-**Version:** 1.7 · **Date:** 2026-10-28 · **Owner:** Nathan Ivy / Next Sketch LLC
+**Version:** 1.8 · **Date:** 2026-10-28 · **Owner:** Nathan Ivy / Next Sketch LLC
 **Answers:** How is everything in this product classified?
 **Reads from:** `_ANCHORS.md` · `PRD.md` · `BUSINESS_RULES.md` · `PROJECT_SETUP_BMMP.md`  ·  **Feeds:** `TECHNICAL_SPEC.md` · `ERD.md` · `UX_SPEC.md` · `SITE_ARCHITECTURE.md` · every builder brief
 
@@ -9,6 +9,14 @@
 ---
 
 ## Changelog
+
+**v1.8 · 2026-10-28 — recall matching (`Decision Log.md` D-72, D-73)**
+
+- T-11, T-25, T-35 and T-43 changes authored by planning (D-72, D-73), transcribed by `b2-09-recalls`.
+- **T-35:** `dismissed` covers a withdrawn confirmed association too, and match rows hold only `possible_match`, `confirmed_match` or `dismissed` — `not_checked` and `no_match` are a record's standing, derived from its check runs (Rule 10.18).
+- **T-11:** `unknown_provenance` and `bulk_consignment` stop only the check on what the battery came out of; the battery's own identity is still checked (Rule 10.11).
+- **T-25:** a lot with no members cannot be closed (D-72 #8).
+- **T-43 gains `recall_check.completed`, `recall_check.failed`, `recall_match.found`, `recall_match.confirmed`, `recall_match.recorded` and `recall_match.dismissed`.**
 
 **v1.7 · 2026-10-28 — the label-vs-catalog check, the lot's audit trail, and the B1a doc pass (`Decision Log.md` D-62, D-68)**
 
@@ -504,7 +512,7 @@ Two citations in this document are deliberately **not** numbered, because what t
 
 - **Single-select.**
 - **Assigned by P1 or P6 at intake** (**Rule 2.30** — B1a captures; it does not verify).
-- **`unknown_provenance` and `bulk_consignment` are legitimate answers, not failures** — but both suppress recall matching (T-35) for the record, because there is nothing to match against.
+- **`unknown_provenance` and `bulk_consignment` are legitimate answers, not failures** — but both stop matching on what the battery came out of; the battery's own identity is still checked (Rule 10.11).
 - **Triggers behaviour:** the provenance binding (**Rule 10.9**, stub — B1a captures the source reference under **Rule 2.30**, B2 specifies the binding and what breaks it), recall matching (**Rule 10.7**, stub), and evidence-pack content at B1b (**Rule 9.3**, stub).
 - **Not terminal**, but the source identifier itself is write-once: once a serial or VIN is bound and confirmed, changing it requires P6 and writes an `audit_event`.
 
@@ -868,6 +876,7 @@ Two citations in this document are deliberately **not** numbered, because what t
 - **Assigned by P1 or P6.**
 - **Triggers behaviour:** shipment building from lots (**Rule 5.1**), grading batch assembly at B2 (**Rule 10.1**, stub).
 - **`dissolved` is terminal for that lot.** Its members are unaffected and the lot row is retained for audit.
+- A lot with no members cannot be closed.
 
 ---
 
@@ -1137,7 +1146,7 @@ Two citations in this document are deliberately **not** numbered, because what t
 | `no_match` | No match | A check ran against the available sources and returned no match. |
 | `possible_match` | Possible match — needs review | A candidate match was returned that is not conclusive. Requires human adjudication. |
 | `confirmed_match` | Confirmed match | A human has confirmed the record matches a published recall. |
-| `dismissed` | Dismissed | A possible match was reviewed and rejected, with a stated reason. |
+| `dismissed` | Dismissed | A possible match reviewed and rejected, or a confirmed association withdrawn, with a stated reason (Rules 10.14, 10.16). |
 
 **Rules**
 
@@ -1145,8 +1154,9 @@ Two citations in this document are deliberately **not** numbered, because what t
 - **`possible_match` requires human adjudication by P1 or P6.** It never resolves itself, never auto-promotes to `confirmed_match`, and never auto-dismisses on a timer. It sits in the review path until a human decides. Governed by **Rule 10.7**: recall matching produces an *advisory* association confirmed by a human — with one exception, that a confirmed association triggers the section 6 handling class immediately, because that direction is the safe one.
 - **`confirmed_match` sets the `recalled` DDR flag (T-30).** This is the only automatic write into T-30. A recalled record is handled in the same class as a damaged or defective one for transport and segregation (**Rule 6.5**), moves to quarantine, triggers a re-classification check, and makes air unavailable on any shipment containing it (**EC-41**).
 - **`dismissed` requires a stated reason** recorded on the match row, is attributable to the human who dismissed it, and never deletes the original — both the match and its dismissal stay permanently visible on the record and in every export (**Rule 6.24**). P5 may never dismiss one.
-- **Matching requires provenance.** Records with T-11 `unknown_provenance` or `bulk_consignment` stay at `not_checked` — there is nothing to match against, and that is a recorded fact rather than a failure.
-- **Append-only.** Each check writes a `recall_match` row. Re-checking a record does not overwrite the previous result; recall data changes over time and the history is the evidence.
+- **Match rows hold `possible_match`, `confirmed_match` or `dismissed`.** `not_checked` and `no_match` describe a record's standing, derived from its check runs (Rule 10.18), never a match row.
+- **Matching needs something to match against** (Rule 10.11): a confirmed catalog entry, or a source make and model.
+- **Check runs are append-only** (Rule 10.18). There is one match row per record, source and recall.
 
 ---
 
@@ -1366,6 +1376,12 @@ Two citations in this document are deliberately **not** numbered, because what t
 | `classification_decision.recorded` | Waste classification recorded | A classification decision and its basis codes were written. |
 | `damage_assessment.recorded` | Damage assessment recorded | An inspection wrote findings. |
 | `battery_record.ddr_flag_set` | DDR flag set | A DDR flag was set on a record. |
+| `recall_check.completed` | Recall check completed | A check ran: source, identity checked, outcome (no match, candidates found, or nothing to match against). |
+| `recall_check.failed` | Recall check failed | A source could not be reached or returned an error. Carries the reason code (Rule 10.17). |
+| `recall_match.found` | Possible recall match found | A candidate was written as `possible_match`. |
+| `recall_match.confirmed` | Recall confirmed | A person confirmed a possible match (Rule 10.14). |
+| `recall_match.recorded` | Recall recorded | A person recorded a recall by hand, with its reference (Rule 10.15). |
+| `recall_match.dismissed` | Recall dismissed | A possible match was dismissed, or a confirmed one withdrawn, with a reason (Rules 10.14, 10.16). |
 | `container.status_changed` | Container status changed | The container moved between values of T-24. |
 | `lot.created` | Lot created | P1 or P6 created a lot. It starts at `open` (T-25); every later move is `lot.status_changed`. |
 | `lot.status_changed` | Lot status changed | The lot moved between values of T-25 — closed, reopened, allocated to a shipment, returned to `closed` when that shipment let it go, shipped on departure, or dissolved. A dissolved lot's row is retained for audit (T-25). |
