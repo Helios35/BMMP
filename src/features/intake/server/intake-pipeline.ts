@@ -91,6 +91,7 @@ import {
 } from "../copy";
 import { systemStepEvent } from "./audit";
 import { readDuplicatePhotos } from "./duplicate-photos";
+import { compareReadWithEntry, comparisonHistory } from "./label-catalog";
 
 /**
  * The intake pipeline — `TECHNICAL_SPEC.md` §11.1 steps 2–5; Rules 2.2–2.4,
@@ -583,6 +584,8 @@ async function recordExtractionFailure(
       match: { candidates: [] },
       extractionFailed: true,
       duplicatePhoto: duplicates.matches.length > 0,
+      // Nothing was read, so nothing can disagree with an entry (Rule 2.11).
+      labelCatalogMismatch: false,
     },
     configuration.thresholds,
   );
@@ -896,14 +899,21 @@ export async function runIntakePipeline(
 
   // 5 · gate (Rules 2.13–2.16). A photo already on another record in this
   // organization routes the whole record too (D-56 level 1, Rule 2.14) — a
-  // reason to look, never a verdict and never a score.
+  // reason to look, never a verdict and never a score. So does a label that
+  // disagrees with the entry it resolved to exactly (Rule 2.35).
   const duplicates = await readDuplicatePhotos(ctx, session);
+  const labelCatalog =
+    exact === undefined
+      ? null
+      : compareReadWithEntry(fields, exact, configuration.matchTolerances);
   const verdict = evaluateConfidenceGate(
     {
       fields: gateFields(fields),
       match: { candidates: ranked },
       extractionFailed: false,
       duplicatePhoto: duplicates.matches.length > 0,
+      labelCatalogMismatch:
+        labelCatalog !== null && labelCatalog.disagreements.length > 0,
     },
     configuration.thresholds,
   );
@@ -953,6 +963,15 @@ export async function runIntakePipeline(
             : {
                 duplicatePhotoOf: duplicates.records.map(
                   (duplicate) => duplicate.recordNumber,
+                ),
+              }),
+          // Rules 2.35, 12.15 — the values compared and the tolerance in force.
+          ...(labelCatalog === null || labelCatalog.disagreements.length === 0
+            ? {}
+            : {
+                labelCatalog: comparisonHistory(
+                  labelCatalog,
+                  configuration.configurationVersion,
                 ),
               }),
         },

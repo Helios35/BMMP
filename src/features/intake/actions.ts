@@ -48,6 +48,7 @@ import {
   ValidationError,
 } from "@/lib/errors";
 import type { IsoTimestamp, Uuid } from "@/types/common";
+import type { CatalogEntry } from "@/types/catalog";
 import type { IntakeDraft, IntakeSession } from "@/types/intake";
 
 import {
@@ -105,6 +106,10 @@ import {
   loadOpenIntake,
 } from "./server/read-intake";
 import { readDuplicatePhotos } from "./server/duplicate-photos";
+import {
+  compareDraftWithEntry,
+  routeLabelDisagreement,
+} from "./server/label-catalog";
 import { sessionAction } from "./server/session-action";
 
 /**
@@ -588,9 +593,10 @@ export async function selectCatalogCandidate(
     "selectCatalogCandidate",
     selectCatalogCandidateSchema,
     input,
-    async (ctx, parsed) => {
-      const { session, draft } = await openDraft(ctx, parsed.sessionId);
+    async (ctx, parsed, attribution) => {
+      const { session, record, draft } = await openDraft(ctx, parsed.sessionId);
       let next: IntakeDraft;
+      let picked: CatalogEntry | null = null;
       if (parsed.catalogEntryId === null) {
         next = selectDraftCandidate(draft, null, null);
       } else {
@@ -607,11 +613,29 @@ export async function selectCatalogCandidate(
           entry.id,
           entry.chemistry === "unknown" ? null : entry.chemistry,
         );
+        picked = entry;
       }
-      return {
-        sessionId: session.id,
-        draft: await persistDraft(ctx, session, next),
-      };
+      const persisted = await persistDraft(ctx, session, next);
+      // Rule 2.35 — a person's pick is a record getting a catalog entry (Rule
+      // 2.19): what the label read is compared with it, and a disagreement
+      // routes the record to review. Declining every candidate compares
+      // nothing.
+      if (picked !== null) {
+        const configuration = await readGateConfiguration(ctx, null);
+        await routeLabelDisagreement(ctx, {
+          session,
+          record,
+          comparison: compareDraftWithEntry(
+            persisted,
+            picked,
+            configuration.matchTolerances,
+          ),
+          configurationVersion: configuration.configurationVersion,
+          at: now(),
+          attribution,
+        });
+      }
+      return { sessionId: session.id, draft: persisted };
     },
   );
 }

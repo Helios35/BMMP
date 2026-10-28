@@ -2,7 +2,7 @@
 /**
  * The intake fixture images.
  *
- * Writes the nine synthetic PNGs the fixture label reader
+ * Writes the ten synthetic PNGs the fixture label reader
  * (`src/lib/vision/providers/fixture.ts`) keys on, to `public/fixtures/intake/`
  * and, as identical copies, to `tests/e2e/fixtures/intake/` for the specs to
  * upload. No real photograph is ever committed: a photo of a real label is a
@@ -91,6 +91,12 @@ const IMAGES = [
     name: "label-scooter.png",
     ground: rgb(0x26, 0x44, 0x5a),
     label: rgb(0xf9, 0xf5, 0xe6),
+    box: LABEL_BOX,
+  },
+  {
+    name: "label-mismatch.png",
+    ground: rgb(0x3a, 0x2c, 0x4a),
+    label: rgb(0xf2, 0xee, 0xe4),
     box: LABEL_BOX,
   },
   {

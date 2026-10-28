@@ -339,9 +339,29 @@ describe("the 24-hour number and the duplicate-photo check (D-63, TAXONOMY.md v1
   });
 
   it("appends T-52 duplicate_photo after the original eight, so no stored order moves", () => {
-    expect(taxonomy.REVIEW_REASON_CODES.at(-1)).toBe("duplicate_photo");
+    expect(taxonomy.REVIEW_REASON_CODES.indexOf("duplicate_photo")).toBe(8);
     expect(taxonomy.REVIEW_REASON_CODE_LABELS.duplicate_photo).toBe(
       "Photo already on another record",
+    );
+  });
+});
+
+describe("the label-vs-catalog check and the lot's audit trail (D-68, TAXONOMY.md v1.7)", () => {
+  it("appends T-52 label_catalog_mismatch after duplicate_photo, so no stored order moves", () => {
+    expect(taxonomy.REVIEW_REASON_CODES.at(-1)).toBe("label_catalog_mismatch");
+    expect(taxonomy.REVIEW_REASON_CODES.at(-2)).toBe("duplicate_photo");
+    expect(taxonomy.REVIEW_REASON_CODE_LABELS.label_catalog_mismatch).toBe(
+      "Label disagrees with catalog",
+    );
+  });
+
+  it("gives T-43 the three lot events, labelled as authored", () => {
+    expect(taxonomy.AUDIT_EVENT_TYPE_LABELS["lot.created"]).toBe("Lot created");
+    expect(taxonomy.AUDIT_EVENT_TYPE_LABELS["lot.status_changed"]).toBe(
+      "Lot status changed",
+    );
+    expect(taxonomy.AUDIT_EVENT_TYPE_LABELS["lot.membership_changed"]).toBe(
+      "Lot membership changed",
     );
   });
 });

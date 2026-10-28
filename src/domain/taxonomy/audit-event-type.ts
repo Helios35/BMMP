@@ -39,6 +39,10 @@
  * v1.6: a change to the 24-hour number or its emergency response reference,
  * which clears the verification, and a person's attestation that the number
  * reaches the provider (Rule 5.6; D-32).
+ * **`lot.created`, `lot.status_changed` and `lot.membership_changed`** were
+ * approved by the owner in `b1a-08-leftovers` and added at TAXONOMY.md v1.7:
+ * a lot's creation, its T-25 moves, and a container joining or leaving it.
+ * A lot holds containers, so a battery joins one by its container.
  *
  * **Never invent a value.** If one is needed and is not here, it does not exist
  * yet — raise it to P6 (TAXONOMY.md §1.1).
@@ -59,6 +63,9 @@ export const AUDIT_EVENT_TYPES = [
   "damage_assessment.recorded",
   "battery_record.ddr_flag_set",
   "container.status_changed",
+  "lot.created",
+  "lot.status_changed",
+  "lot.membership_changed",
   "storage_event.recorded",
   "storage_clock.status_changed",
   "alert.resolved",
@@ -107,6 +114,9 @@ export const AUDIT_EVENT_TYPE_LABELS: Readonly<Record<AuditEventType, string>> =
     "damage_assessment.recorded": "Damage assessment recorded",
     "battery_record.ddr_flag_set": "DDR flag set",
     "container.status_changed": "Container status changed",
+    "lot.created": "Lot created",
+    "lot.status_changed": "Lot status changed",
+    "lot.membership_changed": "Lot membership changed",
     "storage_event.recorded": "Storage event recorded",
     "storage_clock.status_changed": "Storage clock changed",
     "alert.resolved": "Alert resolved",

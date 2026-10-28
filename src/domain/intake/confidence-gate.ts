@@ -70,6 +70,12 @@ export interface GateInput {
    * found.
    */
   readonly duplicatePhoto: boolean;
+  /**
+   * A field the label read disagrees with the catalog entry the record is
+   * matched to (`compareLabelToCatalog`; Rule 2.35, D-68). **Required, with no
+   * default**, for the same reason: the check has no off switch (Rule 2.17).
+   */
+  readonly labelCatalogMismatch: boolean;
 }
 
 export interface GateVerdict {
@@ -105,7 +111,9 @@ const PASSING_BAND: ConfidenceBand = "high";
  *   than `minMatchSeparation` → `catalog_match_ambiguous` (Rule 2.19);
  * - a provider failure → `extraction_failed`;
  * - a photo already on another record → `duplicate_photo` (D-56, D-63) — a
- *   reason to look, never a score.
+ *   reason to look, never a score;
+ * - a label that disagrees with its matched catalog entry →
+ *   `label_catalog_mismatch` (Rule 2.35, D-68) — likewise.
  *
  * `isReviewRequired` is exactly "at least one reason". Rule 2.14 — one field
  * below threshold routes the whole record, never the field alone.
@@ -162,6 +170,7 @@ export function evaluateConfidenceGate(
 
   if (input.extractionFailed) reasons.add("extraction_failed");
   if (input.duplicatePhoto) reasons.add("duplicate_photo");
+  if (input.labelCatalogMismatch) reasons.add("label_catalog_mismatch");
 
   // Stored in T-52's order so two runs with the same reasons write the same
   // array, whatever order the checks above ran in.

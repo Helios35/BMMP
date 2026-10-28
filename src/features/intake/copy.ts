@@ -158,3 +158,6 @@ export const LOG_ANOTHER = "Log another";
 // --- reasons written to the audit log -------------------------------------------
 
 export const REASON_SAVED_TO_QUEUE = "session_saved_to_queue";
+
+/** Rule 2.35 — a person picked an entry the label disagrees with (T-52 `label_catalog_mismatch`). */
+export const REASON_LABEL_CATALOG_MISMATCH = "label_catalog_mismatch";

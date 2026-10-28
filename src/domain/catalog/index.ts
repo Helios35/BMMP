@@ -6,5 +6,6 @@
  * selects one**: a human picks from the list, always.
  */
 
+export * from "./label-catalog-check";
 export * from "./match";
 export * from "./rematch";

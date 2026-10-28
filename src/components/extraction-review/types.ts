@@ -161,6 +161,25 @@ export interface ExtractionReviewGate {
    * or empty renders nothing. **Never a score** (Rule 1.25).
    */
   readonly duplicateRecords?: readonly DuplicatePhotoRecordView[];
+  /**
+   * T-52 `label_catalog_mismatch` — each field the label read that disagrees
+   * with the matched entry, both values side by side (Rule 2.35; `UX_SPEC.md`
+   * §3.8). Absent or `null` renders nothing. **Never a score.**
+   */
+  readonly labelCatalog?: LabelCatalogDisagreementView | null;
+}
+
+export interface LabelCatalogDisagreementView {
+  readonly entryTitle: string;
+  /** `/catalog/[id]` — every role that renders the card can open it. */
+  readonly entryHref: string;
+  readonly rows: readonly {
+    readonly fieldCode: LabelFieldCode;
+    /** From `LABEL_FIELD_CODE_LABELS`, resolved by the caller. */
+    readonly fieldLabel: string;
+    readonly labelSays: string;
+    readonly catalogSays: string;
+  }[];
 }
 
 export interface DuplicatePhotoRecordView {

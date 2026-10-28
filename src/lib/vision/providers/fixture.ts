@@ -53,6 +53,7 @@ export const FIXTURE_SCENARIOS = [
   "fail",
   "manualcrop",
   "scooter",
+  "mismatch",
 ] as const;
 
 export type FixtureScenario = (typeof FIXTURE_SCENARIOS)[number];
@@ -188,6 +189,18 @@ const SCOOTER: FieldAnswers = {
   assessed_condition: UNREAD,
 };
 
+/**
+ * The vehicle pack's label with a voltage its catalog entry does not carry:
+ * the part number resolves the entry exactly (Rule 2.18) and every field
+ * reads cleanly, but the printed voltage is not the entry's within the
+ * configured tolerance — a relabelled pack, a wrong match or a misprint.
+ * Rule 2.35 routes it to review on that alone (T-52 `label_catalog_mismatch`).
+ */
+const MISMATCH: FieldAnswers = {
+  ...CLEAN,
+  voltage: read("400 V", 0.95211, "400V"),
+};
+
 const ANSWERS_BY_SCENARIO: Readonly<
   Record<Exclude<FixtureScenario, "fail">, FieldAnswers>
 > = {
@@ -197,6 +210,7 @@ const ANSWERS_BY_SCENARIO: Readonly<
   unreadable: UNREADABLE,
   manualcrop: CLEAN,
   scooter: SCOOTER,
+  mismatch: MISMATCH,
 };
 
 /**

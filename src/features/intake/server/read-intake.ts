@@ -37,6 +37,7 @@ import { optionsFor } from "@/domain/taxonomy/lookup";
 import { resolveUserNames } from "@/features/battery-record/user-names";
 import { ConflictError, DataIntegrityError, NotFoundError } from "@/lib/errors";
 import type { BatteryRecord } from "@/types/battery-record";
+import type { LabelCatalogComparison } from "@/domain/catalog/label-catalog-check";
 import type { CatalogEntry } from "@/types/catalog";
 import type { IsoDate, IsoTimestamp, Uuid } from "@/types/common";
 import type {
@@ -63,6 +64,7 @@ import {
   type DuplicatePhotoFinding,
 } from "./duplicate-photos";
 import { readGateConfiguration } from "./intake-pipeline";
+import { compareDraftWithEntry } from "./label-catalog";
 
 /**
  * Everything a step of `/batteries/new` renders, read once through `src/data`
@@ -368,6 +370,15 @@ export interface IntakeStepView {
   readonly viewer: { readonly userId: Uuid; readonly fullName: string | null };
   /** D-56 level 1 — the other records a photo here is already on. */
   readonly duplicatePhotos: DuplicatePhotoFinding;
+  /**
+   * Rule 2.35 — what the label read beside the entry the record is matched
+   * to: the person's pick, or the one exact match (Rule 2.18). `null` where
+   * the record has neither.
+   */
+  readonly labelCatalog: {
+    readonly entry: CatalogEntry;
+    readonly comparison: LabelCatalogComparison;
+  } | null;
 }
 
 /**
@@ -523,6 +534,15 @@ export async function readIntakeStepView(
   ]);
   const viewer = await data.users.get(ctx, ctx.userId);
 
+  // Rule 2.35 — the entry the record is matched to: a person's pick, or, until
+  // one is made, the single exact match the read resolved to (Rule 2.18).
+  const exactCandidates = candidates.filter(
+    ({ candidate }) => candidate.matchMethodCode === "exact_part_number",
+  );
+  const matchedEntry =
+    selectedEntry ??
+    (exactCandidates.length === 1 ? (exactCandidates[0]?.entry ?? null) : null);
+
   return {
     session,
     record,
@@ -579,6 +599,17 @@ export async function readIntakeStepView(
       fullName: viewer?.fullName ?? viewer?.email ?? null,
     },
     duplicatePhotos: await readDuplicatePhotos(ctx, session, photos),
+    labelCatalog:
+      matchedEntry === null
+        ? null
+        : {
+            entry: matchedEntry,
+            comparison: compareDraftWithEntry(
+              draft,
+              matchedEntry,
+              configuration.matchTolerances,
+            ),
+          },
   };
 }
 

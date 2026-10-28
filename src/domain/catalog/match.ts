@@ -175,8 +175,11 @@ function toleranceAsDecimal(tolerance: number): string {
  * Multiplication rather than division keeps the inequality exact at every
  * scale and makes a zero catalog figure a plain "does not agree" instead of a
  * division by zero. A figure that is not a decimal string never agrees.
+ *
+ * Exported because the label-vs-catalog check (Rule 2.35) reads the same
+ * tolerances the same way — there is no second comparison and no second set.
  */
-function agreesWithinTolerance(
+export function agreesWithinTolerance(
   label: string | null,
   catalog: string | null,
   tolerance: number,
