@@ -123,8 +123,8 @@ describe("readOrganizationSettings", () => {
   it("renders the jurisdiction profile as a list of sites", async () => {
     const view = await readOrganizationSettings(CASCADE_MANAGER, NOW);
     expect(view.profiles).toHaveLength(1);
-    // Six fixture containers, three of them added by b1a-08.
-    expect(view.profiles[0]?.site.containerCount).toBe(6);
+    // Nine fixture containers: three added by b1a-08, three by b2-09.
+    expect(view.profiles[0]?.site.containerCount).toBe(9);
   });
 
   it("walks the chain most specific first", async () => {

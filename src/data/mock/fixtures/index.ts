@@ -1254,6 +1254,8 @@ export const ruleVersions: readonly RuleVersion[] = [
     createdAt: RULES_AUTHORED_B1A_08,
     createdBy: ID.USER.platformAdmin,
   },
+  // Added by b2-09 — never an edit to a row above (STATE §7.1).
+  ...B2_09.ruleVersions,
 ];
 
 /**
@@ -1867,6 +1869,8 @@ export const batteryRecords: readonly BatteryRecord[] = [
   },
   // Added by b1a-08 — never an edit to a row above (STATE §7.1).
   ...B1A_08.batteryRecords,
+  // Added by b2-09 — never an edit to a row above (STATE §7.1).
+  ...B2_09.batteryRecords,
 ];
 
 // ---------------------------------------------------------------------------
@@ -2451,6 +2455,8 @@ export const containers: readonly Container[] = [
   },
   // Added by b1a-08 — never an edit to a row above (STATE §7.1).
   ...B1A_08.containers,
+  // Added by b2-09 — never an edit to a row above (STATE §7.1).
+  ...B2_09.containers,
 ];
 
 export const lots: readonly Lot[] = [
@@ -2555,6 +2561,8 @@ export const storageClocks: readonly StorageClock[] = [
   },
   // Added by b1a-08 — never an edit to a row above (STATE §7.1).
   ...B1A_08.storageClocks,
+  // Added by b2-09 — never an edit to a row above (STATE §7.1).
+  ...B2_09.storageClocks,
 ];
 
 export const storageEvents: readonly StorageEvent[] = [
@@ -2686,6 +2694,8 @@ export const alerts: readonly Alert[] = [
     createdAt: T.spreadIntake,
     updatedAt: T.spreadIntake,
   },
+  // Added by b2-09 — never an edit to a row above (STATE §7.1).
+  ...B2_09.alerts,
 ];
 
 // ---------------------------------------------------------------------------
@@ -2833,6 +2843,8 @@ export const classificationDecisions: readonly ClassificationDecision[] = [
   },
   // Added by b1a-08 — never an edit to a row above (STATE §7.1).
   ...B1A_08.classificationDecisions,
+  // Added by b2-09 — never an edit to a row above (STATE §7.1).
+  ...B2_09.classificationDecisions,
 ];
 
 export const documentRenders: readonly DocumentRender[] = [
@@ -2899,6 +2911,8 @@ export const documentRenders: readonly DocumentRender[] = [
     supersededAt: null,
     createdAt: T.soundAccumulationStart,
   },
+  // Added by b2-09 — never an edit to a row above (STATE §7.1).
+  ...B2_09.documentRenders,
 ];
 
 export const shipments: readonly Shipment[] = [
@@ -2992,6 +3006,8 @@ export const shipments: readonly Shipment[] = [
   },
   // Added by b1a-08 — never an edit to a row above (STATE §7.1).
   ...B1A_08.shipments,
+  // Added by b2-09 — never an edit to a row above (STATE §7.1).
+  ...B2_09.shipments,
 ];
 
 export const shippingPapers: readonly ShippingPaper[] = [
@@ -3023,6 +3039,8 @@ export const shippingPapers: readonly ShippingPaper[] = [
     generatedBy: ID.USER.danaHandler,
     createdAt: T.julyShipped,
   },
+  // Added by b2-09 — never an edit to a row above (STATE §7.1).
+  ...B2_09.shippingPapers,
 ];
 
 export const containerLabels: readonly ContainerLabel[] = [
@@ -3152,6 +3170,8 @@ export const damageAssessments: readonly DamageAssessment[] = [
   },
   // Added by b1a-08 — never an edit to a row above (STATE §7.1).
   ...B1A_08.damageAssessments,
+  // Added by b2-09 — never an edit to a row above (STATE §7.1).
+  ...B2_09.damageAssessments,
 ];
 
 // ---------------------------------------------------------------------------

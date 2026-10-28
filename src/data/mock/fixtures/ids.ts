@@ -105,6 +105,8 @@ export const RULE_VERSION = {
   federalShipperCertification2026: uid("0a000007", 6),
   waContainerLabel2026: uid("0a000007", 7),
   federalDdrPackaging2026: uid("0a000007", 8),
+  /** b2-09 — v2: the packing level authored, with its citation (D-72 #9). Supersedes v1. */
+  federalDdrPackaging2026v2: uid("0a000007", 9),
 } as const;
 
 export const CATALOG = {
@@ -135,6 +137,18 @@ export const BATTERY = {
   ddrNoPackagingRule: uid("0a000009", 8),
   /** b1a-08 — in review: an exact match whose label voltage disagrees (Rule 2.35). */
   labelMismatchInReview: uid("0a000009", 9),
+  /** b2-09 — a Ridgeline RM-24V50 whose maker and model match recall 26-041: a possible match. */
+  recallBrandModel: uid("0a000009", 10),
+  /** b2-09 — a traction pack out of a Corvane Ion LX 2022, matching vehicle recall 26V-118. */
+  recallVehicle: uid("0a000009", 11),
+  /** b2-09 — the recalled pack: a recall recorded by hand, confirmed, quarantined. */
+  recalledQuarantined: uid("0a000009", 12),
+  /** b2-09 — out of a Kestrel; the vehicle source does not answer, so it reads not checked. */
+  recallCheckFails: uid("0a000009", 13),
+  /** b2-09 — no confirmed catalog entry and no source make: nothing to match against. */
+  nothingToMatch: uid("0a000009", 14),
+  /** b2-09 — sound, on air shipment SH-0004 with an issued paper, with a possible match (Rule 6.14). */
+  airShipmentRecall: uid("0a000009", 15),
 } as const;
 
 export const INTAKE_SESSION = {
@@ -177,6 +191,12 @@ export const CONTAINER = {
   mixedDdrQuarantine: uid("0a00000d", 5),
   /** b1a-08 — quarantine holding the no-rule DDR record, on SH-0003 in lot L-0003. */
   noRuleDdrQuarantine: uid("0a00000d", 6),
+  /** b2-09 — sound, holding the three records whose checks the fixtures record. */
+  recallChecks: uid("0a00000d", 7),
+  /** b2-09 — quarantine holding the recalled pack. */
+  recalledQuarantine: uid("0a00000d", 8),
+  /** b2-09 — sound, on air shipment SH-0004. */
+  airShipmentSound: uid("0a00000d", 9),
 } as const;
 
 export const LOT = {
@@ -194,11 +214,18 @@ export const CLOCK = {
   lotOverdueDrum: uid("0a00000f", 4),
   mixedDdrQuarantine: uid("0a00000f", 5),
   noRuleDdrQuarantine: uid("0a00000f", 6),
+  recallChecks: uid("0a00000f", 7),
+  recalledQuarantine: uid("0a00000f", 8),
+  airShipmentSound: uid("0a00000f", 9),
 } as const;
 
 export const ALERT = {
   overdueDrum: uid("0a000010", 1),
   reviewQueue: uid("0a000010", 2),
+  /** b2-09 — the `recall_match` alerts the three open possible matches raised. */
+  recallBrandModel: uid("0a000010", 3),
+  recallVehicle: uid("0a000010", 4),
+  recallAirShipment: uid("0a000010", 5),
 } as const;
 
 export const CLASSIFICATION = {
@@ -209,6 +236,11 @@ export const CLASSIFICATION = {
   scuffedBlocked: uid("0a000011", 4),
   ddrLithiumOnMixed: uid("0a000011", 5),
   ddrNoPackagingRule: uid("0a000011", 6),
+  recallBrandModel: uid("0a000011", 7),
+  recallVehicle: uid("0a000011", 8),
+  recalledQuarantined: uid("0a000011", 9),
+  recallCheckFails: uid("0a000011", 10),
+  airShipmentRecall: uid("0a000011", 11),
 } as const;
 
 export const SHIPMENT = {
@@ -216,15 +248,21 @@ export const SHIPMENT = {
   augustDraft: uid("0a000012", 2),
   /** b1a-08 — a mixed shipment (Rule 5.1) holding a lithium DDR record. */
   mixedDdr: uid("0a000012", 3),
+  /** b2-09 — by air, documents issued, holding C-0009 (Rule 6.14). */
+  airIssued: uid("0a000012", 4),
 } as const;
 
 export const DOCUMENT_RENDER = {
   julyShippingPaper: uid("0a000013", 1),
   soundDrumLabel: uid("0a000013", 2),
+  /** b2-09 — SH-0004's issued paper. */
+  airShippingPaper: uid("0a000013", 3),
 } as const;
 
 export const SHIPPING_PAPER = {
   july: uid("0a000014", 1),
+  /** b2-09 — SH-0004's issued paper. */
+  airIssued: uid("0a000014", 2),
 } as const;
 
 export const CONTAINER_LABEL = {
@@ -237,6 +275,36 @@ export const DAMAGE = {
   swollenDamaged: uid("0a000016", 3),
   ddrLithiumOnMixed: uid("0a000016", 4),
   ddrNoPackagingRule: uid("0a000016", 5),
+  recallBrandModel: uid("0a000016", 6),
+  recallVehicle: uid("0a000016", 7),
+  recalledQuarantined: uid("0a000016", 8),
+  recallCheckFails: uid("0a000016", 9),
+  nothingToMatch: uid("0a000016", 10),
+  airShipmentRecall: uid("0a000016", 11),
+} as const;
+
+/** b2-09 — recall associations (`recall_match`, Rules 10.13–10.16). */
+export const RECALL_MATCH = {
+  /** Possible — BR-0009, consumer recall 26-041. */
+  brandModel: uid("0a00001c", 1),
+  /** Possible — BR-0010, vehicle recall 26V-118. */
+  vehicle: uid("0a00001c", 2),
+  /** Confirmed, recorded by hand — BR-0011. */
+  recordedByHand: uid("0a00001c", 3),
+  /** Possible — BR-0014 on SH-0004, vehicle recall 26V-118. */
+  airShipment: uid("0a00001c", 4),
+} as const;
+
+/** b2-09 — recall check runs, the `recall_check` table argued for unit 17 (Rule 10.18). */
+export const RECALL_CHECK = {
+  brandModelBattery: uid("0a00001d", 1),
+  vehicleBattery: uid("0a00001d", 2),
+  vehicleSource: uid("0a00001d", 3),
+  failsBattery: uid("0a00001d", 4),
+  failsVehicle: uid("0a00001d", 5),
+  nothingToMatch: uid("0a00001d", 6),
+  airShipmentBattery: uid("0a00001d", 7),
+  airShipmentVehicle: uid("0a00001d", 8),
 } as const;
 
 export const STORAGE_EVENT = {
