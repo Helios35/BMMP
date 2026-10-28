@@ -6,7 +6,6 @@ import { PageHeader, PageShell } from "@/components/page";
 import {
   decodeListQuery,
   encodeListQuery,
-  type ListQuerySpec,
 } from "@/components/record-table/list-url";
 import type { RecordTableFilter } from "@/components/record-table/record-table-filters";
 import { INTENT_SURFACE_CLASSES } from "@/components/status/intent-classes";
@@ -14,7 +13,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { data } from "@/data";
 import type { RequestContext } from "@/data/contracts";
-import { canReadRoute } from "@/domain/access/route-capability";
+import { canReadRoute, capabilityFor } from "@/domain/access/route-capability";
 import { APP_ROUTE_NAMES } from "@/domain/access/routes";
 import {
   nextAfterResolving,
@@ -50,10 +49,15 @@ import {
   type ResolutionOutcome,
 } from "@/features/review/review-hrefs";
 import {
+  inventoryListSpec,
   readInventorySummary,
   readUnidentifiedInventory,
+  REVIEW_EXPORT_PATH,
   type UnidentifiedInventory,
 } from "@/features/review/server/inventory";
+import { ExportControl } from "@/components/record-table/export-control";
+import { exportHref } from "@/components/record-table/list-url";
+import { mayExportList } from "@/domain/access/export";
 import {
   readIntakeItemView,
   readRematchItemView,
@@ -340,8 +344,6 @@ function QueueReadFailure({ cause }: { readonly cause: unknown }) {
 
 // --- P2 (§3.8b) ------------------------------------------------------------------
 
-const INVENTORY_FILTER_IDS = ["site", "container", "tier", "age"] as const;
-
 async function UnidentifiedInventoryScreen({
   ctx,
   params,
@@ -364,18 +366,7 @@ async function UnidentifiedInventoryScreen({
     return <QueueReadFailure cause={cause} />;
   }
 
-  const spec: ListQuerySpec = {
-    sortableColumnIds: [],
-    defaultSort: "",
-    defaultDir: "asc",
-    filterIds: INVENTORY_FILTER_IDS,
-    filterValues: {
-      site: unfiltered.options.site.map((option) => option.value),
-      container: unfiltered.options.container.map((option) => option.value),
-      tier: unfiltered.options.tier.map((option) => option.value),
-      age: unfiltered.options.age.map((option) => option.value),
-    },
-  };
+  const spec = inventoryListSpec(unfiltered);
   const query = decodeListQuery(params, spec);
   const inventory =
     Object.keys(query.filters).length === 0
@@ -428,6 +419,17 @@ async function UnidentifiedInventoryScreen({
         asOf={asOf}
         canOpenContainer={canReadRoute(ctx.role, "/containers/[id]")}
         canSeeContainerAlerts={canReadRoute(ctx.role, "/containers")}
+        exportAction={
+          mayExportList(ctx.role, "/review") ? (
+            <ExportControl
+              href={exportHref(REVIEW_EXPORT_PATH, query, spec)}
+              exportName="review"
+              description=" the unidentified batteries in your containers, with the filters on this page, as a CSV file"
+              role={ctx.role}
+              capability={capabilityFor(ctx.role, "/review")}
+            />
+          ) : null
+        }
       />
       <InventorySummarySheet
         summary={summary}

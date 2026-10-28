@@ -1,4 +1,5 @@
 import type { FieldSource } from "@/components/provenance/field-source-badge";
+import type { ListQuerySpec } from "@/components/record-table/list-url";
 import { data } from "@/data";
 import type { RequestContext } from "@/data/contracts";
 import {
@@ -89,6 +90,39 @@ function ageBucket(since: IsoTimestamp, asOf: IsoTimestamp): AgeFilter {
   if (waited < DAY_MS) return "under_a_day";
   if (waited < WEEK_MS) return "under_a_week";
   return "a_week_or_more";
+}
+
+/** `GET /api/exports/review` — P2's unidentified inventory as CSV (§3.8b; D-50). */
+export const REVIEW_EXPORT_PATH = "/api/exports/review";
+
+/** The P2 view's four filters, in the URL like every list's (§3.8b). */
+export const INVENTORY_FILTER_IDS = [
+  "site",
+  "container",
+  "tier",
+  "age",
+] as const;
+
+/**
+ * The P2 view's URL contract. **The options are the data's own**, so it is
+ * built from an unfiltered read — one definition for the page and its export,
+ * so the file is decoded exactly as the screen was.
+ */
+export function inventoryListSpec(
+  unfiltered: UnidentifiedInventory,
+): ListQuerySpec {
+  return {
+    sortableColumnIds: [],
+    defaultSort: "",
+    defaultDir: "asc",
+    filterIds: INVENTORY_FILTER_IDS,
+    filterValues: {
+      site: unfiltered.options.site.map((option) => option.value),
+      container: unfiltered.options.container.map((option) => option.value),
+      tier: unfiltered.options.tier.map((option) => option.value),
+      age: unfiltered.options.age.map((option) => option.value),
+    },
+  };
 }
 
 export interface InventoryFilters {

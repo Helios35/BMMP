@@ -2,32 +2,29 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
-import {
-  decodeListQuery,
-  toPageRequest,
-} from "@/components/record-table/list-url";
+import { ExportControl } from "@/components/record-table/export-control";
+import { exportHref, toPageRequest } from "@/components/record-table/list-url";
 import { ACTION_BUTTON_CLASS, PageHeader, PageShell } from "@/components/page";
 import { RecordTable } from "@/components/record-table/record-table";
 import { Button } from "@/components/ui/button";
 import { data } from "@/data";
 import type { RequestContext } from "@/data/contracts";
-import { canWriteRoute } from "@/domain/access/route-capability";
+import { mayExportList } from "@/domain/access/export";
+import { canWriteRoute, capabilityFor } from "@/domain/access/route-capability";
 import { APP_ROUTE_NAMES } from "@/domain/access/routes";
 import { batteryColumns } from "@/features/battery-record/battery-columns";
 import { BatteryEmptyState } from "@/features/battery-record/battery-empty-state";
 import { readIntakeGate } from "@/features/consent/read-intake-gate";
 import {
+  BATTERY_EXPORT_PATH,
   BATTERY_LIST_PATH,
   batteryFilters,
-  batteryListSelection,
-  batteryListSpec,
 } from "@/features/battery-record/list-query";
+import { readBatteryListRequest } from "@/features/battery-record/server/list-read";
 import { requireRoute } from "@/lib/auth/guard";
 import { nowIso } from "@/lib/auth/session";
 import { isAppError } from "@/lib/errors";
 import type { BatteryRecord } from "@/types/battery-record";
-import type { Uuid } from "@/types/common";
-import type { Container, StorageClock } from "@/types/storage";
 
 /**
  * `/batteries` — `UX_SPEC.md` §3.5.
@@ -51,18 +48,6 @@ export const metadata: Metadata = {
   title: APP_ROUTE_NAMES["/batteries"],
 };
 
-/**
- * The decoration reads are bounded rather than paged.
- *
- * A container list this large already needs its own screen, and unit 04 builds
- * it. The bound exists so a growing tenant degrades into a missing container
- * code rather than an unbounded read on every list render.
- */
-const DECORATION_LIMIT = 100;
-
-/** The tier filter resolves to a set of containers, so it reads its own clocks. */
-const TIER_CLOCK_LIMIT = 200;
-
 export default async function BatteriesPage({
   searchParams,
 }: PageProps<"/batteries">) {
@@ -70,62 +55,26 @@ export default async function BatteriesPage({
   const params = await searchParams;
   const asOf = nowIso();
 
-  const [containerPage, clockPage, intakeGate] = await Promise.all([
-    data.containers.list(ctx, { limit: DECORATION_LIMIT }),
-    data.storageClocks.list(ctx, { limit: DECORATION_LIMIT }),
+  const [request, intakeGate] = await Promise.all([
+    readBatteryListRequest(ctx, params),
     readIntakeGate(ctx),
   ]);
+  const {
+    spec,
+    listQuery,
+    containerCodes,
+    containersById,
+    clocksByContainerId,
+  } = request;
 
   // E-12 — where no acceptance is in force, intake is blocked organisation-wide
   // (Rules 7.1, 7.2) and every intake affordance is absent rather than disabled.
   // The dashboard makes the same call; the two screens must not disagree.
   const isIntakeBlocked = intakeGate.status === "blocked";
 
-  const containersById = new Map<Uuid, Container>(
-    containerPage.items.map((container) => [container.id, container]),
-  );
-  const clocksByContainerId = new Map<Uuid, StorageClock>(
-    clockPage.items
-      .filter((clock): clock is StorageClock => clock.containerId !== null)
-      .map((clock) => [clock.containerId as Uuid, clock]),
-  );
-
-  // The container filter is keyed on the code rather than the id, so a shared
-  // link reads as the warehouse reads it: `?container=C-0001`.
-  const containerCodes = containerPage.items
-    .map((container) => container.containerCode)
-    .sort((a, b) => a.localeCompare(b));
-
-  const spec = batteryListSpec(containerCodes);
-  const listQuery = decodeListQuery(params, spec);
-  const selection = batteryListSelection(listQuery);
-
-  const containerId = containerPage.items.find(
-    (container) => container.containerCode === selection.containerCode,
-  )?.id;
-
-  const containerIds = await containersAtTier(ctx, selection.tier);
-
   const result = await readBatteryRecords(ctx, {
     ...toPageRequest(listQuery),
-    search: selection.search,
-    // Voided records are retained and stay readable, and they sit outside every
-    // operational count (Rule 12.12) — so the list they are outside of is this
-    // one.
-    excludeVoided: true,
-    // A draft exists from the moment an intake session starts and is visible
-    // only inside that session (T-22). It reaches this list when a person
-    // confirms it, and not before.
-    excludeDrafts: true,
-    assessedCondition: selection.assessedCondition,
-    chemistry: selection.chemistry,
-    containerId,
-    containerIds,
-    isCatalogMatched: selection.isCatalogMatched,
-    loggedAfter: selection.loggedAfter,
-    loggedBefore: selection.loggedBefore,
-    sortBy: selection.sortBy,
-    sortDirection: selection.sortDirection,
+    ...request.query,
   });
 
   return (
@@ -170,33 +119,14 @@ export default async function BatteriesPage({
           searchSuggestion: "Try a record ID, a serial number or a model.",
         }}
         error={result.error}
-        toolbar={logABatteryAction(ctx.role, isIntakeBlocked)}
+        toolbar={batteryToolbar(
+          ctx.role,
+          isIntakeBlocked,
+          exportHref(BATTERY_EXPORT_PATH, listQuery, spec),
+        )}
       />
     </PageShell>
   );
-}
-
-/**
- * The clock-tier filter is two steps, because a battery's tier belongs to its
- * container's clock.
- *
- * The band is the stored tier and is never re-derived from a date: the alert job
- * is what moves it, and a screen that recomputed it would disagree with the
- * alert record printed beside it (`SITE_ARCHITECTURE.md` §7.6a).
- */
-async function containersAtTier(
-  ctx: RequestContext,
-  tier: ReturnType<typeof batteryListSelection>["tier"],
-): Promise<readonly Uuid[] | undefined> {
-  if (tier === undefined) return undefined;
-  const clocks = await data.storageClocks.list(ctx, {
-    alertBand: tier,
-    isRunning: true,
-    limit: TIER_CLOCK_LIMIT,
-  });
-  return clocks.items
-    .map((clock) => clock.containerId)
-    .filter((id): id is Uuid => id !== null);
 }
 
 interface BatteryListResult {
@@ -239,6 +169,35 @@ async function readBatteryRecords(
       },
     };
   }
+}
+
+/**
+ * The table's actions: **Log a battery** for the roles that log, **Export**
+ * for P2, P5 and P6 (`SITE_ARCHITECTURE.md` §5.2). `undefined` when neither
+ * applies, so the toolbar leaves no empty action group behind.
+ */
+function batteryToolbar(
+  role: Parameters<typeof canWriteRoute>[0],
+  isIntakeBlocked: boolean,
+  href: string,
+): ReactNode {
+  const log = logABatteryAction(role, isIntakeBlocked);
+  const canExport = mayExportList(role, "/batteries");
+  if (log === undefined && !canExport) return undefined;
+  return (
+    <>
+      {log}
+      {canExport ? (
+        <ExportControl
+          href={href}
+          exportName="batteries"
+          description=" the battery records, with the filters on this page, as a CSV file"
+          role={role}
+          capability={capabilityFor(role, "/batteries")}
+        />
+      ) : null}
+    </>
+  );
 }
 
 /**
