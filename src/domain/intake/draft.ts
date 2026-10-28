@@ -14,6 +14,7 @@ import type { Decimal, IsoDate, IsoTimestamp, Uuid } from "@/types/common";
 import type {
   DraftCandidate,
   DraftFieldState,
+  DraftLotChoice,
   DraftSourceDevice,
   IntakeDraft,
 } from "@/types/intake";
@@ -492,6 +493,18 @@ export function setDraftPlacement(
   containerId: Uuid | null,
 ): IntakeDraft {
   return { ...draft, containerId };
+}
+
+/**
+ * Step A4's lot: the chosen container joins an open lot, opens a new one, or
+ * keeps its grouping (`null`). A lot holds containers, so the choice is about
+ * the container the battery is placed in (`ERD.md` §6.2).
+ */
+export function setDraftLotChoice(
+  draft: IntakeDraft,
+  lotChoice: DraftLotChoice | null,
+): IntakeDraft {
+  return { ...draft, lotChoice };
 }
 
 /** A date a person entered. A decode never overrides it (Rule 2.24). */

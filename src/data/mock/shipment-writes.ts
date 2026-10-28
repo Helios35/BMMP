@@ -28,7 +28,7 @@ import type {
   Shipment,
   ShippingPaper,
 } from "@/types/documents";
-import type { Container, StorageClock } from "@/types/storage";
+import type { Container, Lot, StorageClock } from "@/types/storage";
 import { isInForceOn } from "@/domain/rules/resolve";
 import { civilDateInZone } from "@/domain/storage/clock-display";
 import {
@@ -44,8 +44,10 @@ import {
 } from "@/domain/transport/air-transport";
 import {
   admitContainerToShipment,
+  admitLotToShipment,
   type ShipmentAdmissionTarget,
   type ShipmentContainerFacts,
+  type ShipmentLotFacts,
 } from "@/domain/transport/container-admission";
 import {
   admitArrival,
@@ -75,6 +77,7 @@ import { formatRecordNumber, nextId, nextSequenceNumber } from "./ids";
 import { hasStoredObject, snapshotObjects } from "./object-store";
 import { assertPolicy } from "./policy";
 import { mockStore } from "./store";
+import { lotMembers, moveLotStatus } from "./lot-writes";
 import { contentsOf } from "./storage-writes";
 
 /**
@@ -153,6 +156,7 @@ function snapshot(): () => void {
   const tables = [
     s.shipments,
     s.containers,
+    s.lots,
     s.batteryRecords,
     s.storageClocks,
     s.alerts,
@@ -301,7 +305,74 @@ export function shipmentContainerFacts(
       hasDamageAssessment: currentFindings(ctx, record.id) !== null,
     })),
     onOtherOpenShipment: openShipmentNumber(ctx, container, exceptShipmentId),
+    lot: lotFactsOf(ctx, container),
   };
+}
+
+function lotFactsOf(
+  ctx: RequestContext,
+  container: Container,
+): ShipmentContainerFacts["lot"] {
+  if (container.lotId === null) return null;
+  const lot = store()
+    .lots.all()
+    .find(
+      (row) =>
+        row.id === container.lotId && row.organizationId === ctx.organizationId,
+    );
+  return lot === undefined
+    ? null
+    : { id: lot.id, lotCode: lot.lotCode, status: lot.status };
+}
+
+/**
+ * The open shipment an allocated lot is on — read through its containers,
+ * because membership is `container.shipment_id` and nothing else (`ERD.md`
+ * §11.1).
+ */
+function lotShipmentId(ctx: RequestContext, lot: Lot): Uuid | null {
+  if (lot.status !== "allocated") return null;
+  return (
+    lotMembers(ctx, lot.id).find((container) => container.shipmentId !== null)
+      ?.shipmentId ?? null
+  );
+}
+
+/** A lot as step 1's admission reads it, from the rows (Rule 5.1). */
+export function shipmentLotFacts(
+  ctx: RequestContext,
+  lot: Lot,
+  exceptShipmentId: Uuid | null,
+): ShipmentLotFacts {
+  const allocatedTo = lotShipmentId(ctx, lot);
+  const other =
+    allocatedTo === null || allocatedTo === exceptShipmentId
+      ? null
+      : (store()
+          .shipments.all()
+          .find((row) => row.id === allocatedTo) ?? null);
+  return {
+    id: lot.id,
+    organizationId: lot.organizationId,
+    lotCode: lot.lotCode,
+    status: lot.status,
+    members: lotMembers(ctx, lot.id).map((container) =>
+      shipmentContainerFacts(ctx, container, exceptShipmentId),
+    ),
+    onOtherOpenShipment:
+      other === null ? null : { shipmentNumber: other.shipmentNumber },
+  };
+}
+
+/** The lots a shipment carries whole: allocated, with their containers on it. */
+function lotsOn(ctx: RequestContext, shipmentId: Uuid): Lot[] {
+  return store()
+    .lots.all()
+    .filter(
+      (lot) =>
+        lot.organizationId === ctx.organizationId &&
+        lotShipmentId(ctx, lot) === shipmentId,
+    );
 }
 
 function siteOf(container: Container) {
@@ -437,12 +508,22 @@ export async function assemble(
 
   const transport = trimmedTransport(input.transport);
   requireTransportDetails(ctx, transport);
-  const containerIds = unique(input.containerIds);
+  const lotIds = unique(input.lotIds);
+  const s = store();
+  const lots: Lot[] = [];
+  for (const id of lotIds) {
+    lots.push(await s.lots.getOrThrow(ctx, id));
+  }
+  // A lot ships as its containers (Rule 5.1): the shipment's containers are
+  // the ones chosen alone and every member of every lot chosen whole.
+  const containerIds = unique([
+    ...input.containerIds,
+    ...lots.flatMap((lot) => lotMembers(ctx, lot.id).map((row) => row.id)),
+  ]);
   if (containerIds.length === 0) {
-    refuseAdmission(ctx, "Choose at least one container to ship.");
+    refuseAdmission(ctx, "Choose at least one lot or container to ship.");
   }
 
-  const s = store();
   const containers: Container[] = [];
   for (const id of containerIds) {
     containers.push(await s.containers.getOrThrow(ctx, id));
@@ -461,7 +542,15 @@ export async function assemble(
     organizationId: ctx.organizationId,
     transportMode: transport.transportMode,
     origin: first === undefined ? null : siteOf(first),
+    shippingLotIds: lotIds,
   };
+  for (const lot of lots) {
+    const admission = admitLotToShipment(
+      shipmentLotFacts(ctx, lot, null),
+      target,
+    );
+    if (!admission.ok) refuseAdmission(ctx, admission.message);
+  }
   for (const container of containers) {
     const admission = admitContainerToShipment(
       shipmentContainerFacts(ctx, container, null),
@@ -501,6 +590,12 @@ export async function assemble(
         updatedBy: ctx.userId,
       });
     }
+    // T-25 — a lot added to a shipment being built is allocated.
+    for (const lot of lots) {
+      await moveLotStatus(ctx, lot, "allocated", input.at, input.attribution, {
+        shipmentId: shipment.id,
+      });
+    }
     await audit(ctx, input.at, input.attribution, {
       eventType: "shipment.created",
       entityTable: "shipment",
@@ -511,6 +606,7 @@ export async function assemble(
         status: shipment.status,
         transportMode: shipment.transportMode,
         containerIds,
+        lotIds,
         destinationFacilityName: shipment.destinationFacilityName,
         carrierName: shipment.carrierName,
       },
@@ -627,13 +723,30 @@ export async function changeContents(
 
   const current = containersOf(ctx, shipment.id);
   const currentIds = current.map((container) => container.id);
-  const nextIds = unique(input.containerIds);
+  const currentLots = lotsOn(ctx, shipment.id);
+  const currentLotIds = currentLots.map((lot) => lot.id);
+  const nextLotIds = unique(input.lotIds);
+  const nextLots: Lot[] = [];
+  for (const id of nextLotIds) {
+    nextLots.push(await s.lots.getOrThrow(ctx, id));
+  }
+  const addedLots = nextLots.filter((lot) => !currentLotIds.includes(lot.id));
+  const removedLots = currentLots.filter((lot) => !nextLotIds.includes(lot.id));
+  const nextIds = unique([
+    ...input.containerIds,
+    ...nextLots.flatMap((lot) => lotMembers(ctx, lot.id).map((row) => row.id)),
+  ]);
   const added = nextIds.filter((id) => !currentIds.includes(id));
   const removed = currentIds.filter((id) => !nextIds.includes(id));
-  if (added.length === 0 && removed.length === 0) {
+  if (
+    added.length === 0 &&
+    removed.length === 0 &&
+    addedLots.length === 0 &&
+    removedLots.length === 0
+  ) {
     throw new ValidationError({
       userMessage:
-        "Nothing changed. The shipment holds those containers already.",
+        "Nothing changed. The shipment holds those lots and containers already.",
       correlationId: ctx.correlationId,
       field: "containerIds",
     });
@@ -682,7 +795,15 @@ export async function changeContents(
     organizationId: ctx.organizationId,
     transportMode: shipment.transportMode,
     origin: anchor === undefined ? null : siteOf(anchor),
+    shippingLotIds: nextLotIds,
   };
+  for (const lot of addedLots) {
+    const admission = admitLotToShipment(
+      shipmentLotFacts(ctx, lot, shipment.id),
+      target,
+    );
+    if (!admission.ok) refuseAdmission(ctx, admission.message);
+  }
   for (const container of addedContainers) {
     const admission = admitContainerToShipment(
       shipmentContainerFacts(ctx, container, shipment.id),
@@ -706,12 +827,25 @@ export async function changeContents(
         updatedBy: ctx.userId,
       });
     }
+    // T-25 — a lot the shipment lets go returns to closed; one it takes is allocated.
+    for (const lot of removedLots) {
+      await moveLotStatus(ctx, lot, "closed", input.at, input.attribution, {
+        releasedFromShipmentId: shipment.id,
+      });
+    }
+    for (const lot of addedLots) {
+      await moveLotStatus(ctx, lot, "allocated", input.at, input.attribution, {
+        shipmentId: shipment.id,
+      });
+    }
 
     let voidedDocumentRenderId: Uuid | null = null;
     let status = shipment.status;
     const change: JsonObject = {
       addedContainerIds: added,
       removedContainerIds: removed,
+      addedLotIds: addedLots.map((lot) => lot.id),
+      removedLotIds: removedLots.map((lot) => lot.id),
     };
     if (voids && issued !== null) {
       // Rule 5.13 — void immediately; Rule 5.14 — retained in full, marked,
@@ -741,6 +875,8 @@ export async function changeContents(
       shipment: updated,
       addedContainerIds: added,
       removedContainerIds: removed,
+      addedLotIds: addedLots.map((lot) => lot.id),
+      removedLotIds: removedLots.map((lot) => lot.id),
       voidedDocumentRenderId,
     };
   });
@@ -1376,6 +1512,12 @@ export async function recordDeparture(
         beforeState: { status: record.status },
         afterState: { status: "shipped", shipmentId: shipment.id },
         changedFields: ["status"],
+      });
+    }
+    // T-25 — a lot that left whole is shipped, which is final.
+    for (const lot of lotsOn(ctx, shipment.id)) {
+      await moveLotStatus(ctx, lot, "shipped", at, input.attribution, {
+        shipmentId: shipment.id,
       });
     }
     // TODO(T-16): Flow B4 writes a storage_event for departure, and T-16 has

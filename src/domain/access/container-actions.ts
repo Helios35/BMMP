@@ -43,6 +43,13 @@ export const CONTAINER_ACTIONS = [
    * gated: it is reading a document (Rule 5.27).
    */
   "generate_label",
+  /**
+   * Create, close, reopen or dissolve a lot, and move a container in or out of
+   * one — T-25's "assigned by P1 or P6". Not a §5.5 row: a lot has no route
+   * of its own, and its controls live on `/containers` and `/containers/[id]`
+   * (owner's call in `b1a-08`).
+   */
+  "manage_lot",
 ] as const;
 
 export type ContainerAction = (typeof CONTAINER_ACTIONS)[number];
@@ -61,6 +68,7 @@ const WRITE_SET: Readonly<Record<ContainerRole, readonly ContainerAction[]>> = {
     "mark_ready_to_ship",
     "ship_this_container",
     "generate_label",
+    "manage_lot",
   ],
   facility_manager: [
     "create",

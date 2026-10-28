@@ -727,6 +727,7 @@ describe("intake confirmation", () => {
         joinStorageClockId: null,
         storageEvent: null,
         containerAccumulationStartedAt: null,
+        lot: null,
         auditEvents: [],
       }),
     ).rejects.toThrow(ValidationError);

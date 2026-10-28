@@ -421,7 +421,12 @@ describe("a contents change voids an issued paper and keeps it (Rules 5.13–5.1
     await expect(
       changeShipmentContents(
         HANDLER,
-        { shipmentId: shipment.id, containerIds: [first.id], reason: null },
+        {
+          shipmentId: shipment.id,
+          containerIds: [first.id],
+          lotIds: [],
+          reason: null,
+        },
         LATER,
         NO_ATTRIBUTION,
       ),
@@ -432,6 +437,7 @@ describe("a contents change voids an issued paper and keeps it (Rules 5.13–5.1
       {
         shipmentId: shipment.id,
         containerIds: [first.id],
+        lotIds: [],
         reason: "One drum pulled off the truck at the dock.",
       },
       LATER,

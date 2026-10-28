@@ -204,11 +204,23 @@ export interface IntakeDraft {
   readonly condition: DraftCondition | null;
   readonly stateOfCharge: DraftStateOfCharge | null;
   readonly containerId: Uuid | null;
+  /**
+   * Step A4's lot (`SITE_ARCHITECTURE.md` A4): the chosen container joins an
+   * open lot, or opens a new one, when the record commits. Absent or `null`
+   * leaves the container's grouping as it is. Optional so a draft written
+   * before lots — every fixture draft — reads as no choice.
+   */
+  readonly lotChoice?: DraftLotChoice | null;
   readonly sourceDevice: DraftSourceDevice | null;
   readonly labelPhotoId: Uuid | null;
   readonly labelCropId: Uuid | null;
   readonly extractionRunId: Uuid | null;
 }
+
+/** Join an open lot, or open a new one — a lot holds containers (`ERD.md` §6.2). */
+export type DraftLotChoice =
+  | { readonly kind: "join"; readonly lotId: Uuid }
+  | { readonly kind: "open"; readonly description: string | null };
 
 /**
  * Both the original photo and its label crop — **APPEND-ONLY**.

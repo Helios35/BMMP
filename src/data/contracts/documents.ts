@@ -209,8 +209,11 @@ export interface ShipmentRepository extends Repository<
   ): Promise<Shipment>;
 
   /**
-   * **Assemble a shipment** from containers, with its transport details — one
-   * operation, all or nothing (Flow B1–B2).
+   * **Assemble a shipment** from containers and lots, with its transport
+   * details — one operation, all or nothing (Flow B1–B2; Rule 5.1). A lot
+   * ships as its containers (`admitLotToShipment`): every member is linked
+   * by `container.shipment_id`, the only membership link, and the lot moves
+   * to T-25 `allocated` (`lot.status_changed`).
    *
    * The adapter re-runs step 1's refusals on every container
    * (`admitContainerToShipment`: Rules 4.19, 4.22, 5.2, 5.24, 5.25, 6.1, 6.13)
@@ -223,7 +226,8 @@ export interface ShipmentRepository extends Repository<
   assemble(ctx: RequestContext, input: ShipmentAssembly): Promise<Shipment>;
 
   /**
-   * Replace a shipment's containers before departure. **Where a shipping paper
+   * Replace a shipment's containers and lots before departure — a lot
+   * removed returns to T-25 `closed`, one added to `allocated`. **Where a shipping paper
    * is issued, the change voids it immediately** (Rule 5.13): the render is
    * kept and marked void with the reason and the actor (Rule 5.14,
    * `document_render.voided`), and the shipment returns to `draft` for
@@ -324,7 +328,10 @@ export interface ShipmentTransportDetails {
 }
 
 export interface ShipmentAssembly {
+  /** Containers chosen on their own — a single battery ships as its container. */
   readonly containerIds: readonly Uuid[];
+  /** Lots chosen whole (Rule 5.1). Their containers join with them. */
+  readonly lotIds: readonly Uuid[];
   readonly transport: ShipmentTransportDetails;
   readonly at: IsoTimestamp;
   readonly attribution: StorageWriteAttribution;
@@ -332,8 +339,10 @@ export interface ShipmentAssembly {
 
 export interface ShipmentContentsChange {
   readonly shipmentId: Uuid;
-  /** The shipment's containers after the change — the whole set, not a delta. */
+  /** The shipment's containers chosen on their own after the change — the whole set, not a delta. */
   readonly containerIds: readonly Uuid[];
+  /** The shipment's lots after the change — the whole set. */
+  readonly lotIds: readonly Uuid[];
   /**
    * Why. **Required where the change voids an issued paper** — a void
    * records its reason and its actor (Rule 5.14).
@@ -347,6 +356,8 @@ export interface ShipmentContentsChangeResult {
   readonly shipment: Shipment;
   readonly addedContainerIds: readonly Uuid[];
   readonly removedContainerIds: readonly Uuid[];
+  readonly addedLotIds: readonly Uuid[];
+  readonly removedLotIds: readonly Uuid[];
   /** The render this change voided, where a paper was issued (Rule 5.13). */
   readonly voidedDocumentRenderId: Uuid | null;
 }
