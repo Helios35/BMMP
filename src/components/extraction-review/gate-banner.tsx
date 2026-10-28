@@ -13,8 +13,13 @@ import {
 } from "@/domain/taxonomy/review-reason-code";
 import { cn } from "@/lib/utils";
 import {
+  CATALOG_SAYS,
   DUPLICATE_PHOTO_AFTER,
   DUPLICATE_PHOTO_BEFORE,
+  LABEL_CATALOG_ENTRY,
+  LABEL_CATALOG_FIELD,
+  LABEL_CATALOG_INTRO,
+  LABEL_SAYS,
   needsReviewTitle,
   NEEDS_REVIEW_TITLE_NO_FIELDS,
   RESOLVE_NOW,
@@ -26,7 +31,11 @@ import {
   ReviewButton,
   useActionCall,
 } from "./review-controls";
-import type { ExtractionReviewActions, ExtractionReviewGate } from "./types";
+import type {
+  ExtractionReviewActions,
+  ExtractionReviewGate,
+  LabelCatalogDisagreementView,
+} from "./types";
 
 /**
  * `GateBanner` — `UX_SPEC.md` §2.1.4(5); Rule 2.14; D-20.
@@ -107,6 +116,11 @@ export function GateBanner({
             ))}
           </ul>
         )}
+        {gate.labelCatalog === undefined ||
+        gate.labelCatalog === null ||
+        gate.labelCatalog.rows.length === 0 ? null : (
+          <LabelCatalogDisagreement view={gate.labelCatalog} />
+        )}
         {reasons.length === 0 ? null : (
           <ul data-gate-reasons="true" className="flex flex-wrap gap-2">
             {reasons.map((reason) => (
@@ -151,5 +165,69 @@ export function GateBanner({
         )}
       </AlertDescription>
     </Alert>
+  );
+}
+
+/**
+ * Rule 2.35 — **Label says / Catalog says**, one row per disagreeing field,
+ * the entry linked so the person can read the whole of it. A table because
+ * the two values are read against each other; no colour, no ranking and no
+ * figure beyond the two values themselves.
+ */
+function LabelCatalogDisagreement({
+  view,
+}: {
+  readonly view: LabelCatalogDisagreementView;
+}): ReactElement {
+  return (
+    <div data-label-catalog="true" className="grid gap-2">
+      <p className="max-w-[72ch] text-body">{LABEL_CATALOG_INTRO}</p>
+      <p className="text-body">
+        {`${LABEL_CATALOG_ENTRY}: `}
+        <Link
+          href={view.entryHref}
+          data-label-catalog-entry="true"
+          className="underline underline-offset-4"
+        >
+          {view.entryTitle}
+        </Link>
+      </p>
+      <table className="w-full max-w-[72ch] text-left text-body">
+        <thead>
+          <tr>
+            <th scope="col" className="pr-4 text-caption">
+              {LABEL_CATALOG_FIELD}
+            </th>
+            <th scope="col" className="pr-4 text-caption">
+              {LABEL_SAYS}
+            </th>
+            <th scope="col" className="text-caption">
+              {CATALOG_SAYS}
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {view.rows.map((row) => (
+            <tr key={row.fieldCode} data-label-catalog-field={row.fieldCode}>
+              <th scope="row" className="pr-4 align-top text-body-strong">
+                {row.fieldLabel}
+              </th>
+              <td
+                data-label-says="true"
+                className="pr-4 align-top font-mono break-all"
+              >
+                {row.labelSays}
+              </td>
+              <td
+                data-catalog-says="true"
+                className="align-top font-mono break-all"
+              >
+                {row.catalogSays}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }

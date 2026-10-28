@@ -1,5 +1,6 @@
 import type {
   CatalogCandidateView,
+  LabelCatalogDisagreementView,
   ReviewCardState,
 } from "@/components/extraction-review";
 import type { FieldSource } from "@/components/provenance/field-source-badge";
@@ -32,6 +33,13 @@ import type {
   ReviewPlaceholderImage,
 } from "@/features/intake/components/extraction-review-step";
 import type { ExistingIntakePhoto } from "@/features/intake/components/photo-capture-step";
+import type { LotPlacementView } from "@/features/intake/components/lot-choice-form";
+import { LOT_STATUS_LABELS } from "@/domain/taxonomy/lot-status";
+import {
+  catalogEntryTitle,
+  measurement,
+} from "@/features/catalog/catalog-entry-display";
+import type { LabelCatalogField } from "@/domain/catalog/label-catalog-check";
 import type { IsoTimestamp } from "@/types/common";
 import type { IntakePhoto } from "@/types/intake";
 
@@ -102,6 +110,57 @@ function candidateViews(view: IntakeStepView): readonly CatalogCandidateView[] {
       },
     ];
   });
+}
+
+/** The catalog side in the column's own unit, exactly as stored. */
+function catalogValueText(fieldCode: LabelCatalogField, value: string): string {
+  switch (fieldCode) {
+    case "voltage":
+      return measurement(value, "V") ?? value;
+    case "capacity_ah":
+      return measurement(value, "Ah") ?? value;
+    case "energy_wh":
+      return measurement(value, "Wh") ?? value;
+    case "chemistry_code": {
+      const chemistry = readTaxonomyValue(CHEMISTRIES, CHEMISTRY_LABELS, value);
+      return chemistry.recognised ? chemistry.label : chemistry.storedValue;
+    }
+    default:
+      return value;
+  }
+}
+
+/**
+ * Rule 2.35 — the side-by-side rows, shown only while the session carries
+ * T-52 `label_catalog_mismatch` and the matched entry still disagrees. A
+ * reason to look, so the card never shows it as anything but two values.
+ */
+function labelCatalogView(
+  view: IntakeStepView,
+): LabelCatalogDisagreementView | null {
+  const check = view.labelCatalog;
+  if (check === null) return null;
+  if (
+    !(view.session.reviewReasonCodes ?? []).includes("label_catalog_mismatch")
+  )
+    return null;
+  if (check.comparison.disagreements.length === 0) return null;
+  return {
+    entryTitle: catalogEntryTitle(check.entry),
+    entryHref: `/catalog/${check.entry.id}`,
+    rows: check.comparison.disagreements.map((disagreement) => ({
+      fieldCode: disagreement.fieldCode,
+      fieldLabel: LABEL_FIELD_CODE_LABELS[disagreement.fieldCode],
+      labelSays:
+        disagreement.fieldCode === "chemistry_code"
+          ? catalogValueText("chemistry_code", disagreement.labelSays)
+          : disagreement.labelSays,
+      catalogSays: catalogValueText(
+        disagreement.fieldCode,
+        disagreement.catalogSays,
+      ),
+    })),
+  };
 }
 
 function isHardGated(fieldCode: LabelFieldCode): boolean {
@@ -181,6 +240,7 @@ export function reviewCardView(view: IntakeStepView): ReviewCardView {
         recordNumber: record.recordNumber,
         href: `/batteries/${record.id}`,
       })),
+      labelCatalog: labelCatalogView(view),
     },
     fields: view.fields,
     candidates,
@@ -325,6 +385,25 @@ export function containerRows(
       };
     },
   );
+}
+
+/** Step A4's lot, from the open lots and the chosen container's own. */
+export function lotPlacementView(view: IntakeStepView): LotPlacementView {
+  const container = view.placementPreview.chosen?.container ?? null;
+  const own = view.lots.ofChosenContainer;
+  return {
+    containerCode: container?.containerCode ?? null,
+    containerLot:
+      own === null
+        ? null
+        : { lotCode: own.lotCode, statusLabel: LOT_STATUS_LABELS[own.status] },
+    openLots: view.lots.open.map((lot) => ({
+      id: lot.id,
+      lotCode: lot.lotCode,
+      description: lot.description,
+    })),
+    choice: view.draft.lotChoice ?? null,
+  };
 }
 
 export function requiredTypeLabel(view: IntakeStepView): string | null {

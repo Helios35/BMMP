@@ -137,7 +137,12 @@ export const supabaseAdapter: DataAdapter = {
     "recordStorageEvent",
     "changeStatus",
   ]),
-  lots: unimplemented("lots", CRUD),
+  lots: unimplemented("lots", [
+    ...CRUD,
+    "open",
+    "changeMembership",
+    "changeStatus",
+  ]),
   storageClocks: unimplemented("storageClocks", CRUD),
   storageEvents: unimplemented("storageEvents", APPEND_ONLY),
   alerts: unimplemented("alerts", [...CRUD, "raiseIfAbsent"]),

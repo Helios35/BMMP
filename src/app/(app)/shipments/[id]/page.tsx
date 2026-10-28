@@ -42,6 +42,7 @@ import {
 import { readTaxonomyValue } from "@/domain/taxonomy/lookup";
 import { TRANSPORT_MODE_LABELS } from "@/domain/taxonomy/transport-mode";
 import { ReadOnlyBanner } from "@/components/access/read-only-banner";
+import { HardBlockNotice } from "@/components/hard-block/hard-block-notice";
 import { absoluteInstant } from "@/features/battery-record/format-instant";
 import { CopyButton } from "@/features/battery-record/copy-button";
 import { DocumentPanel } from "@/features/documents/document-page";
@@ -69,6 +70,14 @@ import {
   NO_PAPER_BODY,
   NO_PAPER_TITLE,
   NO_RENDERS,
+  DDR_HOLD_CHANGE_CONTENTS,
+  DDR_HOLD_GAP_CITATION,
+  DDR_HOLD_GAP_STATEMENT,
+  DDR_HOLD_GAP_TITLE,
+  DDR_HOLD_MISSING_CITATION,
+  DDR_HOLD_MISSING_STATEMENT,
+  DDR_HOLD_MISSING_TITLE,
+  OPEN_DDR_PACKET,
   OPEN_DOCUMENT,
   PAPER_VOIDED_BODY,
   PAPER_VOIDED_TITLE,
@@ -144,6 +153,15 @@ export default async function ShipmentPage({
     isExportOrPrint: false,
   });
   const open = ["draft", "ready", "documents_issued"].includes(shipment.status);
+  // Rule 6.16; D-71 — once documents are issued, a DDR shipment departs only
+  // with a current packet, and only when every record it lists has a
+  // packaging rule on file. Each hold is stated, never a disabled button.
+  const issued = shipment.status === "documents_issued";
+  const packetIssued = detail.ddrPacket?.status === "issued";
+  const holdsOnMissingPacket =
+    issued && detail.damaged.length > 0 && !packetIssued;
+  const holdsOnPackagingGap = open && detail.ddrPackagingGaps.length > 0;
+  const changeContentsHref = `/shipments/new?shipment=${shipment.id}&step=1`;
 
   return (
     <PageShell>
@@ -223,6 +241,60 @@ export default async function ShipmentPage({
                   {ddrBody(detail.damaged)}
                 </AlertDescription>
               </Alert>
+            ) : null}
+            {holdsOnMissingPacket ? (
+              <HardBlockNotice
+                state="blocked"
+                dataAttribute="ddr-packet-missing"
+                title={DDR_HOLD_MISSING_TITLE}
+                statement={DDR_HOLD_MISSING_STATEMENT}
+                citations={[]}
+                missingCitation={DDR_HOLD_MISSING_CITATION}
+                items={detail.damaged.map((recordNumber) => ({
+                  id: recordNumber,
+                  label: recordNumber,
+                  href: null,
+                  indicators: [],
+                }))}
+                paths={
+                  canWrite
+                    ? [
+                        {
+                          id: "change",
+                          label: DDR_HOLD_CHANGE_CONTENTS,
+                          href: changeContentsHref,
+                        },
+                      ]
+                    : []
+                }
+              />
+            ) : null}
+            {holdsOnPackagingGap ? (
+              <HardBlockNotice
+                state="blocked"
+                dataAttribute="ddr-packaging-gap"
+                title={DDR_HOLD_GAP_TITLE}
+                statement={DDR_HOLD_GAP_STATEMENT}
+                citations={[]}
+                missingCitation={DDR_HOLD_GAP_CITATION}
+                items={detail.ddrPackagingGaps.map((recordNumber) => ({
+                  id: recordNumber,
+                  label: recordNumber,
+                  href: null,
+                  indicators: [],
+                }))}
+                paths={
+                  canWrite
+                    ? [
+                        {
+                          id: "change",
+                          label: DDR_HOLD_CHANGE_CONTENTS,
+                          href: changeContentsHref,
+                        },
+                      ]
+                    : []
+                }
+              />
             ) : null}
             {paperVoided && open ? (
               <Alert
@@ -392,6 +464,21 @@ async function PaperTab({
             {OPEN_DOCUMENT}
           </Link>
         </Button>
+        {detail.ddrPacket === null ? null : (
+          <Button
+            asChild
+            variant="outline"
+            size="lg"
+            className={cn(ACTION_BUTTON_CLASS, "ml-2")}
+          >
+            <Link
+              href={`/documents/${detail.ddrPacket.id}`}
+              data-open-ddr-packet={detail.ddrPacket.status}
+            >
+              {OPEN_DDR_PACKET}
+            </Link>
+          </Button>
+        )}
       </div>
       <DocumentPanel view={view} embedded />
       {earlier.length === 0 ? null : (
@@ -440,10 +527,11 @@ function ContentsTab({
     >
       <SectionCard title={CONTENTS_CONTAINERS}>
         <ul className="grid gap-2">
-          {detail.scope.map(({ container, records }) => (
+          {detail.scope.map(({ container, records, lot }) => (
             <li
               key={container.id}
               data-shipment-container={container.containerCode}
+              data-shipment-container-lot={lot?.lotCode ?? undefined}
               className="flex flex-col gap-1"
             >
               {canOpenContainer ? (
@@ -459,7 +547,12 @@ function ContentsTab({
                 </span>
               )}
               <span className="text-caption text-muted-foreground">
-                {`${CONTAINER_TYPE_LABELS[container.containerType]} · ${records.length} ${records.length === 1 ? "record" : "records"}`}
+                {[
+                  CONTAINER_TYPE_LABELS[container.containerType],
+                  `${records.length} ${records.length === 1 ? "record" : "records"}`,
+                  // Rule 5.1 — a container that travels as part of a lot says which.
+                  ...(lot === null ? [] : [`lot ${lot.lotCode}`]),
+                ].join(" · ")}
               </span>
             </li>
           ))}

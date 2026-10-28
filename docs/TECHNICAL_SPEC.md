@@ -572,8 +572,7 @@ Named, grouped by feature. Each has a Zod schema and a role set; the role set ma
 | `generateContainerLabel` | containers | Renders the label, appends `container_label` + `document_render` (§8). | P1, P2, P6 |
 | `createLot`, `updateLot` | lots | Groups containers for handling and reporting. | P1, P2, P6 |
 | `createShipment`, `addContainersToShipment` | shipments | Builds a shipment. Selecting a lot in the UI adds its containers — shipment membership has exactly one storage path (§3.2, `ERD.md` §4). | P1, P6 |
-| `generateShippingPaper` | shipments | Renders the shipping paper with emergency response information and the 24-hour number (§8.3). | P1, P6 |
-| `offerShipment` | shipments | `shipments.offer()`. Refuses without a successful render; the database refuses too (§10.4). | P1, P6 |
+| `generateShippingPaper` | shipments | Renders the shipping paper with emergency response information and the 24-hour number (§8.3). **Issuing is the act that offers the shipment** — it stamps `offered_at` in the same operation, so there is no separate offer action. Refuses without a successful render; the database refuses too (§10.4). | P1, P6 |
 | `recordDamageAssessment` | condition | Appends `damage_assessment`; may set `ddr_flags` and `is_air_transport_prohibited` (`BUSINESS_RULES.md` §6). | P1, P2, P6 |
 | `updateOrganizationProfile` | settings | Org profile, jurisdiction profile, emergency-response defaults. | P2, P6 |
 | `inviteMember`, `changeMemberRole`, `revokeMembership` | settings | Membership lifecycle. Cannot grant a role above the caller's own. | P2, P6 |

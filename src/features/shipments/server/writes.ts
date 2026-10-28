@@ -2,6 +2,7 @@ import "server-only";
 
 import { data } from "@/data";
 import type {
+  DdrPacketIssue,
   IssuedShippingPaper,
   RequestContext,
   ShipmentContentsChangeResult,
@@ -10,8 +11,10 @@ import type {
   StorageWriteAttribution,
   VoidedShippingPaper,
 } from "@/data/contracts";
+import type { DdrPacketBuild } from "@/domain/transport/ddr-packet";
 import { preDocumentStatus } from "@/domain/transport/shipping-paper";
 import {
+  composeDdrPacket,
   composeShippingPaper,
   composeShippingPaperDraft,
 } from "@/features/documents/server/compose";
@@ -24,6 +27,7 @@ import { DRAFT_DETAIL, PAPER_GAP } from "../shipment-copy";
 
 import {
   activeOrganization,
+  readDdrPacketBuild,
   readShippingPaperBuild,
   resolveTransportRules,
   shipmentContainers,
@@ -81,6 +85,8 @@ export async function assembleShipment(
   ctx: RequestContext,
   input: {
     readonly containerIds: readonly Uuid[];
+    /** Lots chosen whole (Rule 5.1). Omitted means none. */
+    readonly lotIds?: readonly Uuid[];
     readonly transport: ShipmentTransportDetails;
   },
   at: IsoTimestamp,
@@ -88,6 +94,7 @@ export async function assembleShipment(
 ): Promise<Shipment> {
   const shipment = await data.shipments.assemble(ctx, {
     containerIds: input.containerIds,
+    lotIds: input.lotIds ?? [],
     transport: input.transport,
     at,
     attribution,
@@ -100,6 +107,7 @@ export async function changeShipmentContents(
   input: {
     readonly shipmentId: Uuid;
     readonly containerIds: readonly Uuid[];
+    readonly lotIds: readonly Uuid[];
     readonly reason: string | null;
   },
   at: IsoTimestamp,
@@ -108,6 +116,7 @@ export async function changeShipmentContents(
   const result = await data.shipments.changeContents(ctx, {
     shipmentId: input.shipmentId,
     containerIds: input.containerIds,
+    lotIds: input.lotIds,
     reason: input.reason,
     at,
     attribution,
@@ -152,11 +161,8 @@ export async function generateShippingPaper(
   attribution: StorageWriteAttribution,
 ): Promise<IssuedShippingPaper> {
   const shipment = await shipmentOrThrow(ctx, shipmentId);
-  const { build, organization, rules } = await readShippingPaperBuild(
-    ctx,
-    shipment,
-    at,
-  );
+  const read = await readShippingPaperBuild(ctx, shipment, at);
+  const { build, organization, rules } = read;
   if (build.kind !== "complete") {
     const count = build.checklist.unmet.length;
     throw new ValidationError({
@@ -177,9 +183,21 @@ export async function generateShippingPaper(
       shipperName: shipperName(organization),
       timeZone: rules.timeZone,
     }),
+    // Rule 6.16 — the packet travels in the same operation wherever a record
+    // on the DDR path is on the shipment. With no packaging rule in force
+    // none can be built, and departure refuses on the missing packet.
+    ddrPacket: ddrPacketIssue(await readDdrPacketBuild(ctx, read)),
     at,
     attribution,
   });
+}
+
+function ddrPacketIssue(build: DdrPacketBuild): DdrPacketIssue | null {
+  if (build.kind !== "packet") return null;
+  return {
+    packet: build.outcome,
+    compose: composeDdrPacket({ content: build.outcome }),
+  };
 }
 
 /**

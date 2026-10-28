@@ -35,6 +35,7 @@ import type {
   User,
 } from "@/types/tenancy";
 import type { AppliedRuleVersion } from "@/domain/rules/outcome";
+import * as B1A_08 from "./b1a-08";
 import * as ID from "./ids";
 import { INVITE_TOKEN_HASHES } from "./invite-tokens";
 
@@ -114,6 +115,8 @@ const STAYS_IN_FORCE = "2099-12-31T23:59:59.000Z";
 
 /** When the two rule versions b1a-06 adds were authored and published. */
 const RULES_AUTHORED_B1A_06 = "2026-10-09T00:00:00.000Z";
+/** When planning authored the DDR packaging rule (`SPEC_ddr-packaging-rule-data_2026-10-22.md`). */
+const RULES_AUTHORED_B1A_08 = "2026-10-22T00:00:00.000Z";
 
 /** The Washington accumulation-period rule as it applied to the running clocks. */
 const WA_ACCUMULATION_APPLIED: AppliedRuleVersion = {
@@ -961,6 +964,24 @@ export const jurisdictionRules: readonly JurisdictionRule[] = [
     createdBy: ID.USER.platformAdmin,
     updatedBy: ID.USER.platformAdmin,
   },
+  // Added in b1a-08, never edited into an existing row — planning's
+  // SPEC_ddr-packaging-rule-data_2026-10-22.md (Rule 6.15, D-71). Beside
+  // transport.basic_description, on the same jurisdiction.
+  {
+    id: ID.JURISDICTION_RULE.federalDdrPackaging,
+    jurisdictionId: ID.JURISDICTION.federal,
+    ruleKey: "transport.ddr_packaging",
+    domain: "transport",
+    title: "Damaged/defective packaging and marking",
+    description:
+      "How a damaged, defective or recalled battery is packed and marked for transport, by chemistry family, and the air prohibition.",
+    appliesToApplicationClasses: null,
+    isActive: true,
+    createdAt: RULES_AUTHORED_B1A_08,
+    updatedAt: RULES_AUTHORED_B1A_08,
+    createdBy: ID.USER.platformAdmin,
+    updatedBy: ID.USER.platformAdmin,
+  },
   // Added in b1a-06 — the owner's call: the label wording is rule data (Rule 4.18).
   {
     id: ID.JURISDICTION_RULE.waContainerLabel,
@@ -1146,6 +1167,86 @@ export const ruleVersions: readonly RuleVersion[] = [
     publishedAt: RULES_AUTHORED_B1A_06,
     publishedBy: ID.USER.platformAdmin,
     createdAt: RULES_AUTHORED_B1A_06,
+    createdBy: ID.USER.platformAdmin,
+  },
+  {
+    // Authored by planning in SPEC_ddr-packaging-rule-data_2026-10-22.md
+    // (Rule 6.15; D-58 #5, #12; D-71). Every item carries its own citation and
+    // the packet prints each beside it (Rule 12.15). Lithium ion and lithium
+    // metal only: federal DDR packaging covers lithium, and a chemistry with
+    // no family here has no rule on file. The packing level is not on file
+    // (D-58 #12) and the packet says so. The air block cites the same row.
+    id: ID.RULE_VERSION.federalDdrPackaging2026,
+    jurisdictionRuleId: ID.JURISDICTION_RULE.federalDdrPackaging,
+    versionLabel: "2026",
+    effectiveOn: "2026-01-01",
+    expiresOn: null,
+    citation: "49 CFR 173.185(f)",
+    citationUrl: null,
+    sourceDocumentRef: "SPEC_ddr-packaging-rule-data_2026-10-22.md",
+    payload: {
+      families: [
+        {
+          familyKey: "lithium_ion",
+          chemistries: [
+            "li_nmc",
+            "li_nca",
+            "li_lfp",
+            "li_lco",
+            "li_lmo",
+            "li_lto",
+            "li_ion_unspecified",
+          ],
+          markingText: "Damaged/defective lithium ion battery",
+        },
+        {
+          familyKey: "lithium_metal",
+          chemistries: ["lithium_metal"],
+          markingText: "Damaged/defective lithium metal battery",
+        },
+      ],
+      packaging: [
+        {
+          item: "Inner packaging",
+          requirement:
+            "Each battery in its own non-metallic inner packaging that completely encloses it",
+          citation: "49 CFR 173.185(f)(1)",
+        },
+        {
+          item: "Cushioning",
+          requirement:
+            "The inner packaging is surrounded by cushioning that is non-combustible and non-conductive",
+          citation: "49 CFR 173.185(f)(2)",
+        },
+        {
+          item: "Per package",
+          requirement:
+            "One battery per inner packaging, one inner packaging per outer packaging",
+          citation: "49 CFR 173.185(f); PHMSA DDR brochure (Mar 2023)",
+        },
+        {
+          item: "Outer packaging",
+          requirement: "Outer packaging meeting 49 CFR 173.185(f)(3)",
+          citation: "49 CFR 173.185(f)(3)",
+        },
+      ],
+      packingLevel: null,
+      marking: {
+        citation: "49 CFR 173.185(f)(4)",
+        minimumHeight: "12 mm (0.47 in)",
+        minimumHeightCitation: "49 CFR 173.185(f)(4)",
+      },
+      air: {
+        requirement: "Forbidden",
+        citation: "49 CFR 173.185(f)",
+      },
+    },
+    payloadSchemaKey: "transport.ddr_packaging.v1",
+    supersedesRuleVersionId: null,
+    status: "active",
+    publishedAt: RULES_AUTHORED_B1A_08,
+    publishedBy: ID.USER.platformAdmin,
+    createdAt: RULES_AUTHORED_B1A_08,
     createdBy: ID.USER.platformAdmin,
   },
 ];
@@ -1759,6 +1860,8 @@ export const batteryRecords: readonly BatteryRecord[] = [
     createdBy: ID.USER.joRainierHandler,
     updatedBy: ID.USER.joRainierHandler,
   },
+  // Added by b1a-08 — never an edit to a row above (STATE §7.1).
+  ...B1A_08.batteryRecords,
 ];
 
 // ---------------------------------------------------------------------------
@@ -1844,6 +1947,8 @@ export const intakeSessions: readonly IntakeSession[] = [
     createdAt: T.spreadIntake,
     updatedAt: T.spreadIntake,
   },
+  // Added by b1a-08 — never an edit to a row above (STATE §7.1).
+  ...B1A_08.intakeSessions,
 ];
 
 export const intakePhotos: readonly IntakePhoto[] = [
@@ -2017,6 +2122,8 @@ export const intakePhotos: readonly IntakePhoto[] = [
     takenBy: ID.USER.danaHandler,
     createdAt: T.swollenIntake,
   },
+  // Added by b1a-08 — never an edit to a row above (STATE §7.1).
+  ...B1A_08.intakePhotos,
 ];
 
 const BAND_CUTOFFS = { high: 0.9, medium: 0.7, low: 0.4 } as const;
@@ -2217,6 +2324,8 @@ export const labelExtractions: readonly LabelExtraction[] = [
     rawText: null,
     createdAt: T.spreadIntake,
   }),
+  // Added by b1a-08 — never an edit to a row above (STATE §7.1).
+  ...B1A_08.labelExtractions,
 ];
 
 export const dateCodeDecodes: readonly DateCodeDecode[] = [
@@ -2335,6 +2444,8 @@ export const containers: readonly Container[] = [
     createdBy: ID.USER.danaHandler,
     updatedBy: null,
   },
+  // Added by b1a-08 — never an edit to a row above (STATE §7.1).
+  ...B1A_08.containers,
 ];
 
 export const lots: readonly Lot[] = [
@@ -2352,6 +2463,8 @@ export const lots: readonly Lot[] = [
     createdBy: ID.USER.danaHandler,
     updatedBy: ID.USER.danaHandler,
   },
+  // Added by b1a-08 — never an edit to a row above (STATE §7.1).
+  ...B1A_08.lots,
 ];
 
 export const storageClocks: readonly StorageClock[] = [
@@ -2435,6 +2548,8 @@ export const storageClocks: readonly StorageClock[] = [
     createdAt: T.overdueAccumulationStart,
     updatedAt: "2026-06-12T07:00:00.000Z",
   },
+  // Added by b1a-08 — never an edit to a row above (STATE §7.1).
+  ...B1A_08.storageClocks,
 ];
 
 export const storageEvents: readonly StorageEvent[] = [
@@ -2498,6 +2613,8 @@ export const storageEvents: readonly StorageEvent[] = [
     governingRuleVersionId: null,
     createdAt: "2026-08-05T16:04:00.000Z",
   },
+  // Added by b1a-08 — never an edit to a row above (STATE §7.1).
+  ...B1A_08.storageEvents,
 ];
 
 export const alerts: readonly Alert[] = [
@@ -2709,6 +2826,8 @@ export const classificationDecisions: readonly ClassificationDecision[] = [
     supersedesClassificationDecisionId: null,
     createdAt: T.scuffedIntake,
   },
+  // Added by b1a-08 — never an edit to a row above (STATE §7.1).
+  ...B1A_08.classificationDecisions,
 ];
 
 export const documentRenders: readonly DocumentRender[] = [
@@ -2866,6 +2985,8 @@ export const shipments: readonly Shipment[] = [
     createdBy: ID.USER.danaHandler,
     updatedBy: ID.USER.danaHandler,
   },
+  // Added by b1a-08 — never an edit to a row above (STATE §7.1).
+  ...B1A_08.shipments,
 ];
 
 export const shippingPapers: readonly ShippingPaper[] = [
@@ -3024,6 +3145,8 @@ export const damageAssessments: readonly DamageAssessment[] = [
     supersedesDamageAssessmentId: null,
     createdAt: T.swollenIntake,
   },
+  // Added by b1a-08 — never an edit to a row above (STATE §7.1).
+  ...B1A_08.damageAssessments,
 ];
 
 // ---------------------------------------------------------------------------
@@ -3129,4 +3252,6 @@ export const auditEvents: readonly AuditEvent[] = [
     reason: null,
     createdAt: T.julyShipped,
   },
+  // Added by b1a-08 — never an edit to a row above (STATE §7.1).
+  ...B1A_08.auditEvents,
 ];

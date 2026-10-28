@@ -37,6 +37,8 @@ import type { IsoTimestamp } from "@/types/common";
  */
 
 export const BATTERY_LIST_PATH = "/batteries";
+/** `GET /api/exports/batteries` — the list as CSV (D-50). */
+export const BATTERY_EXPORT_PATH = "/api/exports/batteries";
 
 /** The list page size. The codec offers the larger sizes through `?perPage=`. */
 export const BATTERY_PAGE_SIZE = 25;

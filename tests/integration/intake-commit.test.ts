@@ -256,6 +256,7 @@ function confirmation(
     joinStorageClockId: null,
     storageEvent: null,
     containerAccumulationStartedAt: null,
+    lot: null,
     auditEvents: [
       auditEvent("battery_record.confirmed", "battery_record"),
       auditEvent("damage_assessment.recorded", "damage_assessment"),

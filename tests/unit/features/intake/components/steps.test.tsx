@@ -820,6 +820,12 @@ function placeProps(
       whoCanCreate:
         "A Compliance Handler or a Facility Manager can create one.",
     },
+    lot: {
+      containerCode: "C-0001",
+      containerLot: null,
+      openLots: [],
+      choice: null,
+    },
     classification: { preview: DECIDED, jurisdictionLabel: "Washington" },
     clock: {
       kind: "running",

@@ -13,7 +13,14 @@ import type {
 } from "@/types/documents";
 import type { Organization } from "@/types/tenancy";
 
-import { activeOrganization, shipmentContainers } from "./paper-build";
+import { nowIso } from "@/lib/auth/session";
+
+import {
+  activeOrganization,
+  readDdrPacketBuild,
+  resolveTransportRules,
+  shipmentContainers,
+} from "./paper-build";
 import { readContainerScope, type ScopeContainer } from "./scope";
 
 /**
@@ -52,7 +59,24 @@ export interface ShipmentDetail {
   readonly fullyRegulated: readonly string[];
   /** Records on the damaged, defective or recalled path. */
   readonly damaged: readonly string[];
+  /**
+   * The newest damaged/defective packet (T-38 `ddr_packet`), issued or not,
+   * and the records with no packaging rule on file for their chemistry, on
+   * which departure holds (Rule 6.16; D-71) — the issued packet's list once
+   * one is issued, and until then the packet as it would be built now, so the
+   * hold is stated as soon as it is knowable.
+   */
+  readonly ddrPacket: DocumentRender | null;
+  readonly ddrPackagingGaps: readonly string[];
   readonly timeZone: TimeZone;
+}
+
+/** A string array out of a stored snapshot field, or empty. */
+function snapshotStrings(render: DocumentRender, key: string): string[] {
+  const value = render.inputSnapshot[key];
+  return Array.isArray(value)
+    ? value.filter((entry): entry is string => typeof entry === "string")
+    : [];
 }
 
 export async function readShipment(
@@ -101,6 +125,24 @@ export async function readShipment(
   }
 
   const records = scope.flatMap((entry) => entry.records);
+  const ddrPacket =
+    [...rendersPage.items]
+      .filter((render) => render.documentType === "ddr_packet")
+      .sort((a, b) => b.renderedAt.localeCompare(a.renderedAt))[0] ?? null;
+  const open = ["draft", "ready", "documents_issued"].includes(shipment.status);
+  const preview =
+    open && ddrPacket?.status !== "issued"
+      ? await readDdrPacketBuild(ctx, {
+          shipment,
+          scope,
+          rules: await resolveTransportRules(
+            ctx,
+            organization,
+            containers,
+            nowIso(),
+          ),
+        })
+      : null;
   const names = await resolveUserNames(ctx, [
     ...rendersPage.items.map((render) => render.renderedBy),
     ...(auditEvents ?? []).map((event) => event.actorUserId),
@@ -128,6 +170,13 @@ export async function readShipment(
           record.ddrFlags.length > 0 || record.isAirTransportProhibited,
       )
       .map(({ record }) => record.recordNumber),
+    ddrPacket,
+    ddrPackagingGaps:
+      ddrPacket?.status === "issued"
+        ? snapshotStrings(ddrPacket, "recordsWithoutPackagingRule")
+        : preview?.kind === "packet"
+          ? preview.outcome.result.recordsWithoutPackagingRule
+          : [],
     timeZone: containers[0]?.siteTimeZone ?? organization.timeZone,
   };
 }

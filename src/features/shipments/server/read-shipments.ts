@@ -88,6 +88,44 @@ export async function holdsFullyRegulated(
   return false;
 }
 
+/**
+ * One ledger row, decorated — the counts, the newest paper and the manifest
+ * gap. Shared by `/shipments` and its CSV export, so the file and the screen
+ * cannot disagree about a shipment.
+ */
+export async function shipmentListRow(
+  ctx: RequestContext,
+  shipment: Shipment,
+): Promise<ShipmentListRow> {
+  const containers = await data.containers.list(ctx, {
+    shipmentId: shipment.id,
+    limit: CONTAINER_LIMIT,
+  });
+  const records =
+    containers.items.length === 0
+      ? []
+      : (
+          await data.batteryRecords.list(ctx, {
+            containerIds: containers.items.map((container) => container.id),
+            excludeVoided: true,
+            excludeDrafts: true,
+            limit: RECORD_LIMIT,
+          })
+        ).items;
+  const paper = await newestPaper(ctx, shipment.id);
+  return {
+    shipment,
+    recordCount: records.length,
+    containerCount: containers.items.length,
+    paper: paper.state,
+    paperRender: paper.render,
+    manifestOutstanding: await holdsFullyRegulated(
+      ctx,
+      records.map((record) => record.id),
+    ),
+  };
+}
+
 export async function readShipmentList(
   ctx: RequestContext,
   query: ShipmentQuery & PageRequest,
@@ -96,33 +134,7 @@ export async function readShipmentList(
     const page = await data.shipments.list(ctx, query);
     const rows: ShipmentListRow[] = [];
     for (const shipment of page.items) {
-      const containers = await data.containers.list(ctx, {
-        shipmentId: shipment.id,
-        limit: CONTAINER_LIMIT,
-      });
-      const records =
-        containers.items.length === 0
-          ? []
-          : (
-              await data.batteryRecords.list(ctx, {
-                containerIds: containers.items.map((container) => container.id),
-                excludeVoided: true,
-                excludeDrafts: true,
-                limit: RECORD_LIMIT,
-              })
-            ).items;
-      const paper = await newestPaper(ctx, shipment.id);
-      rows.push({
-        shipment,
-        recordCount: records.length,
-        containerCount: containers.items.length,
-        paper: paper.state,
-        paperRender: paper.render,
-        manifestOutstanding: await holdsFullyRegulated(
-          ctx,
-          records.map((record) => record.id),
-        ),
-      });
+      rows.push(await shipmentListRow(ctx, shipment));
     }
     return { rows, total: page.total };
   } catch (cause) {

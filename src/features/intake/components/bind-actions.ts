@@ -7,6 +7,7 @@ import type { DamageFindingType } from "@/domain/taxonomy/damage-finding-type";
 import type { LabelFieldCode } from "@/domain/taxonomy/label-field-code";
 import {
   advanceToStep,
+  chooseIntakeLot,
   choosePlacement,
   confirmCondition,
   confirmField,
@@ -28,7 +29,11 @@ import {
 } from "@/features/intake/actions";
 import { reviewItemHref } from "@/features/review/review-hrefs";
 import { actionFailed, type ActionResult } from "@/lib/action-result";
-import type { DraftSourceDevice, DraftStateOfCharge } from "@/types/intake";
+import type {
+  DraftLotChoice,
+  DraftSourceDevice,
+  DraftStateOfCharge,
+} from "@/types/intake";
 
 import { intakeStepHref } from "./intake-hrefs";
 
@@ -292,6 +297,10 @@ export interface PlacementActions {
   readonly createContainer: (input: {
     readonly storageLocation: string;
   }) => Promise<ActionResult<{ readonly id: string }>>;
+  /** Step A4's lot; `null` keeps the container's grouping. */
+  readonly chooseLot: (
+    lot: DraftLotChoice | null,
+  ) => Promise<ActionResult<unknown>>;
   /** The commit. On success the action itself redirects to the record. */
   readonly confirmIntake: () => Promise<ActionResult<never>>;
 }
@@ -332,6 +341,7 @@ export function bindPlacementActions(
       write(() => setSourceDevice({ sessionId, sourceDevice: value })),
     choosePlacement: (containerId) =>
       write(() => choosePlacement({ sessionId, containerId })),
+    chooseLot: (lot) => write(() => chooseIntakeLot({ sessionId, lot })),
     createContainer: async (input) => {
       const result = await write(() =>
         createContainerForIntake({

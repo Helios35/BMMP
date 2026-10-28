@@ -11,8 +11,10 @@ import {
   PageHeader,
   PageShell,
 } from "@/components/page";
+import { ExportControl } from "@/components/record-table/export-control";
 import {
   decodeListQuery,
+  exportHref,
   toPageRequest,
 } from "@/components/record-table/list-url";
 import { RecordTable } from "@/components/record-table/record-table";
@@ -28,13 +30,16 @@ import {
   canWriteRoute,
   capabilityFor,
 } from "@/domain/access/route-capability";
+import { mayExportList } from "@/domain/access/export";
 import { APP_ROUTE_NAMES } from "@/domain/access/routes";
 import type { RoleCode } from "@/domain/taxonomy/role";
 import {
+  SHIPMENT_EXPORT_PATH,
   SHIPMENT_LIST_PATH,
   shipmentFilters,
   shipmentListSelection,
   shipmentListSpec,
+  shipmentQueryOf,
 } from "@/features/shipments/list-query";
 import { shipmentColumns } from "@/features/shipments/shipment-columns";
 import {
@@ -84,22 +89,7 @@ export default async function ShipmentsPage({
 
   const result = await readShipmentList(ctx, {
     ...toPageRequest(listQuery),
-    ...(selection.search === undefined ? {} : { search: selection.search }),
-    ...(selection.transportMode === undefined
-      ? {}
-      : { transportMode: selection.transportMode }),
-    ...(selection.destinationFacilityName === undefined
-      ? {}
-      : { destinationFacilityName: selection.destinationFacilityName }),
-    ...(selection.holdsDamagedRecord === undefined
-      ? {}
-      : { holdsDamagedRecord: selection.holdsDamagedRecord }),
-    ...(selection.shippedAfter === undefined
-      ? {}
-      : { shippedAfter: selection.shippedAfter }),
-    ...(selection.shippedBefore === undefined
-      ? {}
-      : { shippedBefore: selection.shippedBefore }),
+    ...shipmentQueryOf(selection),
   });
 
   const canOpen = canReadRoute(ctx.role, "/shipments/[id]");
@@ -141,9 +131,37 @@ export default async function ShipmentsPage({
         emptyState={<ZeroShipments role={ctx.role} />}
         filteredEmpty={{ noun: "shipments" }}
         {...(result.error === undefined ? {} : { error: result.error })}
-        toolbar={buildControl(ctx.role)}
+        toolbar={shipmentToolbar(
+          ctx.role,
+          exportHref(SHIPMENT_EXPORT_PATH, listQuery, spec),
+        )}
       />
     </PageShell>
+  );
+}
+
+/**
+ * The ledger's actions: **Build a shipment** (or its stated absence) and
+ * **Export** for P2, P5 and P6 (`UX_SPEC.md` §3.11). `undefined` when neither
+ * applies, so the toolbar leaves no empty action group behind.
+ */
+function shipmentToolbar(role: RoleCode, href: string): ReactNode {
+  const build = buildControl(role);
+  const canExport = mayExportList(role, "/shipments");
+  if (build === undefined && !canExport) return undefined;
+  return (
+    <>
+      {build}
+      {canExport ? (
+        <ExportControl
+          href={href}
+          exportName="shipments"
+          description=" the shipment ledger, with the filters on this page, as a CSV file"
+          role={role}
+          capability={capabilityFor(role, "/shipments")}
+        />
+      ) : null}
+    </>
   );
 }
 

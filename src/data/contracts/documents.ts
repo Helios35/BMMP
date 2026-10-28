@@ -24,6 +24,7 @@ import type { WasteClassification } from "@/domain/taxonomy/waste-classification
 import type { ContainerLabelContent } from "@/domain/documents/build-container-label-payload";
 import type { AppliedRuleVersion, RuleOutcome } from "@/domain/rules/outcome";
 import type { ResolvedRule } from "@/domain/rules/resolve";
+import type { DdrPacketContent } from "@/domain/transport/ddr-packet";
 import type { ShippingPaperPayload } from "@/domain/transport/shipping-paper";
 import type { Container } from "@/types/storage";
 import type {
@@ -209,8 +210,11 @@ export interface ShipmentRepository extends Repository<
   ): Promise<Shipment>;
 
   /**
-   * **Assemble a shipment** from containers, with its transport details — one
-   * operation, all or nothing (Flow B1–B2).
+   * **Assemble a shipment** from containers and lots, with its transport
+   * details — one operation, all or nothing (Flow B1–B2; Rule 5.1). A lot
+   * ships as its containers (`admitLotToShipment`): every member is linked
+   * by `container.shipment_id`, the only membership link, and the lot moves
+   * to T-25 `allocated` (`lot.status_changed`).
    *
    * The adapter re-runs step 1's refusals on every container
    * (`admitContainerToShipment`: Rules 4.19, 4.22, 5.2, 5.24, 5.25, 6.1, 6.13)
@@ -223,7 +227,8 @@ export interface ShipmentRepository extends Repository<
   assemble(ctx: RequestContext, input: ShipmentAssembly): Promise<Shipment>;
 
   /**
-   * Replace a shipment's containers before departure. **Where a shipping paper
+   * Replace a shipment's containers and lots before departure — a lot
+   * removed returns to T-25 `closed`, one added to `allocated`. **Where a shipping paper
    * is issued, the change voids it immediately** (Rule 5.13): the render is
    * kept and marked void with the reason and the actor (Rule 5.14,
    * `document_render.voided`), and the shipment returns to `draft` for
@@ -273,6 +278,14 @@ export interface ShipmentRepository extends Repository<
    * organization no longer holds, and re-checks the air block. A paper is
    * never edited and never re-issued over a current one (Rule 5.12) — a
    * correction follows a void and references what it replaces (Rule 5.15).
+   *
+   * **The damaged/defective packet issues in the same operation** wherever
+   * the shipment holds a record on the DDR path (Rule 6.16; T-38
+   * `ddr_packet`): rendered, hashed and stored exactly as the paper is, linked
+   * to the shipment, and voided with it. The adapter refuses a packet that
+   * does not describe exactly the shipment's DDR records, and a packet for a
+   * shipment that holds none. Without a packaging rule in force no packet can
+   * be built; the paper still issues and departure holds on the missing packet.
    */
   issueShippingPaper(
     ctx: RequestContext,
@@ -324,7 +337,10 @@ export interface ShipmentTransportDetails {
 }
 
 export interface ShipmentAssembly {
+  /** Containers chosen on their own — a single battery ships as its container. */
   readonly containerIds: readonly Uuid[];
+  /** Lots chosen whole (Rule 5.1). Their containers join with them. */
+  readonly lotIds: readonly Uuid[];
   readonly transport: ShipmentTransportDetails;
   readonly at: IsoTimestamp;
   readonly attribution: StorageWriteAttribution;
@@ -332,8 +348,10 @@ export interface ShipmentAssembly {
 
 export interface ShipmentContentsChange {
   readonly shipmentId: Uuid;
-  /** The shipment's containers after the change — the whole set, not a delta. */
+  /** The shipment's containers chosen on their own after the change — the whole set, not a delta. */
   readonly containerIds: readonly Uuid[];
+  /** The shipment's lots after the change — the whole set. */
+  readonly lotIds: readonly Uuid[];
   /**
    * Why. **Required where the change voids an issued paper** — a void
    * records its reason and its actor (Rule 5.14).
@@ -347,6 +365,8 @@ export interface ShipmentContentsChangeResult {
   readonly shipment: Shipment;
   readonly addedContainerIds: readonly Uuid[];
   readonly removedContainerIds: readonly Uuid[];
+  readonly addedLotIds: readonly Uuid[];
+  readonly removedLotIds: readonly Uuid[];
   /** The render this change voided, where a paper was issued (Rule 5.13). */
   readonly voidedDocumentRenderId: Uuid | null;
 }
@@ -372,14 +392,28 @@ export interface ShippingPaperIssue {
   readonly paper: RuleOutcome<ShippingPaperPayload>;
   /** Renders exactly that outcome, for the render id the adapter mints. */
   readonly compose: DocumentComposer;
+  /**
+   * The damaged/defective packet that travels with it (Rule 6.16), or null
+   * where the shipment holds no DDR record — or where no packaging rule is in
+   * force to build one, which departure then refuses.
+   */
+  readonly ddrPacket: DdrPacketIssue | null;
   readonly at: IsoTimestamp;
   readonly attribution: StorageWriteAttribution;
+}
+
+/** `buildDdrPacketContent`'s outcome and the composer that renders exactly it. */
+export interface DdrPacketIssue {
+  readonly packet: RuleOutcome<DdrPacketContent>;
+  readonly compose: DocumentComposer;
 }
 
 export interface IssuedShippingPaper {
   readonly shipment: Shipment;
   readonly shippingPaper: ShippingPaper;
   readonly documentRender: DocumentRender;
+  /** The packet issued with it, where one was. */
+  readonly ddrPacketRender: DocumentRender | null;
 }
 
 export interface ShippingPaperVoid {

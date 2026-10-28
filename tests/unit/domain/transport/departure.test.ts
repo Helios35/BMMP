@@ -22,6 +22,7 @@ function facts(overrides: Partial<DepartureFacts> = {}): DepartureFacts {
     air: { available: true },
     ddrRecordNumbers: [],
     ddrPacketIssued: false,
+    ddrPackagingGaps: [],
     retention: {
       ok: true,
       expiresOn: "2029-10-09",
@@ -92,6 +93,32 @@ describe("admitDeparture", () => {
       reason: "ddr_packet_missing",
     });
     if (!admission.ok) expect(admission.message).toContain("BR-0003");
+  });
+
+  it("clears the packet hold once a current packet is issued (Rule 6.16)", () => {
+    expect(
+      admitDeparture(
+        facts({ ddrRecordNumbers: ["BR-0003"], ddrPacketIssued: true }),
+      ),
+    ).toEqual({ ok: true });
+  });
+
+  it("D-71 — holds on a record whose chemistry has no packaging rule on file, naming it", () => {
+    const admission = admitDeparture(
+      facts({
+        ddrRecordNumbers: ["BR-0003", "BR-0009"],
+        ddrPacketIssued: true,
+        ddrPackagingGaps: ["BR-0009"],
+      }),
+    );
+    expect(admission).toMatchObject({
+      ok: false,
+      reason: "ddr_packaging_rule_missing",
+    });
+    if (!admission.ok) {
+      expect(admission.message).toContain("BR-0009");
+      expect(admission.message).not.toContain("BR-0003");
+    }
   });
 
   it("refuses when no retention period is on file — never a literal (Rule 5.18)", () => {

@@ -500,3 +500,48 @@ describe("policy and scope", () => {
     ).rejects.toThrow(/already been closed/);
   });
 });
+
+describe("a label that disagrees with its exact match (label-mismatch.png) — Rule 2.35", () => {
+  it("routes to review as label_catalog_mismatch, with both values and the tolerance on the history", async () => {
+    const { outcome } = await run("label-mismatch.png");
+    const result = reviewed(outcome);
+    // Every field reads high and the part number resolves one entry exactly
+    // (Rule 2.18): the disagreement is the only reason (T-52).
+    expect(result.reasonCodes).toEqual(["label_catalog_mismatch"]);
+    expect(result.isReviewRequired).toBe(true);
+
+    const routed = auditRows().find(
+      (row) => row.eventType === "battery_record.routed_to_review",
+    );
+    const history = routed?.afterState?.labelCatalog as
+      | {
+          readonly catalogEntryId: string;
+          readonly disagreements: readonly {
+            readonly fieldCode: string;
+            readonly labelSays: string;
+            readonly catalogSays: string;
+            readonly toleranceRelative: number | null;
+          }[];
+          readonly configurationVersion: string;
+        }
+      | undefined;
+    expect(history?.catalogEntryId).toBe(ID.CATALOG.vehicleTractionNmc);
+    expect(history?.disagreements).toEqual([
+      {
+        fieldCode: "voltage",
+        labelSays: "400 V",
+        catalogSays: "355.200",
+        toleranceRelative: expect.any(Number),
+      },
+    ]);
+    // A reason to look — no score travels with the comparison (Rule 1.25).
+    expect(JSON.stringify(history)).not.toMatch(/score|probab|likel|percent/i);
+  });
+
+  it("a clean read of the same entry raises nothing", async () => {
+    const { outcome } = await run("label-clean.png");
+    expect(reviewed(outcome).reasonCodes).not.toContain(
+      "label_catalog_mismatch",
+    );
+  });
+});

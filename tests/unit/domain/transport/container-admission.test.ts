@@ -37,6 +37,7 @@ function container(
       },
     ],
     onOtherOpenShipment: null,
+    lot: null,
     ...overrides,
   };
 }

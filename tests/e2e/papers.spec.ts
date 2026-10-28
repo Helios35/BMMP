@@ -1,5 +1,6 @@
 import { expect, test, type Browser, type Page } from "@playwright/test";
 
+import { LOT_STATUS_LABELS } from "@/domain/taxonomy/lot-status";
 import { ROLE_LABELS } from "@/domain/taxonomy/role";
 import {
   EMERGENCY_ATTESTATION,
@@ -9,11 +10,22 @@ import { E11_ASK_WHO, E11_TITLE } from "@/features/shipments/shipment-copy";
 
 import {
   buildShipmentToStepThree,
+  continueByGroundToStepThree,
   createContainer,
   expectDrawnPdf,
   generateLabel,
 } from "./support/documents-flow";
-import { logCleanBattery, tap } from "./support/intake-flow";
+import {
+  chooseContainer,
+  commitIntake,
+  confirmCondition,
+  confirmRow,
+  continueToPlace,
+  logCleanBattery,
+  openReview,
+  selectTopCandidate,
+  tap,
+} from "./support/intake-flow";
 import { storageStateFor, type PersonaKey } from "./support/roles";
 
 /**
@@ -32,7 +44,17 @@ import { storageStateFor, type PersonaKey } from "./support/roles";
  *
  * Every write lands on a container and a shipment this test creates. No
  * fixture container is labelled, emptied or departed.
+ *
+ * ## Why the file runs in order
+ *
+ * A shipment departs only with an issued paper, and a paper issues only
+ * while the number is verified — so every departure in the suite lives here,
+ * after the first test has left the number verified. `b1a-08`'s second test
+ * ships a lot and departs a damaged/defective lithium shipment with its
+ * packet; it re-verifies first if a retry left the number unverified, and
+ * never changes it.
  */
+test.describe.configure({ mode: "serial" });
 
 /** A run-unique, well-formed number — changing it clears the verification. */
 function runNumber(): string {
@@ -85,6 +107,40 @@ async function verify(page: Page): Promise<void> {
     EMERGENCY_ATTESTATION,
   );
   await dialog.locator("[data-emergency-verify-confirm]").click();
+}
+
+/** Verify the number as it stands, only if it is not verified already. */
+async function ensureVerified(page: Page): Promise<void> {
+  await page.goto("/settings/organization");
+  const state = page.locator("[data-verification-state]");
+  await expect(state).toHaveAttribute("data-verification-state", /.+/);
+  if ((await state.getAttribute("data-verification-state")) === "in-force") {
+    return;
+  }
+  await verify(page);
+  await expect(state).toHaveAttribute("data-verification-state", "in-force");
+}
+
+/** Generate the paper from step 3; resolves on the shipment's page. */
+async function generatePaper(page: Page, shipmentId: string): Promise<void> {
+  await page.goto(`/shipments/new?shipment=${shipmentId}&step=3`);
+  await expect(page.locator("[data-precondition-checklist]")).toHaveAttribute(
+    "data-precondition-checklist",
+    "complete",
+  );
+  await tap(page.locator("[data-generate-paper]"), "Generate shipping paper");
+  await page.locator("[data-generate-confirm]").click();
+  await page.waitForURL((url) => url.pathname === `/shipments/${shipmentId}`);
+  await expect(page.locator("[data-paper-tab]")).toBeVisible();
+}
+
+/** **Record departure** on the shipment's page, and see it recorded. */
+async function depart(page: Page): Promise<void> {
+  await tap(page.locator("[data-depart]"), "Record departure");
+  await page.locator("[data-depart-confirm]").click();
+  await expect(page.locator("[data-shipment-departed]")).not.toHaveText(
+    "Not departed",
+  );
 }
 
 test("the 24-hour number: changed, blocked, set from the draft, verified — then a paper issues, is voided and departs", async ({
@@ -283,5 +339,156 @@ test("the 24-hour number: changed, blocked, set from the draft, verified — the
     });
   } finally {
     await Promise.all([manager.close(), handler.close(), admin.close()]);
+  }
+});
+
+test("with the number verified: a lot started at step A4 ships whole, and a damaged lithium shipment departs with its packet", async ({
+  browser,
+}) => {
+  test.setTimeout(300_000);
+
+  const manager = await as(browser, "p2");
+  const handler = await as(browser, "p1");
+
+  try {
+    let lotContainerId = "";
+    let lotCode = "";
+    let lotId = "";
+    let ddrContainerId = "";
+    let ddrShipmentId = "";
+
+    await test.step("P2 finds the number verified, or verifies it as it stands", async () => {
+      await ensureVerified(manager.page);
+    });
+
+    await test.step("P1 logs a battery into a new container and starts a lot with it at step A4", async () => {
+      const page = handler.page;
+      lotContainerId = await createContainer(page, "lot");
+      await openReview(page, "label-clean.png");
+      await confirmRow(page, "model");
+      await selectTopCandidate(page);
+      await confirmRow(page, "chemistry_code");
+      await continueToPlace(page);
+      await confirmCondition(page, "none_observed", "sound");
+      await chooseContainer(page, lotContainerId);
+      // T-25 — a lot holds containers, so the battery joins one through the
+      // container it goes into; nothing is written until the commit.
+      await page.locator("[data-lot-trigger]").click();
+      await page.locator('[data-lot-option="open"]').click();
+      await expect(page.locator("[data-lot-choice-form]")).toHaveAttribute(
+        "data-lot-choice",
+        "open",
+      );
+      await commitIntake(page);
+
+      await page.goto(`/containers/${lotContainerId}`);
+      const section = page.locator("[data-container-lot]");
+      await expect(section).not.toHaveAttribute("data-container-lot", "none");
+      lotCode = (await section.getAttribute("data-container-lot")) ?? "";
+      expect(lotCode).toMatch(/^L-\d{4}$/);
+    });
+
+    await test.step("P1 labels the container and closes the lot on the Lots view", async () => {
+      const page = handler.page;
+      await generateLabel(page, lotContainerId);
+      await page.goto("/containers?tab=lots");
+      await expect(
+        page.locator(`[data-lot-members="${lotCode}"]`),
+      ).toBeVisible();
+      await tap(page.locator(`[data-lot-close="${lotCode}"]`), "Close lot");
+      await expect(
+        page.locator(`[data-lot-reopen="${lotCode}"]`),
+      ).toBeVisible();
+
+      // A closed lot ships whole, so the container's Ship link carries it.
+      await page.goto(`/containers/${lotContainerId}`);
+      const href =
+        (await page
+          .locator("[data-ship-this-container]")
+          .getAttribute("href")) ?? "";
+      lotId = new URL(href, "http://localhost").searchParams.get("lots") ?? "";
+      expect(lotId).not.toBe("");
+    });
+
+    await test.step("step 1 refuses the container alone, and offers the lot whole (Rule 5.1)", async () => {
+      const page = handler.page;
+      await page.goto(`/shipments/new?containers=${lotContainerId}`);
+      await expect(
+        page.locator(`[data-candidate="${lotContainerId}"]`),
+      ).toHaveAttribute("data-admission", "ships_with_lot");
+
+      await page.goto(`/shipments/new?lots=${lotId}`);
+      const lot = page.locator(`[data-lot-candidate="${lotId}"]`);
+      await expect(lot).toHaveAttribute("data-admission", "ok");
+      await expect(lot).toHaveAttribute("data-selected", "true");
+    });
+
+    await test.step("P1 generates the paper for the lot's shipment and departs it; the lot reads shipped", async () => {
+      const page = handler.page;
+      const shipmentId = await continueByGroundToStepThree(page);
+      await generatePaper(page, shipmentId);
+      await depart(page);
+
+      await page.goto(`/shipments/${shipmentId}?tab=contents`);
+      await expect(
+        page.locator(`[data-shipment-container-lot="${lotCode}"]`),
+      ).toBeVisible();
+      await page.goto("/containers?tab=lots");
+      const row = page.locator("tr", {
+        has: page.locator(`[data-lot-members="${lotCode}"]`),
+      });
+      await expect(row).toContainText(LOT_STATUS_LABELS.shipped);
+      // A shipped lot is final: nothing left to close, reopen or dissolve.
+      await expect(page.locator(`[data-lot-actions="${lotCode}"]`)).toHaveCount(
+        0,
+      );
+    });
+
+    await test.step("P1 logs a swollen lithium pack into a new quarantine container and builds a ground shipment", async () => {
+      const page = handler.page;
+      ddrContainerId = await createContainer(
+        page,
+        "ddr-packet",
+        "light_category_ddr",
+      );
+      await openReview(page, "label-clean.png");
+      await confirmRow(page, "model");
+      await selectTopCandidate(page);
+      await confirmRow(page, "chemistry_code");
+      await continueToPlace(page);
+      await confirmCondition(page, "swelling", "damaged_or_defective");
+      await chooseContainer(page, ddrContainerId);
+      await commitIntake(page);
+      await generateLabel(page, ddrContainerId);
+      ddrShipmentId = await buildShipmentToStepThree(page, ddrContainerId);
+      // D-71 — lithium has its packaging rule on file, so nothing holds.
+      await expect(
+        page.locator('[data-hard-block-notice="ddr-packaging-gap"]'),
+      ).toHaveCount(0);
+    });
+
+    await test.step("the paper issues with its damaged/defective packet (Rule 6.16), and the shipment departs", async () => {
+      const page = handler.page;
+      await generatePaper(page, ddrShipmentId);
+      const packet = page.locator('[data-open-ddr-packet="issued"]');
+      await expect(packet).toBeVisible();
+      await expect(
+        page.locator(
+          '[data-hard-block-notice="ddr-packet-missing"], [data-hard-block-notice="ddr-packaging-gap"]',
+        ),
+      ).toHaveCount(0);
+
+      await packet.click();
+      await page.waitForURL(/\/documents\/[^/]+$/);
+      await expect(page.locator('[data-document-marking="draft"]')).toHaveCount(
+        0,
+      );
+      await expect(page.locator('[data-pdf-pages="ready"]')).toBeVisible();
+
+      await page.goto(`/shipments/${ddrShipmentId}`);
+      await depart(page);
+    });
+  } finally {
+    await Promise.all([manager.close(), handler.close()]);
   }
 });

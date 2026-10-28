@@ -22,6 +22,7 @@ import type { LotStatus } from "@/domain/taxonomy/lot-status";
 import type { StorageClockAlertBand } from "@/domain/taxonomy/storage-clock-alert-band";
 import type { StorageClockStatus } from "@/domain/taxonomy/storage-clock-status";
 import type { ContentsMoveOperation } from "@/domain/storage/accumulation";
+import type { LotPersonMove } from "@/domain/storage/lot";
 import type { ResolvedRule } from "@/domain/rules/resolve";
 import type { IsoTimestamp, Uuid } from "@/types/common";
 
@@ -228,7 +229,77 @@ export interface LotQuery extends BaseQuery {
   readonly status?: LotStatus;
 }
 
-export type LotRepository = Repository<Lot, CreateLot, UpdateLot, LotQuery>;
+/**
+ * A new lot, at T-25 `open` — P1 or P6 (T-25), with the container that starts
+ * it where one does. **A lot holds containers**, never batteries directly
+ * (`ERD.md` §6.2; owner's call in `b1a-08`).
+ */
+export interface LotOpening {
+  readonly description: string | null;
+  /** A container to put in the new lot at once, or null for an empty lot. */
+  readonly containerId: Uuid | null;
+  readonly at: IsoTimestamp;
+  readonly attribution: StorageWriteAttribution;
+}
+
+/** A container joining or leaving a lot — only while the lot is open (T-25). */
+export interface LotMembershipChange {
+  readonly lotId: Uuid;
+  readonly containerId: Uuid;
+  readonly change: "join" | "leave";
+  readonly at: IsoTimestamp;
+  readonly attribution: StorageWriteAttribution;
+}
+
+/**
+ * The three moves a person makes on a lot (T-25): close it, reopen it, or
+ * dissolve it. **Dissolving returns every member to its prior state** — out of
+ * any lot — and **the lot row is retained for audit**. `allocated` and
+ * `shipped` follow a shipment and are written by the shipment's own writes.
+ */
+export interface LotStatusChange {
+  readonly lotId: Uuid;
+  readonly status: LotPersonMove;
+  readonly at: IsoTimestamp;
+  readonly attribution: StorageWriteAttribution;
+}
+
+/**
+ * Where a battery logged at intake step A4 groups (`SITE_ARCHITECTURE.md` A4):
+ * the container it is placed in joins an open lot, or starts a new one.
+ */
+export type IntakeLotPlacement =
+  | { readonly kind: "join"; readonly lotId: Uuid }
+  | { readonly kind: "open"; readonly description: string | null };
+
+export interface LotRepository extends Repository<
+  Lot,
+  CreateLot,
+  UpdateLot,
+  LotQuery
+> {
+  /**
+   * Open a lot — T-43 `lot.created`, and `lot.membership_changed` where a
+   * container starts it — as one operation. Refused for any role but P1 and
+   * P6 (T-25), and for a container `admitContainerToLot` refuses.
+   */
+  open(ctx: RequestContext, input: LotOpening): Promise<Lot>;
+
+  /**
+   * A container joins or leaves an open lot — `container.lot_id` and T-43
+   * `lot.membership_changed`, with the lot's containers before and after.
+   */
+  changeMembership(
+    ctx: RequestContext,
+    input: LotMembershipChange,
+  ): Promise<Lot>;
+
+  /**
+   * Close, reopen or dissolve — T-43 `lot.status_changed`. Dissolving clears
+   * every member's `lot_id` (each a `lot.membership_changed`); the row stays.
+   */
+  changeStatus(ctx: RequestContext, input: LotStatusChange): Promise<Lot>;
+}
 
 // --- storage_clock ----------------------------------------------------------
 

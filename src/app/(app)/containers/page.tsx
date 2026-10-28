@@ -9,6 +9,7 @@ import {
   EmptyState,
   PageHeader,
   PageShell,
+  RouteTabs,
 } from "@/components/page";
 import {
   decodeListQuery,
@@ -32,21 +33,37 @@ import {
 import { optionsFor } from "@/domain/taxonomy/lookup";
 import type { RoleCode } from "@/domain/taxonomy/role";
 import { NewContainerAction } from "@/features/containers/components/new-container-action";
+import { NewLotAction } from "@/features/containers/components/lot-controls";
 import {
   CONTAINER_DETAIL_ROLES_REASON,
   LIST_CAPTION,
   LIST_SEARCH_PLACEHOLDER,
+  LOT_HAS_NO_PAGE,
+  LOT_NO_CLOCK_NOTE,
+  LOTS_CAPTION,
+  LOTS_SEARCH_PLACEHOLDER,
   NEW_CONTAINER,
+  VIEW_CONTAINERS,
+  VIEW_LOTS,
   ZERO_CONTAINERS_TITLE,
   ZERO_CONTAINERS_WHO_CAN,
+  ZERO_LOTS_BODY,
+  ZERO_LOTS_TITLE,
+  ZERO_LOTS_WHO_CAN,
 } from "@/features/containers/container-copy";
 import { containerColumns } from "@/features/containers/container-columns";
+import { lotColumns } from "@/features/containers/lot-columns";
 import {
+  activeContainerView,
   CONTAINER_LIST_PATH,
   containerFilters,
   containerListSelection,
   containerListSpec,
+  LOT_FILTERS,
+  LOT_LIST_SPEC,
+  lotListSelection,
 } from "@/features/containers/list-query";
+import { readLotList } from "@/features/containers/server/read-lots";
 import {
   containersAtTier,
   readContainerList,
@@ -68,7 +85,18 @@ import { nowIso } from "@/lib/auth/session";
  * **Filter state lives in the URL**, so `?filter=alerting` — the link the
  * dashboard and `/review` send — is shareable, and it narrows by the `alert`
  * rows themselves (Flow C2).
+ *
+ * **Two views, the tab in the URL**: the containers, and `?tab=lots` — the
+ * lots that group them (T-25). A lot has no route of its own (the owner's
+ * call in `b1a-08`), so it is created, closed, reopened and dissolved here,
+ * by P1 and P6, and every role reads it. A lot has no fill and no clock
+ * (Rule 4.23); its rows report their containers' (Rule 4.24).
  */
+
+const VIEWS = [
+  { id: "containers", label: VIEW_CONTAINERS },
+  { id: "lots", label: VIEW_LOTS },
+] as const;
 
 export const metadata: Metadata = {
   title: APP_ROUTE_NAMES["/containers"],
@@ -97,6 +125,73 @@ export default async function ContainersPage({
 
   const spec = containerListSpec(locations);
   const listQuery = decodeListQuery(params, spec);
+  const view = activeContainerView(listQuery);
+  const header = (
+    <PageHeader
+      title={APP_ROUTE_NAMES["/containers"]}
+      notice={
+        showsReadOnlyBanner({
+          role: ctx.role,
+          routeHasMutatingControls: true,
+        }) ? (
+          <ReadOnlyBanner />
+        ) : undefined
+      }
+    />
+  );
+  const tabs = (
+    <RouteTabs
+      tabs={VIEWS}
+      basePath={CONTAINER_LIST_PATH}
+      query={listQuery}
+      spec={spec}
+      active={view}
+      label="Containers and lots"
+      dataAttribute="data-containers-view"
+    />
+  );
+
+  if (view === "lots") {
+    const lotQuery = decodeListQuery(params, LOT_LIST_SPEC);
+    const organization = await data.organizations.get(ctx, ctx.organizationId);
+    const lots = await readLotList(ctx, lotListSelection(lotQuery));
+    const canManage = mayTakeContainerAction(ctx.role, "manage_lot");
+    return (
+      <PageShell>
+        {header}
+        {tabs}
+        <p className="max-w-[72ch] text-body text-muted-foreground">
+          {LOT_NO_CLOCK_NOTE}
+        </p>
+        <RecordTable
+          caption={LOTS_CAPTION}
+          columns={lotColumns(organization?.timeZone ?? "UTC", canManage)}
+          rows={lots.rows}
+          rowKey={(row) => row.lot.id}
+          rowLink={() => ({ kind: "not-linked", reason: LOT_HAS_NO_PAGE })}
+          total={lots.total}
+          query={lotQuery}
+          querySpec={LOT_LIST_SPEC}
+          basePath={CONTAINER_LIST_PATH}
+          searchPlaceholder={LOTS_SEARCH_PLACEHOLDER}
+          filters={LOT_FILTERS}
+          emptyState={
+            <EmptyState
+              icon={Boxes}
+              title={ZERO_LOTS_TITLE}
+              description={ZERO_LOTS_BODY}
+              {...(canManage ? {} : { whoCanAct: ZERO_LOTS_WHO_CAN })}
+              dataAttributes={{ "data-lots-empty": "true" }}
+            />
+          }
+          filteredEmpty={{ noun: "lots" }}
+          {...(lots.error === undefined ? {} : { error: lots.error })}
+          toolbar={canManage ? <NewLotAction /> : undefined}
+        />
+      </PageShell>
+    );
+  }
+
   const selection = containerListSelection(listQuery);
   const containerIds = await containersAtTier(ctx, selection.tier);
 
@@ -115,17 +210,8 @@ export default async function ContainersPage({
     <PageShell>
       {/* The primary action sits in the table's toolbar, not here (§2.7), so
           the header's height is the same for every role. */}
-      <PageHeader
-        title={APP_ROUTE_NAMES["/containers"]}
-        notice={
-          showsReadOnlyBanner({
-            role: ctx.role,
-            routeHasMutatingControls: true,
-          }) ? (
-            <ReadOnlyBanner />
-          ) : undefined
-        }
-      />
+      {header}
+      {tabs}
 
       <RecordTable
         caption={LIST_CAPTION}

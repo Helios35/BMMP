@@ -33,6 +33,12 @@
  * the organization. A reason to look, never a verdict — no score or
  * probability is shown with it (Rule 1.25).
  *
+ * **`label_catalog_mismatch` is D-68** (D-56 level 2, text half), added at
+ * TAXONOMY.md v1.7: a field the label read disagrees with the catalog entry
+ * the record is matched to, beyond the configured tolerance (Rule 2.35). A
+ * reason to look, never a verdict — no score or probability is shown with it,
+ * and a person decides.
+ *
  * **Never invent a value.** If one is needed and is not here, it does not exist
  * yet — raise it to P6 (TAXONOMY.md §1.1).
  */
@@ -47,6 +53,7 @@ export const REVIEW_REASON_CODES = [
   "extraction_failed",
   "session_abandoned",
   "duplicate_photo",
+  "label_catalog_mismatch",
 ] as const;
 
 export type ReviewReasonCode = (typeof REVIEW_REASON_CODES)[number];
@@ -73,4 +80,5 @@ export const REVIEW_REASON_CODE_LABELS: Readonly<
   extraction_failed: "Extraction did not complete",
   session_abandoned: "Left unfinished",
   duplicate_photo: "Photo already on another record",
+  label_catalog_mismatch: "Label disagrees with catalog",
 };

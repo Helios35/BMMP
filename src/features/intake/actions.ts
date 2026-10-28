@@ -24,6 +24,7 @@ import {
   selectDraftCandidate,
   setDraftCondition,
   setDraftManufacturedOn,
+  setDraftLotChoice,
   setDraftPlacement,
   setDraftSourceDevice,
   setDraftStateOfCharge,
@@ -48,6 +49,7 @@ import {
   ValidationError,
 } from "@/lib/errors";
 import type { IsoTimestamp, Uuid } from "@/types/common";
+import type { CatalogEntry } from "@/types/catalog";
 import type { IntakeDraft, IntakeSession } from "@/types/intake";
 
 import {
@@ -58,6 +60,8 @@ import {
   CONTAINER_NEEDS_CLASSIFICATION,
   CONTAINER_NOT_FOUND,
   fieldValueRefused,
+  LOT_NEEDS_CONTAINER,
+  LOT_NOT_OPEN,
   findingsRefused,
   INTAKE_HAS_NO_RECORD,
   LABEL_READ_NEEDS_CROP,
@@ -69,6 +73,7 @@ import {
 import {
   abandonIntakeSessionSchema,
   advanceToStepSchema,
+  chooseIntakeLotSchema,
   choosePlacementSchema,
   confirmFieldSchema,
   confirmIntakeSchema,
@@ -105,6 +110,10 @@ import {
   loadOpenIntake,
 } from "./server/read-intake";
 import { readDuplicatePhotos } from "./server/duplicate-photos";
+import {
+  compareDraftWithEntry,
+  routeLabelDisagreement,
+} from "./server/label-catalog";
 import { sessionAction } from "./server/session-action";
 
 /**
@@ -588,9 +597,10 @@ export async function selectCatalogCandidate(
     "selectCatalogCandidate",
     selectCatalogCandidateSchema,
     input,
-    async (ctx, parsed) => {
-      const { session, draft } = await openDraft(ctx, parsed.sessionId);
+    async (ctx, parsed, attribution) => {
+      const { session, record, draft } = await openDraft(ctx, parsed.sessionId);
       let next: IntakeDraft;
+      let picked: CatalogEntry | null = null;
       if (parsed.catalogEntryId === null) {
         next = selectDraftCandidate(draft, null, null);
       } else {
@@ -607,11 +617,29 @@ export async function selectCatalogCandidate(
           entry.id,
           entry.chemistry === "unknown" ? null : entry.chemistry,
         );
+        picked = entry;
       }
-      return {
-        sessionId: session.id,
-        draft: await persistDraft(ctx, session, next),
-      };
+      const persisted = await persistDraft(ctx, session, next);
+      // Rule 2.35 — a person's pick is a record getting a catalog entry (Rule
+      // 2.19): what the label read is compared with it, and a disagreement
+      // routes the record to review. Declining every candidate compares
+      // nothing.
+      if (picked !== null) {
+        const configuration = await readGateConfiguration(ctx, null);
+        await routeLabelDisagreement(ctx, {
+          session,
+          record,
+          comparison: compareDraftWithEntry(
+            persisted,
+            picked,
+            configuration.matchTolerances,
+          ),
+          configurationVersion: configuration.configurationVersion,
+          at: now(),
+          attribution,
+        });
+      }
+      return { sessionId: session.id, draft: persisted };
     },
   );
 }
@@ -1053,7 +1081,59 @@ export async function choosePlacement(
           });
         }
       }
-      const next = setDraftPlacement(draft, parsed.containerId);
+      // A container already in a lot keeps that lot: a container is in one
+      // lot at a time, so an earlier step-A4 choice no longer applies.
+      const chosen =
+        parsed.containerId === null
+          ? null
+          : await data.containers.get(ctx, parsed.containerId);
+      const placed = setDraftPlacement(draft, parsed.containerId);
+      const next =
+        chosen !== null && chosen.lotId !== null
+          ? setDraftLotChoice(placed, null)
+          : placed;
+      return {
+        sessionId: session.id,
+        draft: await persistDraft(ctx, session, next),
+      };
+    },
+  );
+}
+
+/**
+ * Step A4 — the container this battery goes into joins an open lot, or opens
+ * a new one, when the record commits (`SITE_ARCHITECTURE.md` A4; T-25). A lot
+ * holds containers, so there is nothing to group until a container is
+ * chosen; the commit re-checks the lot is still open and writes the lot rows
+ * in the same operation.
+ */
+export async function chooseIntakeLot(
+  input: unknown,
+): Promise<ActionResult<DraftActionData>> {
+  return intakeAction(
+    "chooseIntakeLot",
+    chooseIntakeLotSchema,
+    input,
+    async (ctx, parsed) => {
+      const { session, draft } = await openDraft(ctx, parsed.sessionId);
+      if (parsed.lot !== null && draft.containerId === null) {
+        throw new ValidationError({
+          userMessage: LOT_NEEDS_CONTAINER,
+          correlationId: ctx.correlationId,
+          field: "lot",
+        });
+      }
+      if (parsed.lot?.kind === "join") {
+        const lot = await data.lots.get(ctx, parsed.lot.lotId);
+        if (lot === null || lot.status !== "open") {
+          throw new ValidationError({
+            userMessage: LOT_NOT_OPEN,
+            correlationId: ctx.correlationId,
+            field: "lot",
+          });
+        }
+      }
+      const next = setDraftLotChoice(draft, parsed.lot);
       return {
         sessionId: session.id,
         draft: await persistDraft(ctx, session, next),

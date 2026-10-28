@@ -11,7 +11,11 @@ import type {
   SortRequest,
   UpdateInput,
 } from "./repository";
-import type { CreateStorageClock, CreateStorageEvent } from "./storage";
+import type {
+  CreateStorageClock,
+  CreateStorageEvent,
+  IntakeLotPlacement,
+} from "./storage";
 import type { BatteryRecord } from "@/types/battery-record";
 import type { CatalogEntry } from "@/types/catalog";
 import type {
@@ -366,6 +370,12 @@ export interface IntakeConfirmation {
   readonly storageEvent: CreateStorageEvent | null;
   /** Set on the container when this placement is its first (Rule 4.4). */
   readonly containerAccumulationStartedAt: IsoTimestamp | null;
+  /**
+   * Step A4's lot (`SITE_ARCHITECTURE.md` A4): the container this record is
+   * placed in joins an open lot or opens a new one, in the same operation.
+   * Null leaves the container's grouping as it is. Refused unplaced.
+   */
+  readonly lot: IntakeLotPlacement | null;
   /**
    * One event per row written above, sharing `ctx.correlationId`. The adapter
    * appends them through the `security definer` door as part of the same

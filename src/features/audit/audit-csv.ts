@@ -1,4 +1,5 @@
 import { ROLE_LABELS } from "@/domain/taxonomy/role";
+import { csvFile } from "@/lib/export/csv";
 import type { JsonObject } from "@/types/common";
 
 import type { AuditRowView } from "./audit-row";
@@ -19,24 +20,6 @@ import type { AuditRowView } from "./audit-row";
  * Pure — string in, string out. The scoping, the tenancy and the audit write live
  * in the route handler, where the request is.
  */
-
-/**
- * RFC 4180 quoting.
- *
- * **Values are never rewritten.** A spreadsheet may read a leading `=` as a
- * formula, and the usual mitigation is to prefix the cell — which changes what
- * the log said. An audit export that alters a stored value to suit a reader's
- * spreadsheet is a falsified record, so the bytes stay as stored and the quoting
- * is the only transformation.
- */
-function csvCell(value: string): string {
-  if (!/[",\r\n]/u.test(value)) return value;
-  return `"${value.replaceAll('"', '""')}"`;
-}
-
-function csvLine(cells: readonly string[]): string {
-  return cells.map(csvCell).join(",");
-}
 
 /** The column order, and the only place these headings exist. */
 export const AUDIT_CSV_HEADERS = [
@@ -94,16 +77,9 @@ export function auditCsvRow(row: AuditRowView): readonly string[] {
 }
 
 /**
- * The whole file.
- *
- * CRLF line endings and a UTF-8 byte-order mark, because the reader of this file
- * is an auditor opening it in a spreadsheet, and a name with an accent in it
- * rendering as mojibake is a defect in a record about who did what.
+ * The whole file — `csvFile`'s quoting, byte-order mark and CRLF, which every
+ * export in the product shares. Values are never rewritten.
  */
 export function auditCsv(rows: readonly AuditRowView[]): string {
-  const lines = [
-    csvLine(AUDIT_CSV_HEADERS),
-    ...rows.map((row) => csvLine(auditCsvRow(row))),
-  ];
-  return `\uFEFF${lines.join("\r\n")}\r\n`;
+  return csvFile(AUDIT_CSV_HEADERS, rows.map(auditCsvRow));
 }

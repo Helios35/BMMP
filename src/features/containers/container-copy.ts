@@ -106,3 +106,63 @@ export const REMEDIATION_REASON_REQUIRED =
 export const STORAGE_EVENT_TITLE = "Record a storage event";
 export const STORAGE_EVENT_BODY =
   "An inspection of this container, recorded to its history. It changes no date and no status.";
+
+// --- lots — T-25; Rules 4.23, 4.24 ----------------------------------------------
+
+/** `/containers`' two views — the containers, and the lots that group them. */
+export const VIEW_CONTAINERS = "Containers";
+export const VIEW_LOTS = "Lots";
+export const LOTS_CAPTION = "Lots";
+export const LOTS_SEARCH_PLACEHOLDER = "Search lot or description";
+export const LOT_COLUMN_ID = "Lot";
+export const LOT_COLUMN_DESCRIPTION = "Description";
+export const LOT_COLUMN_CONTAINERS = "Containers";
+export const LOT_COLUMN_EARLIEST = "Earliest accumulation start";
+export const LOT_COLUMN_STATUS = "Status";
+export const LOT_COLUMN_ACTIONS = "Actions";
+export const LOT_NO_DESCRIPTION = "No description";
+export const LOT_NO_CONTAINERS = "None";
+export const LOT_NO_START = "No battery placed yet";
+export const LOT_OVERDUE =
+  "Overdue — a container in this lot is past its accumulation period (Rule 4.24).";
+/** A lot row does not open: a lot has no route of its own (no 21st route). */
+export const LOT_HAS_NO_PAGE =
+  "A lot has no page of its own. Its containers are named in the row.";
+export const LOT_NO_CLOCK_NOTE =
+  "A lot is a grouping, not a place. It has no fill level or clock of its own; it reports its containers' (Rules 4.23, 4.24).";
+export const ZERO_LOTS_TITLE = "No lots yet.";
+export const ZERO_LOTS_BODY =
+  "A lot groups containers for shipping and reporting. Start one here, or when you log a battery.";
+export const ZERO_LOTS_WHO_CAN =
+  "A Compliance Handler or an Admin can start one.";
+
+export const NEW_LOT = "New lot";
+export const NEW_LOT_TITLE = "Start a new lot";
+export const NEW_LOT_BODY =
+  "The lot opens empty. Add containers to it from each container's page, or when you log a battery.";
+export const NEW_LOT_DESCRIPTION_LABEL = "Description (optional)";
+export const NEW_LOT_CONFIRM = "Start the lot";
+export const NEW_LOT_CONFIRMING = "Starting…";
+export const CANCEL = "Cancel";
+
+export const CLOSE_LOT = "Close";
+export const CLOSING_LOT = "Closing…";
+export const REOPEN_LOT = "Reopen";
+export const REOPENING_LOT = "Reopening…";
+export const DISSOLVE_LOT = "Dissolve";
+export const DISSOLVE_LOT_TITLE = "Dissolve this lot?";
+export const DISSOLVE_LOT_BODY =
+  "Its containers leave the lot and keep everything else as it is. The lot stays on record as dissolved, and cannot be used again.";
+export const DISSOLVE_LOT_CONFIRM = "Dissolve the lot";
+export const DISSOLVING_LOT = "Dissolving…";
+
+/** `/containers/[id]`'s lot field. */
+export const FIELD_LOT = "Lot";
+export const NOT_IN_A_LOT = "Not in a lot";
+export const ADD_TO_LOT = "Add to a lot";
+export const ADD_TO_LOT_LABEL = "Lot";
+export const ADD_TO_LOT_CHOOSE = "Choose an open lot";
+export const ADD_TO_NEW_LOT = "Start a new lot with this container";
+export const ADDING_TO_LOT = "Adding…";
+export const REMOVE_FROM_LOT = "Remove from lot";
+export const REMOVING_FROM_LOT = "Removing…";

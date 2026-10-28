@@ -53,6 +53,7 @@ export type IntakeFixtureImage =
   | "label-fail.png"
   | "label-manualcrop.png"
   | "label-scooter.png"
+  | "label-mismatch.png"
   | "whole-pack.png"
   | "damage.png";
 

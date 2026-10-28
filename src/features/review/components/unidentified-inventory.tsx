@@ -1,5 +1,5 @@
 import Link from "next/link";
-import type { ReactElement } from "react";
+import type { ReactElement, ReactNode } from "react";
 import { Boxes, FilterX, Info, PackageOpen } from "lucide-react";
 
 import { EmptyState, SectionCard } from "@/components/page";
@@ -93,6 +93,11 @@ export interface UnidentifiedInventoryProps {
   readonly asOf: string;
   readonly canOpenContainer: boolean;
   readonly canSeeContainerAlerts: boolean;
+  /**
+   * §3.8b's **Export** — "the list for an insurer or inspection file". The
+   * route renders it from `mayExportList`; null where the role does not export.
+   */
+  readonly exportAction?: ReactNode;
 }
 
 export function UnidentifiedInventoryView({
@@ -103,6 +108,7 @@ export function UnidentifiedInventoryView({
   asOf,
   canOpenContainer,
   canSeeContainerAlerts,
+  exportAction = null,
 }: UnidentifiedInventoryProps): ReactElement {
   if (inventory.total === 0) {
     // E-15 for P2 — her assurance, styled as the good state it is.
@@ -154,20 +160,25 @@ export function UnidentifiedInventoryView({
           />
         }
         actions={
-          canSeeContainerAlerts ? (
-            <Button
-              asChild
-              variant="outline"
-              size="lg"
-              className="min-h-11 rounded-md text-label"
-            >
-              <Link
-                href="/containers?filter=alerting"
-                data-see-clock-alerts="true"
-              >
-                {SEE_CLOCK_ALERTS}
-              </Link>
-            </Button>
+          canSeeContainerAlerts || exportAction !== null ? (
+            <>
+              {canSeeContainerAlerts ? (
+                <Button
+                  asChild
+                  variant="outline"
+                  size="lg"
+                  className="min-h-11 rounded-md text-label"
+                >
+                  <Link
+                    href="/containers?filter=alerting"
+                    data-see-clock-alerts="true"
+                  >
+                    {SEE_CLOCK_ALERTS}
+                  </Link>
+                </Button>
+              ) : null}
+              {exportAction}
+            </>
           ) : undefined
         }
       />

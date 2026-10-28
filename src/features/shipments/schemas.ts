@@ -18,8 +18,9 @@ const MAX_NAME_LENGTH = 200;
 const MAX_LINE_LENGTH = 200;
 const MAX_REFERENCE_LENGTH = 120;
 const MAX_REASON_LENGTH = 500;
-/** A shipment is chosen by a person from one organization's containers. */
+/** A shipment is chosen by a person from one organization's containers and lots. */
 const MAX_CONTAINERS = 200;
+const MAX_LOTS = 100;
 
 const required = (message: string) =>
   z.string().trim().min(1, message).max(MAX_LINE_LENGTH);
@@ -31,10 +32,8 @@ const optional = z
   .nullable()
   .transform((value) => (value === null || value === "" ? null : value));
 
-const containerIds = z
-  .array(z.uuid())
-  .min(1, "Choose at least one container to ship.")
-  .max(MAX_CONTAINERS);
+const containerIds = z.array(z.uuid()).max(MAX_CONTAINERS);
+const lotIds = z.array(z.uuid()).max(MAX_LOTS);
 
 export const transportFields = {
   transportMode: z.enum(TRANSPORT_MODES, {
@@ -86,10 +85,16 @@ export function transportDetails(
   };
 }
 
-export const assembleShipmentSchema = z.object({
-  containerIds,
-  ...transportFields,
-});
+export const assembleShipmentSchema = z
+  .object({
+    containerIds,
+    lotIds,
+    ...transportFields,
+  })
+  .refine((input) => input.containerIds.length + input.lotIds.length > 0, {
+    message: "Choose at least one lot or container to ship.",
+    path: ["containerIds"],
+  });
 
 export const recordTransportSchema = z.object({
   shipmentId: z.uuid(),
@@ -98,7 +103,8 @@ export const recordTransportSchema = z.object({
 
 export const changeContentsSchema = z.object({
   shipmentId: z.uuid(),
-  containerIds: z.array(z.uuid()).max(MAX_CONTAINERS),
+  containerIds,
+  lotIds,
   reason: z
     .string()
     .trim()

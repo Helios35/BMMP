@@ -91,6 +91,8 @@ export const JURISDICTION_RULE = {
   federalShipperCertification: uid("0a000006", 5),
   /** The container label phrase — the owner's call in b1a-06. */
   waContainerLabel: uid("0a000006", 6),
+  /** DDR packaging and marking — `SPEC_ddr-packaging-rule-data_2026-10-22.md`, b1a-08. */
+  federalDdrPackaging: uid("0a000006", 7),
 } as const;
 
 export const RULE_VERSION = {
@@ -102,6 +104,7 @@ export const RULE_VERSION = {
   waAccumulationPeriodDraft2027: uid("0a000007", 5),
   federalShipperCertification2026: uid("0a000007", 6),
   waContainerLabel2026: uid("0a000007", 7),
+  federalDdrPackaging2026: uid("0a000007", 8),
 } as const;
 
 export const CATALOG = {
@@ -126,12 +129,20 @@ export const BATTERY = {
   midReviewSpread: uid("0a000009", 5),
   /** Rainier's record. Cascade must never see it. */
   rainierScooter: uid("0a000009", 6),
+  /** b1a-08 — a swollen NV-TP400 traction pack, on SH-0003: the lithium DDR record. */
+  ddrLithiumOnMixed: uid("0a000009", 7),
+  /** b1a-08 — a leaking lead-acid scooter pack: DDR, no packaging rule on file (D-71). */
+  ddrNoPackagingRule: uid("0a000009", 8),
+  /** b1a-08 — in review: an exact match whose label voltage disagrees (Rule 2.35). */
+  labelMismatchInReview: uid("0a000009", 9),
 } as const;
 
 export const INTAKE_SESSION = {
   vehicleCompleted: uid("0a00000a", 1),
   scuffedInReview: uid("0a00000a", 2),
   spreadInReview: uid("0a00000a", 3),
+  /** b1a-08 — the label-vs-catalog disagreement in review. */
+  labelMismatchInReview: uid("0a00000a", 4),
 } as const;
 
 export const PHOTO = {
@@ -142,12 +153,15 @@ export const PHOTO = {
   spreadOriginal: uid("0a00000b", 5),
   spreadCrop: uid("0a00000b", 6),
   swollenDamage: uid("0a00000b", 7),
+  labelMismatchOriginal: uid("0a00000b", 8),
+  labelMismatchCrop: uid("0a00000b", 9),
 } as const;
 
 export const EXTRACTION_RUN = {
   vehicle: uid("0a00000c", 1),
   scuffed: uid("0a00000c", 2),
   spread: uid("0a00000c", 3),
+  labelMismatch: uid("0a00000c", 4),
 } as const;
 
 export const CONTAINER = {
@@ -157,16 +171,29 @@ export const CONTAINER = {
   quarantineDrum: uid("0a00000d", 2),
   /** **Past its accumulation period — the hard `overdue` state.** */
   overdueDrum: uid("0a00000d", 3),
+  /** b1a-08 — overdue, in lot L-0002, so the lot reads overdue (Rule 4.24). */
+  lotOverdueDrum: uid("0a00000d", 4),
+  /** b1a-08 — quarantine holding the lithium DDR record, on SH-0003 alone. */
+  mixedDdrQuarantine: uid("0a00000d", 5),
+  /** b1a-08 — quarantine holding the no-rule DDR record, on SH-0003 in lot L-0003. */
+  noRuleDdrQuarantine: uid("0a00000d", 6),
 } as const;
 
 export const LOT = {
   augustConsolidation: uid("0a00000e", 1),
+  /** b1a-08 — closed, holding the overdue C-0004. */
+  overdueHold: uid("0a00000e", 2),
+  /** b1a-08 — allocated to SH-0003, holding C-0006. */
+  mixedShipment: uid("0a00000e", 3),
 } as const;
 
 export const CLOCK = {
   soundDrum: uid("0a00000f", 1),
   quarantineDrum: uid("0a00000f", 2),
   overdueDrum: uid("0a00000f", 3),
+  lotOverdueDrum: uid("0a00000f", 4),
+  mixedDdrQuarantine: uid("0a00000f", 5),
+  noRuleDdrQuarantine: uid("0a00000f", 6),
 } as const;
 
 export const ALERT = {
@@ -180,11 +207,15 @@ export const CLASSIFICATION = {
   swollenLaptop: uid("0a000011", 3),
   /** Blocked — chemistry is unconfirmed, so no classification can be derived. */
   scuffedBlocked: uid("0a000011", 4),
+  ddrLithiumOnMixed: uid("0a000011", 5),
+  ddrNoPackagingRule: uid("0a000011", 6),
 } as const;
 
 export const SHIPMENT = {
   julyDelivered: uid("0a000012", 1),
   augustDraft: uid("0a000012", 2),
+  /** b1a-08 — a mixed shipment (Rule 5.1) holding a lithium DDR record. */
+  mixedDdr: uid("0a000012", 3),
 } as const;
 
 export const DOCUMENT_RENDER = {
@@ -204,6 +235,8 @@ export const DAMAGE = {
   vehicleSound: uid("0a000016", 1),
   mobilitySound: uid("0a000016", 2),
   swollenDamaged: uid("0a000016", 3),
+  ddrLithiumOnMixed: uid("0a000016", 4),
+  ddrNoPackagingRule: uid("0a000016", 5),
 } as const;
 
 export const STORAGE_EVENT = {
@@ -211,6 +244,8 @@ export const STORAGE_EVENT = {
   mobilityPlaced: uid("0a000017", 2),
   swollenQuarantined: uid("0a000017", 3),
   overdueInspected: uid("0a000017", 4),
+  ddrLithiumPlaced: uid("0a000017", 5),
+  ddrNoRulePlaced: uid("0a000017", 6),
 } as const;
 
 export const AUDIT = {
@@ -218,6 +253,8 @@ export const AUDIT = {
   swollenDdrSet: uid("0a000018", 2),
   overdueClockChanged: uid("0a000018", 3),
   julyPaperIssued: uid("0a000018", 4),
+  /** b1a-08 — the Rule 2.35 disagreement on BR-0008's history. */
+  labelMismatchRouted: uid("0a000018", 5),
 } as const;
 
 export const DATE_CODE = {

@@ -42,6 +42,7 @@ import type {
   CreateStorageClock,
   CreateStorageEvent,
   LotQuery,
+  LotRepository,
   StorageClockQuery,
   StorageEventQuery,
   UpdateContainer,
@@ -174,6 +175,7 @@ import {
 } from "@/lib/errors";
 import { mockPlatformConfiguration } from "./platform-configuration";
 import { assertPolicy } from "./policy";
+import { sequenceStart } from "./sequence-start";
 import { mockStore, type TenantAuditEvent } from "./store";
 import {
   platformAppendOnlyRepository,
@@ -193,6 +195,12 @@ import {
   recordStorageEvent,
   runStorageClockAlerts,
 } from "./storage-writes";
+import {
+  changeLotMembership,
+  changeLotStatus,
+  openLot,
+  placeContainerInLot,
+} from "./lot-writes";
 import {
   assemble,
   buildShipmentRow,
@@ -796,7 +804,11 @@ const batteryRecords = tenantRepository<
     const seq = nextSequenceNumber(
       ctx.organizationId,
       "battery_record",
-      organization?.batteryRecordSeq ?? 0,
+      sequenceStart(
+        ctx.organizationId,
+        "battery_record",
+        organization?.batteryRecordSeq ?? 0,
+      ),
     );
     return {
       ...input,
@@ -1178,6 +1190,7 @@ function commitSnapshot(): readonly {
     s.storageClocks,
     s.storageEvents,
     s.containers,
+    s.lots,
     s.auditEvents,
   ] as const;
   // `all()` hands back the live array, so the copy is what makes this a
@@ -1241,6 +1254,18 @@ const intakeSessions: IntakeRepository = {
       assertPolicy(ctx, "container", "update");
       if (input.storageClock !== null) {
         assertPolicy(ctx, "storage_clock", "insert");
+      }
+    }
+    if (input.lot !== null) {
+      assertPolicy(ctx, "lot", input.lot.kind === "open" ? "insert" : "update");
+      // A lot holds containers; a battery joins one only by being placed.
+      if (input.containerId === null) {
+        throw new ValidationError({
+          userMessage:
+            "A lot holds containers. Choose a container for this battery before grouping it into a lot.",
+          correlationId: ctx.correlationId,
+          field: "lot",
+        });
       }
     }
 
@@ -1545,6 +1570,24 @@ const intakeSessions: IntakeRepository = {
                 ),
               }),
         } as UpdateContainer);
+        // Step A4 — the container joins its lot in this same operation, so a
+        // refused lot leaves no placement behind it.
+        if (input.lot !== null) {
+          // The request the builder stamped on its own rows is the request
+          // these were made in.
+          const [stamped] = input.auditEvents;
+          await placeContainerInLot(
+            ctx,
+            await store().containers.getOrThrow(ctx, container.id),
+            input.lot,
+            now(),
+            {
+              requestId: stamped?.requestId ?? null,
+              ipAddress: stamped?.ipAddress ?? null,
+              userAgent: stamped?.userAgent ?? null,
+            },
+          );
+        }
       }
 
       // The status follows what else is in the payload, never the caller's
@@ -1760,7 +1803,11 @@ const containersBase = tenantRepository<
     const seq = nextSequenceNumber(
       ctx.organizationId,
       "container",
-      organization?.containerSeq ?? 0,
+      sequenceStart(
+        ctx.organizationId,
+        "container",
+        organization?.containerSeq ?? 0,
+      ),
     );
     return {
       ...input,
@@ -1794,7 +1841,7 @@ const containers: ContainerRepository = {
   changeStatus,
 };
 
-const lots = tenantRepository<Lot, CreateLot, UpdateLot, LotQuery>(
+const lotsBase = tenantRepository<Lot, CreateLot, UpdateLot, LotQuery>(
   store().lots,
   {
     compare: (a, b) => byNewest(a.createdAt, b.createdAt),
@@ -1808,7 +1855,7 @@ const lots = tenantRepository<Lot, CreateLot, UpdateLot, LotQuery>(
       const seq = nextSequenceNumber(
         ctx.organizationId,
         "lot",
-        organization?.lotSeq ?? 0,
+        sequenceStart(ctx.organizationId, "lot", organization?.lotSeq ?? 0),
       );
       return {
         ...input,
@@ -1826,6 +1873,14 @@ const lots = tenantRepository<Lot, CreateLot, UpdateLot, LotQuery>(
     },
   },
 );
+
+/** The lot repository, plus the three person moves T-25 names (`./lot-writes.ts`). */
+const lots: LotRepository = {
+  ...lotsBase,
+  open: openLot,
+  changeMembership: changeLotMembership,
+  changeStatus: changeLotStatus,
+};
 
 const storageClocks = tenantRepository<
   StorageClock,

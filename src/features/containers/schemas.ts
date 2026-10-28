@@ -78,3 +78,33 @@ export const editContainerDetailsSchema = z.object({
     )
     .nullable(),
 });
+
+// --- lots (T-25) ---------------------------------------------------------------
+
+const MAX_LOT_DESCRIPTION_LENGTH = 120;
+
+const lotDescription = z
+  .string()
+  .trim()
+  .max(MAX_LOT_DESCRIPTION_LENGTH)
+  .nullable()
+  .transform((value) => (value === null || value === "" ? null : value));
+
+/** A new lot — empty, or started with one container. */
+export const openLotSchema = z.object({
+  description: lotDescription,
+  containerId: z.uuid().nullable(),
+});
+
+/** A container joining or leaving an open lot. */
+export const lotMembershipSchema = z.object({
+  lotId: z.uuid(),
+  containerId: z.uuid(),
+  change: z.enum(["join", "leave"]),
+});
+
+/** Close, reopen or dissolve — the three moves a person makes on a lot. */
+export const lotStatusSchema = z.object({
+  lotId: z.uuid(),
+  status: z.enum(["closed", "open", "dissolved"]),
+});

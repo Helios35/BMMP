@@ -17,7 +17,7 @@ import type { CatalogEntry } from "@/types/catalog";
 import type { Uuid } from "@/types/common";
 import type { DamageAssessment } from "@/types/condition";
 import type { ClassificationDecision, Shipment } from "@/types/documents";
-import type { Container } from "@/types/storage";
+import type { Container, Lot } from "@/types/storage";
 
 /**
  * Everything a shipment's rules read about the containers in scope, read once
@@ -57,6 +57,8 @@ export interface ScopeContainer {
   readonly records: readonly ScopeRecord[];
   /** The open shipment it is on, where it is on one. */
   readonly openShipment: Shipment | null;
+  /** The lot it is in (`ERD.md` §6.2), or null. */
+  readonly lot: Lot | null;
 }
 
 async function governingDecision(
@@ -106,6 +108,7 @@ export async function readContainerScope(
   const catalog = new Map<Uuid, CatalogEntry | null>();
   const citations = new Map<Uuid, string | null>();
   const shipments = new Map<Uuid, Shipment | null>();
+  const lots = new Map<Uuid, Lot | null>();
 
   const scopeRecords = new Map<Uuid, ScopeRecord[]>();
   for (const record of recordsPage.items) {
@@ -165,8 +168,16 @@ export async function readContainerScope(
           ? shipment
           : null;
     }
+    let lot: Lot | null = null;
+    if (container.lotId !== null) {
+      if (!lots.has(container.lotId)) {
+        lots.set(container.lotId, await data.lots.get(ctx, container.lotId));
+      }
+      lot = lots.get(container.lotId) ?? null;
+    }
     scope.push({
       container,
+      lot,
       labelFlags: containerLabelFlags({
         contentCount: records.length,
         currentContainerLabelId: container.currentContainerLabelId,
@@ -206,6 +217,14 @@ export function admissionFacts(
       scope.openShipment === null || scope.openShipment.id === shipmentId
         ? null
         : { shipmentNumber: scope.openShipment.shipmentNumber },
+    lot:
+      scope.lot === null
+        ? null
+        : {
+            id: scope.lot.id,
+            lotCode: scope.lot.lotCode,
+            status: scope.lot.status,
+          },
   };
 }
 

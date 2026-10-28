@@ -45,6 +45,7 @@ import {
   containerRows,
   existingPhotos,
   jurisdictionLabel,
+  lotPlacementView,
   requiredTypeLabel,
   reviewCardView,
   reviewPlaceholders,
@@ -292,6 +293,7 @@ export default async function LogBatteryPage({
         requiredTypeLabel: requiredTypeLabel(view),
         whoCanCreate: WHO_CAN_CREATE_CONTAINER,
       }}
+      lot={lotPlacementView(view)}
       classification={{
         preview: view.classificationPreview,
         jurisdictionLabel: jurisdictionLabel(view),

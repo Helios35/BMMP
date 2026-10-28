@@ -186,7 +186,9 @@ describe("tenant isolation", () => {
     });
     expect(created.organizationId).toBe(ID.ORG.cascade);
     // And the counter is per-organization, allocated inside the insert.
-    expect(created.containerCode).toBe("C-0004");
+    // The next code after every fixture container — C-0004 to C-0006 were
+    // added by b1a-08 — so a new container never repeats one on file.
+    expect(created.containerCode).toBe("C-0007");
     // The accumulation start date is not settable by any caller: it is set by
     // the first placement and travels with the records (Rule 4.4).
     expect(created.accumulationStartedAt).toBeNull();
@@ -271,10 +273,10 @@ describe("role enforcement, using the same sets Postgres uses", () => {
     );
     await expect(
       mockAdapter.auditEvents.list(MANAGER, PAGE),
-    ).resolves.toHaveProperty("total", 4);
+    ).resolves.toHaveProperty("total", 5);
     await expect(
       mockAdapter.auditEvents.list(AUDITOR, PAGE),
-    ).resolves.toHaveProperty("total", 4);
+    ).resolves.toHaveProperty("total", 5);
   });
 
   it("refuses a rule-version publish from anyone but P6", async () => {
@@ -453,7 +455,8 @@ describe("the awkward fixtures", () => {
     });
     expect(created.ddrFlags).toEqual([]);
     expect(created.isAirTransportProhibited).toBe(false);
-    expect(created.recordNumber).toBe("BR-0006");
+    // BR-0006 to BR-0008 are b1a-08 fixtures; the counter starts above them.
+    expect(created.recordNumber).toBe("BR-0009");
   });
 
   it("carries a container past its accumulation period in the hard overdue state", async () => {
@@ -727,6 +730,7 @@ describe("intake confirmation", () => {
         joinStorageClockId: null,
         storageEvent: null,
         containerAccumulationStartedAt: null,
+        lot: null,
         auditEvents: [],
       }),
     ).rejects.toThrow(ValidationError);

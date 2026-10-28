@@ -18,6 +18,7 @@ import {
   generateShippingPaper,
   recordShipmentArrival,
   recordShipmentTransport,
+  voidShippingPaper,
 } from "@/features/shipments/server/writes";
 import { ConflictError, PermissionError, ValidationError } from "@/lib/errors";
 import type { BatteryRecord } from "@/types/battery-record";
@@ -421,7 +422,12 @@ describe("a contents change voids an issued paper and keeps it (Rules 5.13–5.1
     await expect(
       changeShipmentContents(
         HANDLER,
-        { shipmentId: shipment.id, containerIds: [first.id], reason: null },
+        {
+          shipmentId: shipment.id,
+          containerIds: [first.id],
+          lotIds: [],
+          reason: null,
+        },
         LATER,
         NO_ATTRIBUTION,
       ),
@@ -432,6 +438,7 @@ describe("a contents change voids an issued paper and keeps it (Rules 5.13–5.1
       {
         shipmentId: shipment.id,
         containerIds: [first.id],
+        lotIds: [],
         reason: "One drum pulled off the truck at the dock.",
       },
       LATER,
@@ -571,14 +578,63 @@ describe("air is refused server-side for a shipment holding a damaged record (Ru
     expect(auditRows("denial.recorded")).toHaveLength(1);
   });
 
-  it("blocks departure while the damaged/defective packet is absent (Rule 6.16)", async () => {
+  it("issues the damaged/defective packet with the paper, and departure clears (Rule 6.16)", async () => {
     verifyCascadeNumber();
     const shipment = await shipmentHoldingTheSwollenPack();
-    await generateShippingPaper(HANDLER, shipment.id, AT, NO_ATTRIBUTION);
-    await expect(
-      departShipment(HANDLER, shipment.id, LATER, NO_ATTRIBUTION),
-    ).rejects.toThrow(/damaged\/defective packet/);
-    expect(runningClockOf(ID.CONTAINER.quarantineDrum)).toBeDefined();
+    const issued = await generateShippingPaper(
+      HANDLER,
+      shipment.id,
+      AT,
+      NO_ATTRIBUTION,
+    );
+    // Locked like every render: issued, hashed, stored, linked to the shipment.
+    expect(issued.ddrPacketRender).toMatchObject({
+      documentType: "ddr_packet",
+      status: "issued",
+      shipmentId: shipment.id,
+    });
+    expect(issued.ddrPacketRender?.contentHash).toMatch(/^[0-9a-f]{64}$/);
+    expect(issued.ddrPacketRender?.ruleVersionsApplied[0]?.ruleKey).toBe(
+      "transport.ddr_packaging",
+    );
+
+    const departed = await departShipment(
+      HANDLER,
+      shipment.id,
+      LATER,
+      NO_ATTRIBUTION,
+    );
+    expect(departed.shipment.status).toBe("dispatched");
+    expect(runningClockOf(ID.CONTAINER.quarantineDrum)).toBeUndefined();
+  });
+
+  it("voids the packet with the paper, and a fresh paper issues a fresh packet (Rules 5.13, 5.15)", async () => {
+    verifyCascadeNumber();
+    const shipment = await shipmentHoldingTheSwollenPack();
+    const first = await generateShippingPaper(
+      HANDLER,
+      shipment.id,
+      AT,
+      NO_ATTRIBUTION,
+    );
+    await voidShippingPaper(
+      HANDLER,
+      { shipmentId: shipment.id, reason: "Carrier changed at the dock." },
+      LATER,
+      NO_ATTRIBUTION,
+    );
+    const voided = mockStore()
+      .documentRenders.all()
+      .find((render) => render.id === first.ddrPacketRender?.id);
+    expect(voided?.status).toBe("voided");
+    const second = await generateShippingPaper(
+      HANDLER,
+      shipment.id,
+      LATER,
+      NO_ATTRIBUTION,
+    );
+    expect(second.ddrPacketRender?.status).toBe("issued");
+    expect(second.ddrPacketRender?.id).not.toBe(first.ddrPacketRender?.id);
   });
 });
 

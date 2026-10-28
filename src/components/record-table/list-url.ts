@@ -78,7 +78,8 @@ export interface ListQuerySpec {
   readonly perPageOptions?: readonly number[];
 }
 
-type RawSearchParams = Readonly<
+/** A page's `searchParams`, or a route handler's URL read into the same shape. */
+export type RawSearchParams = Readonly<
   Record<string, string | readonly string[] | undefined>
 >;
 
@@ -323,4 +324,23 @@ export function clearNarrowingHref(
   spec: ListQuerySpec,
 ): string {
   return encodeListQuery(basePath, query, { q: null, filters: {} }, spec);
+}
+
+/**
+ * A list's export href for the view currently on screen — its search, sort
+ * and filters, never its page: an export is the whole scope the reader
+ * narrowed to, not the rows they happen to be looking at (`UX_SPEC.md` §3.20).
+ */
+export function exportHref(
+  exportPath: string,
+  query: ListQuery,
+  spec: ListQuerySpec,
+): string {
+  const view = encodeListQuery(
+    exportPath,
+    query,
+    { page: 1, perPage: defaultPerPage(spec) },
+    spec,
+  );
+  return `${view}${view.includes("?") ? "&" : "?"}format=csv`;
 }

@@ -37,6 +37,7 @@ import { optionsFor } from "@/domain/taxonomy/lookup";
 import { resolveUserNames } from "@/features/battery-record/user-names";
 import { ConflictError, DataIntegrityError, NotFoundError } from "@/lib/errors";
 import type { BatteryRecord } from "@/types/battery-record";
+import type { LabelCatalogComparison } from "@/domain/catalog/label-catalog-check";
 import type { CatalogEntry } from "@/types/catalog";
 import type { IsoDate, IsoTimestamp, Uuid } from "@/types/common";
 import type {
@@ -49,7 +50,7 @@ import type {
   LabelExtraction,
 } from "@/types/intake";
 import type { Jurisdiction } from "@/types/rules-as-data";
-import type { Container, StorageClock } from "@/types/storage";
+import type { Container, Lot, StorageClock } from "@/types/storage";
 import type { Organization } from "@/types/tenancy";
 
 import { INTAKE_CLOSED, INTAKE_HAS_NO_RECORD, INTAKE_NOT_FOUND } from "../copy";
@@ -63,6 +64,7 @@ import {
   type DuplicatePhotoFinding,
 } from "./duplicate-photos";
 import { readGateConfiguration } from "./intake-pipeline";
+import { compareDraftWithEntry } from "./label-catalog";
 
 /**
  * Everything a step of `/batteries/new` renders, read once through `src/data`
@@ -85,6 +87,7 @@ const PHOTO_LIMIT = 50;
 const EXTRACTION_LIMIT = 200;
 const CONTAINER_LIMIT = 100;
 const CLOCK_LIMIT = 100;
+const LOT_LIMIT = 100;
 const OPEN_SESSION_LIMIT = 20;
 
 /** Assessed condition is confirmed on step 3 as a condition, never typed on the card (Rule 6.2). */
@@ -368,6 +371,20 @@ export interface IntakeStepView {
   readonly viewer: { readonly userId: Uuid; readonly fullName: string | null };
   /** D-56 level 1 — the other records a photo here is already on. */
   readonly duplicatePhotos: DuplicatePhotoFinding;
+  /**
+   * Rule 2.35 — what the label read beside the entry the record is matched
+   * to: the person's pick, or the one exact match (Rule 2.18). `null` where
+   * the record has neither.
+   */
+  readonly labelCatalog: {
+    readonly entry: CatalogEntry;
+    readonly comparison: LabelCatalogComparison;
+  } | null;
+  /** Step A4 — the open lots, and the lot the chosen container is already in. */
+  readonly lots: {
+    readonly open: readonly Lot[];
+    readonly ofChosenContainer: Lot | null;
+  };
 }
 
 /**
@@ -522,6 +539,21 @@ export async function readIntakeStepView(
     draft.condition?.confirmedBy ?? null,
   ]);
   const viewer = await data.users.get(ctx, ctx.userId);
+  const [openLots, chosenLot] = await Promise.all([
+    data.lots.list(ctx, { status: "open", limit: LOT_LIMIT }),
+    chosenContainer === null || chosenContainer.lotId === null
+      ? Promise.resolve(null)
+      : data.lots.get(ctx, chosenContainer.lotId),
+  ]);
+
+  // Rule 2.35 — the entry the record is matched to: a person's pick, or, until
+  // one is made, the single exact match the read resolved to (Rule 2.18).
+  const exactCandidates = candidates.filter(
+    ({ candidate }) => candidate.matchMethodCode === "exact_part_number",
+  );
+  const matchedEntry =
+    selectedEntry ??
+    (exactCandidates.length === 1 ? (exactCandidates[0]?.entry ?? null) : null);
 
   return {
     session,
@@ -579,6 +611,23 @@ export async function readIntakeStepView(
       fullName: viewer?.fullName ?? viewer?.email ?? null,
     },
     duplicatePhotos: await readDuplicatePhotos(ctx, session, photos),
+    lots: {
+      open: [...openLots.items].sort((a, b) =>
+        a.lotCode.localeCompare(b.lotCode),
+      ),
+      ofChosenContainer: chosenLot,
+    },
+    labelCatalog:
+      matchedEntry === null
+        ? null
+        : {
+            entry: matchedEntry,
+            comparison: compareDraftWithEntry(
+              draft,
+              matchedEntry,
+              configuration.matchTolerances,
+            ),
+          },
   };
 }
 

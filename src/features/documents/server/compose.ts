@@ -12,6 +12,7 @@ import {
   buildContainerLabelPayload,
   type ContainerLabelContent,
 } from "@/domain/documents/build-container-label-payload";
+import { buildDdrPacketPayload } from "@/domain/documents/build-ddr-packet-payload";
 import {
   buildShippingPaperDocumentPayload,
   buildShippingPaperDraftPayload,
@@ -24,6 +25,7 @@ import {
 } from "@/domain/documents/document-identity";
 import { canonicalJson, verificationCodeOf } from "@/domain/documents/snapshot";
 import type { RuleOutcome } from "@/domain/rules/outcome";
+import type { DdrPacketContent } from "@/domain/transport/ddr-packet";
 import type {
   ShippingPaperDraft,
   ShippingPaperPayload,
@@ -38,6 +40,10 @@ import {
   CONTAINER_LABEL_TEMPLATE,
   ContainerLabelTemplate,
 } from "../templates/container-label-template";
+import {
+  DDR_PACKET_TEMPLATE,
+  DdrPacketTemplate,
+} from "../templates/ddr-packet-template";
 import {
   SHIPPING_PAPER_TEMPLATE,
   ShippingPaperTemplate,
@@ -235,6 +241,38 @@ export function composeContainerLabel(input: {
       outcome,
       (verificationCode) =>
         ContainerLabelTemplate({ payload, verificationCode }),
+    );
+  };
+}
+
+/**
+ * The damaged/defective packet, exactly as `buildDdrPacketContent` decided it
+ * (Rule 6.16) — rendered, hashed and stored in the same operation as the
+ * shipping paper it travels with.
+ */
+export function composeDdrPacket(input: {
+  readonly content: RuleOutcome<DdrPacketContent>;
+}): DocumentComposer {
+  return async (identity) => {
+    const outcome = accepted(
+      buildDdrPacketPayload({
+        content: input.content,
+        document: identityFor(
+          identity,
+          "ddr_packet",
+          DDR_PACKET_TEMPLATE,
+          input.content.result.timeZone,
+          "",
+        ),
+      }),
+    );
+    const payload = outcome.result;
+    return compose(
+      "ddr_packet",
+      DDR_PACKET_TEMPLATE,
+      payload,
+      outcome,
+      (verificationCode) => DdrPacketTemplate({ payload, verificationCode }),
     );
   };
 }

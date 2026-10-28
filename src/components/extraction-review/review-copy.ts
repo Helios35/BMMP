@@ -121,6 +121,19 @@ export const DUPLICATE_PHOTO_BEFORE = "This photo is already on battery ";
 export const DUPLICATE_PHOTO_AFTER =
   ". Check this is a different battery before you confirm.";
 
+/**
+ * T-52 `label_catalog_mismatch` — `UX_SPEC.md` §3.8; Rule 2.35. Two values
+ * side by side, the entry linked. **No score, no percentage, no "match
+ * strength"** — a reason to look, and the card's own three choices are the
+ * way on: keep this entry, pick another, or enter manually.
+ */
+export const LABEL_CATALOG_INTRO =
+  "The label disagrees with the catalog entry this record is matched to. Check the battery in your hands before you confirm.";
+export const LABEL_CATALOG_ENTRY = "Catalog entry";
+export const LABEL_CATALOG_FIELD = "Field";
+export const LABEL_SAYS = "Label says";
+export const CATALOG_SAYS = "Catalog says";
+
 export const RESOLVE_NOW = "Resolve now";
 export const SAVE_TO_QUEUE = "Save to review queue";
 export const SAVING_TO_QUEUE = "Saving…";

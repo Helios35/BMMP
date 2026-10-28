@@ -3,6 +3,7 @@ import type {
   ListQuerySpec,
 } from "@/components/record-table/list-url";
 import type { RecordTableFilter } from "@/components/record-table/record-table-filters";
+import type { ShipmentQuery } from "@/data/contracts";
 import { isTaxonomyValue, optionsFor } from "@/domain/taxonomy/lookup";
 import {
   TRANSPORT_MODES,
@@ -22,6 +23,8 @@ import type { IsoTimestamp } from "@/types/common";
  */
 
 export const SHIPMENT_LIST_PATH = "/shipments";
+/** `GET /api/exports/shipments` — the ledger as CSV (D-50). */
+export const SHIPMENT_EXPORT_PATH = "/api/exports/shipments";
 export const SHIPMENT_PAGE_SIZE = 25;
 
 export const SHIPMENT_FILTER_IDS = [
@@ -93,6 +96,30 @@ export interface ShipmentListSelection {
   readonly holdsDamagedRecord: boolean | undefined;
   readonly shippedAfter: IsoTimestamp | undefined;
   readonly shippedBefore: IsoTimestamp | undefined;
+}
+
+/** What the adapter is asked for a selection — one shape for the page and its export. */
+export function shipmentQueryOf(
+  selection: ShipmentListSelection,
+): ShipmentQuery {
+  return {
+    ...(selection.search === undefined ? {} : { search: selection.search }),
+    ...(selection.transportMode === undefined
+      ? {}
+      : { transportMode: selection.transportMode }),
+    ...(selection.destinationFacilityName === undefined
+      ? {}
+      : { destinationFacilityName: selection.destinationFacilityName }),
+    ...(selection.holdsDamagedRecord === undefined
+      ? {}
+      : { holdsDamagedRecord: selection.holdsDamagedRecord }),
+    ...(selection.shippedAfter === undefined
+      ? {}
+      : { shippedAfter: selection.shippedAfter }),
+    ...(selection.shippedBefore === undefined
+      ? {}
+      : { shippedBefore: selection.shippedBefore }),
+  };
 }
 
 export function shipmentListSelection(query: ListQuery): ShipmentListSelection {
