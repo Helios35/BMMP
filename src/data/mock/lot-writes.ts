@@ -24,6 +24,7 @@ import { writeTriggerAudit as audit } from "./audit-row";
 import { now } from "./factory";
 import { formatRecordNumber, nextId, nextSequenceNumber } from "./ids";
 import { assertPolicy } from "./policy";
+import { sequenceStart } from "./sequence-start";
 import { mockStore } from "./store";
 import { contentsOf } from "./storage-writes";
 
@@ -210,7 +211,7 @@ async function insertLot(
   const seq = nextSequenceNumber(
     ctx.organizationId,
     "lot",
-    organization?.lotSeq ?? 0,
+    sequenceStart(ctx.organizationId, "lot", organization?.lotSeq ?? 0),
   );
   const lot = await store().lots.insert(ctx, {
     id: nextId(),

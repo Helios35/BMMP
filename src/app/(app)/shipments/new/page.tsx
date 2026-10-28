@@ -56,6 +56,10 @@ import {
   CLASSIFICATION_TITLE,
   CONTENTS_CHANGED,
   ddrBody,
+  DDR_HOLD_CHANGE_CONTENTS,
+  DDR_HOLD_GAP_CITATION,
+  DDR_HOLD_GAP_STATEMENT,
+  DDR_HOLD_GAP_TITLE,
   DDR_TITLE,
   DRAFT_DETAIL,
   LINES_TITLE,
@@ -84,6 +88,7 @@ import { readShipmentSources } from "@/features/shipments/server/candidates";
 import {
   activeOrganization,
   ddrAirCitations,
+  readDdrPacketBuild,
   readShippingPaperBuild,
   resolveTransportRules,
   shipmentContainers,
@@ -681,12 +686,16 @@ async function StepThree({
     redirect(`/shipments/${shipment.id}`);
   }
 
-  const { build, organization, scope } = await readShippingPaperBuild(
-    ctx,
-    shipment,
-    nowIso(),
-  );
+  const read = await readShippingPaperBuild(ctx, shipment, nowIso());
+  const { build, organization, scope } = read;
   const { draft } = build;
+  // D-71 — a record on the DDR path whose chemistry has no packaging rule on
+  // file holds departure; said here, before the paper, as soon as it is known.
+  const packet = await readDdrPacketBuild(ctx, read);
+  const packagingGaps =
+    packet.kind === "packet"
+      ? packet.outcome.result.recordsWithoutPackagingRule
+      : [];
   const packagingSentence =
     draft.packagingException.basis === "no_rule_on_file"
       ? PACKAGING_NO_RULE
@@ -735,6 +744,30 @@ async function StepThree({
             {ddrBody(draft.ddrRecordNumbers)}
           </AlertDescription>
         </Alert>
+      )}
+
+      {packagingGaps.length === 0 ? null : (
+        <HardBlockNotice
+          state="blocked"
+          dataAttribute="ddr-packaging-gap"
+          title={DDR_HOLD_GAP_TITLE}
+          statement={DDR_HOLD_GAP_STATEMENT}
+          citations={[]}
+          missingCitation={DDR_HOLD_GAP_CITATION}
+          items={packagingGaps.map((recordNumber) => ({
+            id: recordNumber,
+            label: recordNumber,
+            href: null,
+            indicators: [],
+          }))}
+          paths={[
+            {
+              id: "change",
+              label: DDR_HOLD_CHANGE_CONTENTS,
+              href: `/shipments/new?shipment=${shipment.id}&step=1`,
+            },
+          ]}
+        />
       )}
 
       <SectionCard

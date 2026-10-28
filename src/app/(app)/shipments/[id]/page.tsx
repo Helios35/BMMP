@@ -160,7 +160,7 @@ export default async function ShipmentPage({
   const packetIssued = detail.ddrPacket?.status === "issued";
   const holdsOnMissingPacket =
     issued && detail.damaged.length > 0 && !packetIssued;
-  const holdsOnPackagingGap = issued && detail.ddrPackagingGaps.length > 0;
+  const holdsOnPackagingGap = open && detail.ddrPackagingGaps.length > 0;
   const changeContentsHref = `/shipments/new?shipment=${shipment.id}&step=1`;
 
   return (

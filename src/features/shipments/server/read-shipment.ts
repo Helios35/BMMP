@@ -13,7 +13,14 @@ import type {
 } from "@/types/documents";
 import type { Organization } from "@/types/tenancy";
 
-import { activeOrganization, shipmentContainers } from "./paper-build";
+import { nowIso } from "@/lib/auth/session";
+
+import {
+  activeOrganization,
+  readDdrPacketBuild,
+  resolveTransportRules,
+  shipmentContainers,
+} from "./paper-build";
 import { readContainerScope, type ScopeContainer } from "./scope";
 
 /**
@@ -54,8 +61,10 @@ export interface ShipmentDetail {
   readonly damaged: readonly string[];
   /**
    * The newest damaged/defective packet (T-38 `ddr_packet`), issued or not,
-   * and — where it is issued — the records it lists with no packaging rule
-   * on file, on which departure holds (Rule 6.16; D-71).
+   * and the records with no packaging rule on file for their chemistry, on
+   * which departure holds (Rule 6.16; D-71) — the issued packet's list once
+   * one is issued, and until then the packet as it would be built now, so the
+   * hold is stated as soon as it is knowable.
    */
   readonly ddrPacket: DocumentRender | null;
   readonly ddrPackagingGaps: readonly string[];
@@ -120,6 +129,20 @@ export async function readShipment(
     [...rendersPage.items]
       .filter((render) => render.documentType === "ddr_packet")
       .sort((a, b) => b.renderedAt.localeCompare(a.renderedAt))[0] ?? null;
+  const open = ["draft", "ready", "documents_issued"].includes(shipment.status);
+  const preview =
+    open && ddrPacket?.status !== "issued"
+      ? await readDdrPacketBuild(ctx, {
+          shipment,
+          scope,
+          rules: await resolveTransportRules(
+            ctx,
+            organization,
+            containers,
+            nowIso(),
+          ),
+        })
+      : null;
   const names = await resolveUserNames(ctx, [
     ...rendersPage.items.map((render) => render.renderedBy),
     ...(auditEvents ?? []).map((event) => event.actorUserId),
@@ -151,7 +174,9 @@ export async function readShipment(
     ddrPackagingGaps:
       ddrPacket?.status === "issued"
         ? snapshotStrings(ddrPacket, "recordsWithoutPackagingRule")
-        : [],
+        : preview?.kind === "packet"
+          ? preview.outcome.result.recordsWithoutPackagingRule
+          : [],
     timeZone: containers[0]?.siteTimeZone ?? organization.timeZone,
   };
 }

@@ -39,7 +39,8 @@ describe("organizationSites", () => {
     expect(Array.isArray(sites)).toBe(true);
     expect(sites).toHaveLength(1);
     expect(sites[0]?.address).toEqual(cascade.primaryAddress);
-    expect(sites[0]?.containerCount).toBe(3);
+    // Six fixture containers, three of them added by b1a-08.
+    expect(sites[0]?.containerCount).toBe(6);
   });
 
   it("still returns one row for an organization with no containers", () => {
@@ -75,7 +76,7 @@ describe("organizationSites", () => {
     ]);
 
     expect(sites).toHaveLength(2);
-    expect(sites.map((site) => site.containerCount)).toEqual([2, 1]);
+    expect(sites.map((site) => site.containerCount)).toEqual([5, 1]);
   });
 
   it("carries each site's own jurisdiction, and null is a real state", () => {

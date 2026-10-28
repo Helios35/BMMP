@@ -175,6 +175,7 @@ import {
 } from "@/lib/errors";
 import { mockPlatformConfiguration } from "./platform-configuration";
 import { assertPolicy } from "./policy";
+import { sequenceStart } from "./sequence-start";
 import { mockStore, type TenantAuditEvent } from "./store";
 import {
   platformAppendOnlyRepository,
@@ -803,7 +804,11 @@ const batteryRecords = tenantRepository<
     const seq = nextSequenceNumber(
       ctx.organizationId,
       "battery_record",
-      organization?.batteryRecordSeq ?? 0,
+      sequenceStart(
+        ctx.organizationId,
+        "battery_record",
+        organization?.batteryRecordSeq ?? 0,
+      ),
     );
     return {
       ...input,
@@ -1798,7 +1803,11 @@ const containersBase = tenantRepository<
     const seq = nextSequenceNumber(
       ctx.organizationId,
       "container",
-      organization?.containerSeq ?? 0,
+      sequenceStart(
+        ctx.organizationId,
+        "container",
+        organization?.containerSeq ?? 0,
+      ),
     );
     return {
       ...input,
@@ -1846,7 +1855,7 @@ const lotsBase = tenantRepository<Lot, CreateLot, UpdateLot, LotQuery>(
       const seq = nextSequenceNumber(
         ctx.organizationId,
         "lot",
-        organization?.lotSeq ?? 0,
+        sequenceStart(ctx.organizationId, "lot", organization?.lotSeq ?? 0),
       );
       return {
         ...input,

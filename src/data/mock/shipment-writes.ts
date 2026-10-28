@@ -77,6 +77,7 @@ import { now } from "./factory";
 import { formatRecordNumber, nextId, nextSequenceNumber } from "./ids";
 import { hasStoredObject, snapshotObjects } from "./object-store";
 import { assertPolicy } from "./policy";
+import { sequenceStart } from "./sequence-start";
 import { mockStore } from "./store";
 import { lotMembers, moveLotStatus } from "./lot-writes";
 import { contentsOf } from "./storage-writes";
@@ -127,7 +128,11 @@ export function buildShipmentRow(
   const seq = nextSequenceNumber(
     ctx.organizationId,
     "shipment",
-    organization?.shipmentSeq ?? 0,
+    sequenceStart(
+      ctx.organizationId,
+      "shipment",
+      organization?.shipmentSeq ?? 0,
+    ),
   );
   return {
     ...input,

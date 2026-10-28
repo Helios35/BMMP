@@ -35,6 +35,7 @@ import type {
   User,
 } from "@/types/tenancy";
 import type { AppliedRuleVersion } from "@/domain/rules/outcome";
+import * as B1A_08 from "./b1a-08";
 import * as ID from "./ids";
 import { INVITE_TOKEN_HASHES } from "./invite-tokens";
 
@@ -1859,6 +1860,8 @@ export const batteryRecords: readonly BatteryRecord[] = [
     createdBy: ID.USER.joRainierHandler,
     updatedBy: ID.USER.joRainierHandler,
   },
+  // Added by b1a-08 — never an edit to a row above (STATE §7.1).
+  ...B1A_08.batteryRecords,
 ];
 
 // ---------------------------------------------------------------------------
@@ -1944,6 +1947,8 @@ export const intakeSessions: readonly IntakeSession[] = [
     createdAt: T.spreadIntake,
     updatedAt: T.spreadIntake,
   },
+  // Added by b1a-08 — never an edit to a row above (STATE §7.1).
+  ...B1A_08.intakeSessions,
 ];
 
 export const intakePhotos: readonly IntakePhoto[] = [
@@ -2117,6 +2122,8 @@ export const intakePhotos: readonly IntakePhoto[] = [
     takenBy: ID.USER.danaHandler,
     createdAt: T.swollenIntake,
   },
+  // Added by b1a-08 — never an edit to a row above (STATE §7.1).
+  ...B1A_08.intakePhotos,
 ];
 
 const BAND_CUTOFFS = { high: 0.9, medium: 0.7, low: 0.4 } as const;
@@ -2317,6 +2324,8 @@ export const labelExtractions: readonly LabelExtraction[] = [
     rawText: null,
     createdAt: T.spreadIntake,
   }),
+  // Added by b1a-08 — never an edit to a row above (STATE §7.1).
+  ...B1A_08.labelExtractions,
 ];
 
 export const dateCodeDecodes: readonly DateCodeDecode[] = [
@@ -2435,6 +2444,8 @@ export const containers: readonly Container[] = [
     createdBy: ID.USER.danaHandler,
     updatedBy: null,
   },
+  // Added by b1a-08 — never an edit to a row above (STATE §7.1).
+  ...B1A_08.containers,
 ];
 
 export const lots: readonly Lot[] = [
@@ -2452,6 +2463,8 @@ export const lots: readonly Lot[] = [
     createdBy: ID.USER.danaHandler,
     updatedBy: ID.USER.danaHandler,
   },
+  // Added by b1a-08 — never an edit to a row above (STATE §7.1).
+  ...B1A_08.lots,
 ];
 
 export const storageClocks: readonly StorageClock[] = [
@@ -2535,6 +2548,8 @@ export const storageClocks: readonly StorageClock[] = [
     createdAt: T.overdueAccumulationStart,
     updatedAt: "2026-06-12T07:00:00.000Z",
   },
+  // Added by b1a-08 — never an edit to a row above (STATE §7.1).
+  ...B1A_08.storageClocks,
 ];
 
 export const storageEvents: readonly StorageEvent[] = [
@@ -2598,6 +2613,8 @@ export const storageEvents: readonly StorageEvent[] = [
     governingRuleVersionId: null,
     createdAt: "2026-08-05T16:04:00.000Z",
   },
+  // Added by b1a-08 — never an edit to a row above (STATE §7.1).
+  ...B1A_08.storageEvents,
 ];
 
 export const alerts: readonly Alert[] = [
@@ -2809,6 +2826,8 @@ export const classificationDecisions: readonly ClassificationDecision[] = [
     supersedesClassificationDecisionId: null,
     createdAt: T.scuffedIntake,
   },
+  // Added by b1a-08 — never an edit to a row above (STATE §7.1).
+  ...B1A_08.classificationDecisions,
 ];
 
 export const documentRenders: readonly DocumentRender[] = [
@@ -2966,6 +2985,8 @@ export const shipments: readonly Shipment[] = [
     createdBy: ID.USER.danaHandler,
     updatedBy: ID.USER.danaHandler,
   },
+  // Added by b1a-08 — never an edit to a row above (STATE §7.1).
+  ...B1A_08.shipments,
 ];
 
 export const shippingPapers: readonly ShippingPaper[] = [
@@ -3124,6 +3145,8 @@ export const damageAssessments: readonly DamageAssessment[] = [
     supersedesDamageAssessmentId: null,
     createdAt: T.swollenIntake,
   },
+  // Added by b1a-08 — never an edit to a row above (STATE §7.1).
+  ...B1A_08.damageAssessments,
 ];
 
 // ---------------------------------------------------------------------------
@@ -3229,4 +3252,6 @@ export const auditEvents: readonly AuditEvent[] = [
     reason: null,
     createdAt: T.julyShipped,
   },
+  // Added by b1a-08 — never an edit to a row above (STATE §7.1).
+  ...B1A_08.auditEvents,
 ];
