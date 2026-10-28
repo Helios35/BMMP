@@ -52,7 +52,22 @@ export interface ShipmentDetail {
   readonly fullyRegulated: readonly string[];
   /** Records on the damaged, defective or recalled path. */
   readonly damaged: readonly string[];
+  /**
+   * The newest damaged/defective packet (T-38 `ddr_packet`), issued or not,
+   * and — where it is issued — the records it lists with no packaging rule
+   * on file, on which departure holds (Rule 6.16; D-71).
+   */
+  readonly ddrPacket: DocumentRender | null;
+  readonly ddrPackagingGaps: readonly string[];
   readonly timeZone: TimeZone;
+}
+
+/** A string array out of a stored snapshot field, or empty. */
+function snapshotStrings(render: DocumentRender, key: string): string[] {
+  const value = render.inputSnapshot[key];
+  return Array.isArray(value)
+    ? value.filter((entry): entry is string => typeof entry === "string")
+    : [];
 }
 
 export async function readShipment(
@@ -101,6 +116,10 @@ export async function readShipment(
   }
 
   const records = scope.flatMap((entry) => entry.records);
+  const ddrPacket =
+    [...rendersPage.items]
+      .filter((render) => render.documentType === "ddr_packet")
+      .sort((a, b) => b.renderedAt.localeCompare(a.renderedAt))[0] ?? null;
   const names = await resolveUserNames(ctx, [
     ...rendersPage.items.map((render) => render.renderedBy),
     ...(auditEvents ?? []).map((event) => event.actorUserId),
@@ -128,6 +147,11 @@ export async function readShipment(
           record.ddrFlags.length > 0 || record.isAirTransportProhibited,
       )
       .map(({ record }) => record.recordNumber),
+    ddrPacket,
+    ddrPackagingGaps:
+      ddrPacket?.status === "issued"
+        ? snapshotStrings(ddrPacket, "recordsWithoutPackagingRule")
+        : [],
     timeZone: containers[0]?.siteTimeZone ?? organization.timeZone,
   };
 }

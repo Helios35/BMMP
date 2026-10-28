@@ -9,6 +9,7 @@
  */
 
 export * from "./build-container-label-payload";
+export * from "./build-ddr-packet-payload";
 export * from "./build-shipping-paper-payload";
 export * from "./document-identity";
 export * from "./snapshot";

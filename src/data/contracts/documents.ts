@@ -24,6 +24,7 @@ import type { WasteClassification } from "@/domain/taxonomy/waste-classification
 import type { ContainerLabelContent } from "@/domain/documents/build-container-label-payload";
 import type { AppliedRuleVersion, RuleOutcome } from "@/domain/rules/outcome";
 import type { ResolvedRule } from "@/domain/rules/resolve";
+import type { DdrPacketContent } from "@/domain/transport/ddr-packet";
 import type { ShippingPaperPayload } from "@/domain/transport/shipping-paper";
 import type { Container } from "@/types/storage";
 import type {
@@ -277,6 +278,14 @@ export interface ShipmentRepository extends Repository<
    * organization no longer holds, and re-checks the air block. A paper is
    * never edited and never re-issued over a current one (Rule 5.12) — a
    * correction follows a void and references what it replaces (Rule 5.15).
+   *
+   * **The damaged/defective packet issues in the same operation** wherever
+   * the shipment holds a record on the DDR path (Rule 6.16; T-38
+   * `ddr_packet`): rendered, hashed and stored exactly as the paper is, linked
+   * to the shipment, and voided with it. The adapter refuses a packet that
+   * does not describe exactly the shipment's DDR records, and a packet for a
+   * shipment that holds none. Without a packaging rule in force no packet can
+   * be built; the paper still issues and departure holds on the missing packet.
    */
   issueShippingPaper(
     ctx: RequestContext,
@@ -383,14 +392,28 @@ export interface ShippingPaperIssue {
   readonly paper: RuleOutcome<ShippingPaperPayload>;
   /** Renders exactly that outcome, for the render id the adapter mints. */
   readonly compose: DocumentComposer;
+  /**
+   * The damaged/defective packet that travels with it (Rule 6.16), or null
+   * where the shipment holds no DDR record — or where no packaging rule is in
+   * force to build one, which departure then refuses.
+   */
+  readonly ddrPacket: DdrPacketIssue | null;
   readonly at: IsoTimestamp;
   readonly attribution: StorageWriteAttribution;
+}
+
+/** `buildDdrPacketContent`'s outcome and the composer that renders exactly it. */
+export interface DdrPacketIssue {
+  readonly packet: RuleOutcome<DdrPacketContent>;
+  readonly compose: DocumentComposer;
 }
 
 export interface IssuedShippingPaper {
   readonly shipment: Shipment;
   readonly shippingPaper: ShippingPaper;
   readonly documentRender: DocumentRender;
+  /** The packet issued with it, where one was. */
+  readonly ddrPacketRender: DocumentRender | null;
 }
 
 export interface ShippingPaperVoid {

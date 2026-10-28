@@ -91,6 +91,8 @@ export const JURISDICTION_RULE = {
   federalShipperCertification: uid("0a000006", 5),
   /** The container label phrase — the owner's call in b1a-06. */
   waContainerLabel: uid("0a000006", 6),
+  /** DDR packaging and marking — `SPEC_ddr-packaging-rule-data_2026-10-22.md`, b1a-08. */
+  federalDdrPackaging: uid("0a000006", 7),
 } as const;
 
 export const RULE_VERSION = {
@@ -102,6 +104,7 @@ export const RULE_VERSION = {
   waAccumulationPeriodDraft2027: uid("0a000007", 5),
   federalShipperCertification2026: uid("0a000007", 6),
   waContainerLabel2026: uid("0a000007", 7),
+  federalDdrPackaging2026: uid("0a000007", 8),
 } as const;
 
 export const CATALOG = {

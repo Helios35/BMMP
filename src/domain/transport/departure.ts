@@ -20,8 +20,10 @@ import { readRetentionRule } from "./rule-data";
  * for the contents (Rule 5.13) and whose bytes are stored (§8.2), the carrier on record (Rule 5.16), no air
  * conflict (Rule 6.7 — re-checked, because a condition can change after the
  * paper issued), the damaged/defective packet where any record needs one
- * (Rule 6.16), and a retention period read from rule data (Rule 5.18). **Each
- * refusal is stated**; none is a warning.
+ * (Rule 6.16) — and, for every record it lists, a packaging rule on file for
+ * that record's chemistry (D-71: the system never assumes packaging) — and a
+ * retention period read from rule data (Rule 5.18). **Each refusal is
+ * stated**; none is a warning.
  *
  * **Arrival closes the shipment** and moves its records to closed out, which is
  * terminal (Rule 5.26).
@@ -34,6 +36,7 @@ export type DepartureRefusal =
   | "carrier_missing"
   | "air_blocked"
   | "ddr_packet_missing"
+  | "ddr_packaging_rule_missing"
   | "retention_unresolved";
 
 export type DepartureAdmission =
@@ -58,8 +61,17 @@ export interface DepartureFacts {
   readonly air: AirTransportAssessment;
   /** Records on the damaged/defective path. */
   readonly ddrRecordNumbers: readonly string[];
-  /** A damaged/defective packet is issued for this shipment (T-38 `ddr_packet`). */
+  /**
+   * A damaged/defective packet is issued for this shipment (T-38
+   * `ddr_packet`), not voided, and describing exactly its DDR records.
+   */
   readonly ddrPacketIssued: boolean;
+  /**
+   * The records that packet lists with no packaging rule on file for their
+   * chemistry — departure holds on them until a rule is on file or they
+   * leave the shipment (D-71).
+   */
+  readonly ddrPackagingGaps: readonly string[];
   readonly retention: RetentionDetermination;
 }
 
@@ -103,8 +115,16 @@ export function admitDeparture(facts: DepartureFacts): DepartureAdmission {
   if (facts.ddrRecordNumbers.length > 0 && !facts.ddrPacketIssued) {
     return refuse(
       "ddr_packet_missing",
-      `This shipment holds ${facts.ddrRecordNumbers.join(", ")}, on the damaged, defective or recalled path. ` +
-        "Its damaged/defective packet must be issued before departure (Rule 6.16), and this version does not yet generate that document.",
+      `This shipment holds ${facts.ddrRecordNumbers.join(", ")}, on the damaged, defective or recalled path, and no current damaged/defective packet is issued for it (Rule 6.16). ` +
+        "The packet is generated with the shipping paper from the packaging rule on file: void the paper with a reason and generate it again, or, where no packaging rule is in force for this site, a Platform Admin must add one.",
+    );
+  }
+  if (facts.ddrPackagingGaps.length > 0) {
+    const many = facts.ddrPackagingGaps.length > 1;
+    return refuse(
+      "ddr_packaging_rule_missing",
+      `${facts.ddrPackagingGaps.join(", ")} ${many ? "are" : "is"} on the damaged, defective or recalled path, and no damaged/defective packaging rule is on file for ${many ? "their" : "its"} chemistry. ` +
+        "Departure holds until a rule is on file or the record leaves the shipment — the system never assumes packaging (Rule 6.15).",
     );
   }
   if (!facts.retention.ok) {

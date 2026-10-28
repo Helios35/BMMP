@@ -5,7 +5,13 @@ import type { RequestContext } from "@/data/contracts";
 import type { ResolvedRule } from "@/domain/rules/resolve";
 import { civilDateInZone } from "@/domain/storage/clock-display";
 import {
+  buildDdrPacketContent,
+  type DdrPacketBuild,
+} from "@/domain/transport/ddr-packet";
+import {
   BASIC_DESCRIPTION_RULE_KEY,
+  DDR_PACKAGING_RULE_KEY,
+  readDdrPackagingRule,
   PACKAGING_EXCEPTION_RULE_KEY,
   SHIPMENT_RETENTION_RULE_KEY,
   SHIPPER_CERTIFICATION_RULE_KEY,
@@ -16,6 +22,7 @@ import {
   type ShippingPaperBuild,
   type ShippingPaperRuleInput,
 } from "@/domain/transport/shipping-paper";
+import { resolveUserNames } from "@/features/battery-record/user-names";
 import { organizationSites } from "@/features/settings/sites";
 import { DataIntegrityError } from "@/lib/errors";
 import type { IsoTimestamp, TimeZone } from "@/types/common";
@@ -48,6 +55,8 @@ export interface TransportRules {
   readonly paper: ShippingPaperRuleInput;
   /** Rule 5.18 — read at departure. */
   readonly retention: ResolvedRule | null;
+  /** Rule 6.15 — the damaged/defective packaging the packet prints (D-71). */
+  readonly ddrPackaging: ResolvedRule | null;
   /** The site's zone — every date on the shipment is read in it (Rule 4.29). */
   readonly timeZone: TimeZone;
 }
@@ -99,11 +108,16 @@ export async function resolveTransportRules(
         packagingException: null,
       },
       retention: null,
+      ddrPackaging: null,
       timeZone,
     };
   }
   const resolution = await data.ruleVersions.resolve(ctx, {
-    ruleKeys: [...SHIPPING_PAPER_RULE_KEYS, SHIPMENT_RETENTION_RULE_KEY],
+    ruleKeys: [
+      ...SHIPPING_PAPER_RULE_KEYS,
+      SHIPMENT_RETENTION_RULE_KEY,
+      DDR_PACKAGING_RULE_KEY,
+    ],
     jurisdictionId,
     asOf: civilDateInZone(at, timeZone),
   });
@@ -117,8 +131,67 @@ export async function resolveTransportRules(
       packagingException: rules[PACKAGING_EXCEPTION_RULE_KEY] ?? null,
     },
     retention: rules[SHIPMENT_RETENTION_RULE_KEY] ?? null,
+    ddrPackaging: rules[DDR_PACKAGING_RULE_KEY] ?? null,
     timeZone,
   };
+}
+
+/**
+ * The federal DDR-air citation the packaging row carries — what the air block
+ * cites (D-58 #5). Empty where no packaging rule is in force; the block holds
+ * regardless and says the citation is missing (Rule 1.23).
+ */
+export function ddrAirCitations(rules: TransportRules): readonly string[] {
+  const rule =
+    rules.ddrPackaging === null
+      ? null
+      : readDdrPackagingRule(rules.ddrPackaging);
+  return rule === null ? [] : [rule.air.citation];
+}
+
+/**
+ * The damaged/defective packet for a shipment as it stands — `buildDdrPacketContent`
+ * over the same scope and rules the paper read (Rule 6.16). Each record's
+ * findings are its current, human-confirmed assessment's, with the person
+ * who confirmed them (Rule 6.6) — a name, never "the system".
+ */
+export async function readDdrPacketBuild(
+  ctx: RequestContext,
+  read: Pick<ShippingPaperRead, "shipment" | "scope" | "rules">,
+): Promise<DdrPacketBuild> {
+  const entries = read.scope.flatMap((entry) =>
+    entry.records.map((scoped) => ({ container: entry.container, scoped })),
+  );
+  const names = await resolveUserNames(
+    ctx,
+    entries.map(({ scoped }) => scoped.assessment?.confirmedBy ?? null),
+  );
+  return buildDdrPacketContent({
+    shipmentNumber: read.shipment.shipmentNumber,
+    timeZone: read.rules.timeZone,
+    rule: read.rules.ddrPackaging,
+    records: entries.map(({ container, scoped }) => {
+      const { record, assessment } = scoped;
+      const confirmedBy = assessment?.confirmedBy ?? null;
+      return {
+        recordId: record.id,
+        recordNumber: record.recordNumber,
+        chemistry: record.chemistry,
+        chemistryConfirmed:
+          record.chemistry !== null &&
+          record.chemistry !== "unknown" &&
+          record.chemistryConfirmedBy !== null,
+        ddrFlags: record.ddrFlags,
+        isAirTransportProhibited: record.isAirTransportProhibited,
+        findings: assessment?.findingTypes ?? [],
+        assessedByName:
+          confirmedBy === null ? null : (names.get(confirmedBy) ?? null),
+        assessedAt: assessment?.confirmedAt ?? assessment?.assessedAt ?? null,
+        containerCode: container.containerCode,
+        containerType: container.containerType,
+      };
+    }),
+  });
 }
 
 /** The containers on a shipment, through the one membership link (`ERD.md` §11.1). */

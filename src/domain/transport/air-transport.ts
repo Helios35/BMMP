@@ -115,9 +115,18 @@ function blocks(subject: AirTransportSubject): boolean {
   return subject.ddrFlags.length > 0 || subject.isAirTransportProhibited;
 }
 
-/** Whether air is available for a shipment holding these records, and if not, who blocks it and why. */
+/**
+ * Whether air is available for a shipment holding these records, and if not,
+ * who blocks it and why.
+ *
+ * `ruleCitations` are the citations of the rule versions that forbid air for
+ * a DDR battery outright — the federal DDR-air citation the
+ * `transport.ddr_packaging` row carries (D-58 #5; D-71) — printed beside the
+ * records' own. They never decide anything: the block is the records'.
+ */
 export function assessAirTransport(
   subjects: readonly AirTransportSubject[],
+  ruleCitations: readonly string[] = [],
 ): AirTransportAssessment {
   const blocking = subjects
     .filter(blocks)
@@ -132,11 +141,12 @@ export function assessAirTransport(
   if (blocking.length === 0) return { available: true };
 
   const citations = [
-    ...new Set(
-      blocking
+    ...new Set([
+      ...ruleCitations.filter((citation) => citation.trim() !== ""),
+      ...blocking
         .map((record) => record.citation)
         .filter((citation): citation is string => citation !== null),
-    ),
+    ]),
   ];
   return { available: false, blockingRecords: blocking, citations };
 }

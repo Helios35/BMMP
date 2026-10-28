@@ -83,7 +83,9 @@ import {
 import { readShipmentSources } from "@/features/shipments/server/candidates";
 import {
   activeOrganization,
+  ddrAirCitations,
   readShippingPaperBuild,
+  resolveTransportRules,
   shipmentContainers,
 } from "@/features/shipments/server/paper-build";
 import {
@@ -474,7 +476,16 @@ async function StepTwo({
   let air: AirTransportAssessment | "unknown";
   try {
     scope = await readContainerScope(ctx, containers);
-    air = assessAirTransport(scopeRecords(scope).map(airSubject));
+    const rules = await resolveTransportRules(
+      ctx,
+      organization,
+      containers,
+      nowIso(),
+    );
+    air = assessAirTransport(
+      scopeRecords(scope).map(airSubject),
+      ddrAirCitations(rules),
+    );
   } catch (cause) {
     // §2.6 Error — fail closed: the constraint could not be evaluated, so
     // Air is unavailable until it can be.

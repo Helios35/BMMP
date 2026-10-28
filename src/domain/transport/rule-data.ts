@@ -1,5 +1,7 @@
 import type { AppliedRuleVersion } from "@/domain/rules/outcome";
 import type { ResolvedRule } from "@/domain/rules/resolve";
+import { CHEMISTRIES, type Chemistry } from "@/domain/taxonomy/chemistry";
+import { isTaxonomyValue } from "@/domain/taxonomy/lookup";
 import type { JsonValue } from "@/types/common";
 
 /**
@@ -28,6 +30,12 @@ export const SHIPPER_CERTIFICATION_RULE_KEY = "transport.shipper_certification";
 export const PACKAGING_EXCEPTION_RULE_KEY = "transport.packaging_exception";
 /** How long a shipment record is retained (Rules 5.18, 12.10). */
 export const SHIPMENT_RETENTION_RULE_KEY = "retention.shipment_record";
+/**
+ * Packaging and marking for a damaged, defective or recalled battery, by
+ * chemistry family, and the air prohibition's citation (Rule 6.15; D-58 #5;
+ * D-71) — authored by planning in `SPEC_ddr-packaging-rule-data_2026-10-22.md`.
+ */
+export const DDR_PACKAGING_RULE_KEY = "transport.ddr_packaging";
 
 /** Every key a shipping paper resolves, in one place so a caller cannot forget one. */
 export const SHIPPING_PAPER_RULE_KEYS = [
@@ -39,6 +47,7 @@ export const SHIPPING_PAPER_RULE_KEYS = [
 const BASIC_DESCRIPTION_SCHEMA = "transport.basic_description.v1";
 const SHIPPER_CERTIFICATION_SCHEMA = "transport.shipper_certification.v1";
 const RETENTION_SCHEMA = "retention.shipment_record.v1";
+const DDR_PACKAGING_SCHEMA = "transport.ddr_packaging.v1";
 
 /**
  * The fields `transport.basic_description.v1` may sequence. The schema's own
@@ -123,6 +132,123 @@ export function readRetentionRule(
     return null;
   }
   return { retentionYears };
+}
+
+// --- transport.ddr_packaging.v1 ----------------------------------------------------
+
+/** One chemistry family the rule covers, and the marking text it requires. */
+export interface DdrPackagingFamily {
+  readonly familyKey: string;
+  /** T-01 values. A chemistry in no family has no rule on file (D-71). */
+  readonly chemistries: readonly Chemistry[];
+  readonly markingText: string;
+}
+
+/** One packaging requirement, with its own citation (Rule 12.15). */
+export type DdrPackagingItem = {
+  readonly item: string;
+  readonly requirement: string;
+  readonly citation: string;
+};
+
+export interface DdrPackagingRule {
+  readonly families: readonly DdrPackagingFamily[];
+  readonly packaging: readonly DdrPackagingItem[];
+  /** **Null means not on file** (D-58 #12) — the packet says so; nothing assumes one. */
+  readonly packingLevel: string | null;
+  readonly marking: {
+    readonly citation: string;
+    readonly minimumHeight: string;
+    readonly minimumHeightCitation: string;
+  };
+  /** The federal DDR-air citation the air block prints (D-58 #5). */
+  readonly air: { readonly requirement: string; readonly citation: string };
+}
+
+function isText(value: unknown): value is string {
+  return typeof value === "string" && value.trim() !== "";
+}
+
+function readFamily(value: unknown): DdrPackagingFamily | null {
+  if (!isRecord(value)) return null;
+  const { familyKey, chemistries, markingText } = value;
+  if (!isText(familyKey) || !isText(markingText)) return null;
+  if (
+    !Array.isArray(chemistries) ||
+    chemistries.length === 0 ||
+    !chemistries.every(
+      (chemistry): chemistry is Chemistry =>
+        typeof chemistry === "string" &&
+        isTaxonomyValue(CHEMISTRIES, chemistry),
+    )
+  ) {
+    return null;
+  }
+  return { familyKey, chemistries, markingText };
+}
+
+function readItem(value: unknown): DdrPackagingItem | null {
+  if (!isRecord(value)) return null;
+  const { item, requirement, citation } = value;
+  if (!isText(item) || !isText(requirement) || !isText(citation)) return null;
+  return { item, requirement, citation };
+}
+
+/**
+ * `transport.ddr_packaging.v1`, read whole or not at all. A family, an item
+ * or a citation that is missing or malformed refuses the payload — a packet
+ * that printed half its packaging would be a wrong document, and a wrong
+ * document is worse than none.
+ */
+export function readDdrPackagingRule(
+  resolved: ResolvedRule,
+): DdrPackagingRule | null {
+  if (resolved.ruleKey !== DDR_PACKAGING_RULE_KEY) return null;
+  if (resolved.version.payloadSchemaKey !== DDR_PACKAGING_SCHEMA) return null;
+  const payload: unknown = resolved.version.payload;
+  if (!isRecord(payload)) return null;
+  const { families, packaging, packingLevel, marking, air } = payload;
+  if (!Array.isArray(families) || families.length === 0) return null;
+  if (!Array.isArray(packaging) || packaging.length === 0) return null;
+  const readFamilies = families.map(readFamily);
+  const readItems = packaging.map(readItem);
+  if (readFamilies.some((family) => family === null)) return null;
+  if (readItems.some((item) => item === null)) return null;
+  if (packingLevel !== null && !isText(packingLevel)) return null;
+  if (!isRecord(marking) || !isRecord(air)) return null;
+  const { citation, minimumHeight, minimumHeightCitation } = marking;
+  if (
+    !isText(citation) ||
+    !isText(minimumHeight) ||
+    !isText(minimumHeightCitation)
+  ) {
+    return null;
+  }
+  if (!isText(air.requirement) || !isText(air.citation)) return null;
+  return {
+    families: readFamilies.filter(
+      (family): family is DdrPackagingFamily => family !== null,
+    ),
+    packaging: readItems.filter(
+      (item): item is DdrPackagingItem => item !== null,
+    ),
+    packingLevel,
+    marking: { citation, minimumHeight, minimumHeightCitation },
+    air: { requirement: air.requirement, citation: air.citation },
+  };
+}
+
+/** The family a chemistry falls under, or null — no rule on file for it (D-71). */
+export function ddrPackagingFamilyFor(
+  rule: DdrPackagingRule,
+  chemistry: string | null,
+): DdrPackagingFamily | null {
+  if (chemistry === null) return null;
+  return (
+    rule.families.find((family) =>
+      (family.chemistries as readonly string[]).includes(chemistry),
+    ) ?? null
+  );
 }
 
 /** The rule version as it read when it was applied — copied, never referenced (Rules 12.15, 12.16). */

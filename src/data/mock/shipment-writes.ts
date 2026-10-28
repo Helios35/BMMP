@@ -54,6 +54,7 @@ import {
   admitDeparture,
   shipmentRetention,
 } from "@/domain/transport/departure";
+import { onDdrPath } from "@/domain/transport/ddr-packet";
 import { emergencyVerification } from "@/domain/transport/emergency-verification";
 import { mockPlatformConfiguration } from "./platform-configuration";
 import { SHIPMENT_RETENTION_RULE_KEY } from "@/domain/transport/rule-data";
@@ -693,6 +694,28 @@ async function voidIssuedPaper(
     changedFields: ["status"],
     reason,
   });
+  // Rule 6.16 — the packet travels with the paper, so it is voided with it:
+  // kept, marked, with the same reason and actor (Rules 5.13, 5.14).
+  const packet = currentPacket(ctx, shipment.id);
+  if (packet !== null) {
+    await store().documentRenders.updateAsDefiner(ctx, packet.id, {
+      status: "voided",
+    });
+    await audit(ctx, at, attribution, {
+      eventType: "document_render.voided",
+      entityTable: "document_render",
+      entityId: packet.id,
+      beforeState: { status: packet.status },
+      afterState: {
+        status: "voided",
+        shipmentId: shipment.id,
+        documentType: packet.documentType,
+        ...change,
+      },
+      changedFields: ["status"],
+      reason,
+    });
+  }
   await audit(ctx, at, attribution, {
     eventType: "shipment.status_changed",
     entityTable: "shipment",
@@ -1099,6 +1122,23 @@ export async function issueShippingPaper(
     });
   }
 
+  // Rule 6.16 — the packet describes exactly the shipment's DDR records, or
+  // there is none to describe.
+  const ddrRecordIds = records.filter(onDdrPath).map((record) => record.id);
+  if (
+    input.ddrPacket !== null &&
+    (ddrRecordIds.length === 0 ||
+      !sameIds(input.ddrPacket.packet.result.recordIds, ddrRecordIds))
+  ) {
+    throw new ConflictError({
+      userMessage:
+        "The shipment changed while its damaged/defective packet was being prepared. Nothing was issued — review it again.",
+      correlationId: ctx.correlationId,
+      context: { rule: "6.16" },
+    });
+  }
+  const previousPacket = currentPacket(ctx, shipment.id);
+
   try {
     return await atomically(async () => {
       // §8.2 — the bytes, their hash and the row, or none of them. The
@@ -1111,10 +1151,49 @@ export async function issueShippingPaper(
         subject: { shipmentId: shipment.id },
         supersedesDocumentRenderId: previous?.render.id ?? null,
       });
-      return writePaperRows(ctx, input, shipment, records, render, {
-        previousPaperId: previous?.paper.id ?? null,
-        governingRuleVersionId: governing.ruleVersionId,
+      const issued = await writePaperRows(
+        ctx,
+        input,
+        shipment,
+        records,
+        render,
+        {
+          previousPaperId: previous?.paper.id ?? null,
+          governingRuleVersionId: governing.ruleVersionId,
+        },
+      );
+      if (input.ddrPacket === null) return issued;
+      // Rule 6.16 — the packet, in the same operation: stored and locked
+      // exactly as the paper is, pointing at the packet it follows.
+      const packet = await writeRender(ctx, {
+        compose: input.ddrPacket.compose,
+        status: "issued",
+        at: input.at,
+        documentType: "ddr_packet",
+        subject: { shipmentId: shipment.id },
+        supersedesDocumentRenderId: previousPacket?.id ?? null,
       });
+      const [packetRule] = input.ddrPacket.packet.ruleVersionsApplied;
+      await audit(ctx, input.at, input.attribution, {
+        eventType: "document_render.issued",
+        entityTable: "document_render",
+        entityId: packet.id,
+        beforeState: null,
+        afterState: {
+          documentType: packet.documentType,
+          shipmentId: shipment.id,
+          recordIds: [...input.ddrPacket.packet.result.recordIds],
+          recordsWithoutPackagingRule: [
+            ...input.ddrPacket.packet.result.recordsWithoutPackagingRule,
+          ],
+          contentHash: packet.contentHash,
+          verificationCode: packet.verificationCode,
+          supersedesDocumentRenderId: packet.supersedesDocumentRenderId,
+        },
+        governingRuleVersionId: packetRule?.ruleVersionId ?? null,
+        ruleVersionsApplied: input.ddrPacket.packet.ruleVersionsApplied,
+      });
+      return { ...issued, ddrPacketRender: packet };
     });
   } catch (error) {
     await recordRenderFailure(ctx, input.at, input.attribution, {
@@ -1220,7 +1299,42 @@ async function writePaperRows(
     changedFields: ["status", "offeredAt"],
     governingRuleVersionId: links.governingRuleVersionId,
   });
-  return { shipment: updated, shippingPaper, documentRender: render };
+  return {
+    shipment: updated,
+    shippingPaper,
+    documentRender: render,
+    ddrPacketRender: null,
+  };
+}
+
+/**
+ * The shipment's newest damaged/defective packet that is still issued — not
+ * voided, not superseded (Rule 6.16).
+ */
+function currentPacket(
+  ctx: RequestContext,
+  shipmentId: Uuid,
+): DocumentRender | null {
+  return (
+    store()
+      .documentRenders.all()
+      .filter(
+        (render) =>
+          render.organizationId === ctx.organizationId &&
+          render.shipmentId === shipmentId &&
+          render.documentType === "ddr_packet" &&
+          render.status === "issued",
+      )
+      .sort((a, b) => b.renderedAt.localeCompare(a.renderedAt))[0] ?? null
+  );
+}
+
+/** A string array out of a stored snapshot field, or empty. */
+function storedStrings(render: DocumentRender, key: string): readonly string[] {
+  const value = render.inputSnapshot[key];
+  return Array.isArray(value)
+    ? value.filter((entry): entry is string => typeof entry === "string")
+    : [];
 }
 
 // --- voidShippingPaper ---------------------------------------------------------------------------
@@ -1318,21 +1432,21 @@ export async function recordDeparture(
   const air = assessAirTransport(
     records.map((record) => airSubject(ctx, record)),
   );
-  const ddrRecordNumbers = records
-    .filter(
-      (record) => record.ddrFlags.length > 0 || record.isAirTransportProhibited,
-    )
+  const ddrRecords = records.filter(onDdrPath);
+  const ddrRecordNumbers = ddrRecords
     .map((record) => record.recordNumber)
     .sort((a, b) => a.localeCompare(b));
-  const ddrPacketIssued = store()
-    .documentRenders.all()
-    .some(
-      (render) =>
-        render.organizationId === ctx.organizationId &&
-        render.shipmentId === shipment.id &&
-        render.documentType === "ddr_packet" &&
-        render.status === "issued",
+  // Rule 6.16 — a packet that is issued, not voided, and describes exactly the
+  // DDR records leaving; D-71 — the records it lists with no rule on file.
+  const packet = currentPacket(ctx, shipment.id);
+  const ddrPacketIssued =
+    packet !== null &&
+    sameIds(
+      storedStrings(packet, "recordIds"),
+      ddrRecords.map((record) => record.id),
     );
+  const ddrPackagingGaps =
+    packet === null ? [] : storedStrings(packet, "recordsWithoutPackagingRule");
 
   // Rule 5.18 — the period in force at the site on the ship date. The caller
   // resolved it; one not in force on the date computed here means the two
@@ -1362,6 +1476,7 @@ export async function recordDeparture(
     air,
     ddrRecordNumbers,
     ddrPacketIssued,
+    ddrPackagingGaps,
     retention,
   });
   if (!admission.ok) {

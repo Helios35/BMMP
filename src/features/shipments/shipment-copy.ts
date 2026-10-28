@@ -218,6 +218,23 @@ export function manifestBody(recordNumbers: readonly string[]): string {
 }
 export const MANIFEST_BADGE = "Manifest outstanding";
 
+/** Rule 6.16; D-71 — the packet, and the two holds it can carry. */
+export const OPEN_DDR_PACKET = "Open the damaged/defective packet";
+export const DDR_HOLD_MISSING_TITLE =
+  "Departure holds: the damaged/defective packet is not issued";
+export const DDR_HOLD_MISSING_STATEMENT =
+  "A shipment holding a damaged, defective or recalled battery departs only with its damaged/defective packet (Rule 6.16). The packet is generated with the shipping paper from the packaging rule on file.";
+export const DDR_HOLD_MISSING_CITATION =
+  "No damaged/defective packaging rule is in force for this site, so no packet could be generated. A Platform Admin must add one.";
+export const DDR_HOLD_GAP_TITLE =
+  "Departure holds: no damaged/defective packaging rule on file";
+export const DDR_HOLD_GAP_STATEMENT =
+  "These batteries are on the damaged, defective or recalled path, and no damaged/defective packaging rule is on file for their chemistry. The system never assumes packaging, so departure holds until a rule is on file or the battery leaves the shipment (Rule 6.15).";
+export const DDR_HOLD_GAP_CITATION =
+  "No damaged/defective packaging rule on file for this chemistry.";
+export const DDR_HOLD_CHANGE_CONTENTS = "Change the contents";
+export const DDR_HOLD_REGENERATE = "Void the paper and generate it again";
+
 export const DDR_TITLE =
   "Damaged, defective or recalled batteries are on this shipment";
 export function ddrBody(recordNumbers: readonly string[]): string {
