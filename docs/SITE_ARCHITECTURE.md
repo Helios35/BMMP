@@ -1,5 +1,5 @@
 # Site Architecture — BMMP
-**Version:** 1.0 · **Date:** 2026-08-11 · **Owner:** Nathan Ivy / Next Sketch LLC
+**Version:** 1.1 · **Date:** 2026-10-28 · **Owner:** Nathan Ivy / Next Sketch LLC
 **Answers:** How is the product structured — what pages exist, how they connect, and who can reach them?
 **Reads from:** `_ANCHORS.md` · `PROJECT_SETUP_BMMP.md` · `VISION.md` · `PRD.md` · Roadmap v3.0 (2026-07-28) · Decision Log D-1–D-11  ·  **Feeds:** `UX_SPEC.md` · `TECHNICAL_SPEC.md` · `ERD.md` · builder briefs
 
@@ -19,6 +19,10 @@
 > A battery that has not cleared the confidence gate has **no confirmed chemistry** (Rule 2.8). Without confirmed chemistry it cannot be classified (Rule 3.3), and without a classification it cannot be correctly segregated (Rule 4.28) or clocked against the right accumulation period (Rule 4.5). **A backing-up review queue is therefore a storage-compliance problem**, and storage compliance is P2's job — she answers to the fire marshal and the insurer for it. The dashboard count tells her the queue is growing; it does not tell her **which** of the batteries sitting in her containers are the unidentified ones, which is the question she actually has to answer. Blocking her from the list means she finds out through a segregation violation instead.
 
 **Viewing is not confirming.** Rule 2.22 already forbids P2 confirming, and §5.2 below encodes view-only rather than write. The original instinct behind RN-3 — that a builder must not split the difference between two disagreeing documents — was right, and is why this is now written in one place instead of inferred in three.
+
+**CL-2 · 2026-10-28 · Consolidation leaves P2's storage-event row. `Decision Log.md` D-57 #5.**
+
+§5.5 gave P2 "consolidation" in its storage-event row while its "add or remove records" row and the policy matrix denied her moving batteries. Moving batteries between containers — consolidation and split — is P1 and P6 only; P2 records inspection and relocation. Flow C4 says the same.
 
 ---
 
@@ -308,7 +312,7 @@ P1 sets the assessed condition to the damaged/defective value at step 3. See **F
 | C1 | `/` | Reads the alert region, ordered most urgent first. | Orders: overdue → the configured remaining-time alert ladder → over-limit container quantity → open review items. The ladder is configuration data seeded with the roadmap's default tiers; the tier *names* are `TAXONOMY.md` (Rule 4.13). Alerts go to P2 always, and to P1 for containers at their site (Rule 4.14). |
 | C2 | `/containers?filter=alerting` | Opens the alert. | Filters the list to alerting containers. Filter state is in the URL and is shareable. |
 | C3 | `/containers/[id]` | Opens the container. | Shows the storage clock — accumulation start date, elapsed, remaining, tier — the contents, and the fill reading against the per-container limit **supplied by the site's jurisdiction and fire-code data**. The limit value and its unit are read from `jurisdiction_rule`; the UI renders whatever number and unit the rule supplies and assumes nothing (Rule 1.23). Every date is computed in the **site's local time zone** (Rule 4.29). In B1a, crossing a limit raises a warning to P2 with the limit's source stated — the monitoring and evidence behaviour is `[B1b]` §9 and **B1a must not implement it ahead of specification** (Rule 4.26). |
-| C4 | `/containers/[id]` | Chooses a response. | Three are available to P2: (a) record a `storage_event` — inspection, consolidation, relocation; (b) regenerate and reprint the `container_label` where the system has flagged it as needing it (Rules 4.19, 4.21); (c) **mark the container ready to ship**, which sets the container's ready-to-ship status (value in `TAXONOMY.md`), writes a `storage_event`, and raises it on `/` for P1 and P6. On an **overdue** container, a fourth appears: **record a remediation** stating what was done and why (Rule 4.17). |
+| C4 | `/containers/[id]` | Chooses a response. | Three are available to P2: (a) record a `storage_event` — inspection, relocation; (b) regenerate and reprint the `container_label` where the system has flagged it as needing it (Rules 4.19, 4.21); (c) **mark the container ready to ship**, which sets the container's ready-to-ship status (value in `TAXONOMY.md`), writes a `storage_event`, and raises it on `/` for P1 and P6. On an **overdue** container, a fourth appears: **record a remediation** stating what was done and why (Rule 4.17). |
 | C5 | `/review` | Checks what in her containers is still unidentified. | View-only list of open queue items **keyed on the container each one sits in** (CL-1). An unconfirmed record has no confirmed chemistry, so it cannot be classified (Rule 3.3) and therefore cannot be validated against its container's segregation class (Rule 4.28). This is the question the dashboard count cannot answer. She can open the record or the container; she cannot confirm or void (Rule 2.22). |
 | C6 | `/` | — | The alert re-tiers, or moves to a handed-off state if C4(c) was taken. An `audit_event` records who did what, when, and with what stated reason. |
 
@@ -474,7 +478,8 @@ Both hold `W`. They do not hold the same `W`.
 
 | Action | P1 | P2 | P6 |
 |---|:--:|:--:|:--:|
-| Record a `storage_event` (inspection, consolidation, relocation) | ✓ | ✓ | ✓ |
+| Record a `storage_event` (inspection, relocation) | ✓ | ✓ | ✓ |
+| Move batteries between containers — consolidate or split (Rules 4.9–4.12) | ✓ | — | ✓ |
 | **Record a remediation on an overdue container** (Rule 4.17) | — | ✓ | ✓ |
 | Choose the site's clock demonstration method (Rule 4.3) | — | ✓ | ✓ |
 | Generate / reprint the `container_label` | ✓ | ✓ | ✓ |

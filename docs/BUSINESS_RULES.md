@@ -1,5 +1,5 @@
 # Business Rules — BMMP
-**Version:** 1.1 · **Date:** 2026-08-11 · **Owner:** Nathan Ivy / Next Sketch LLC
+**Version:** 1.2 · **Date:** 2026-10-28 · **Owner:** Nathan Ivy / Next Sketch LLC
 **Answers:** What decisions does the system make, and on what basis?
 **Reads from:** `docs/_ANCHORS.md`, `docs/PRD.md`, `ROADMAP_BMMP_2026-07-28.md` (v3.0), `Decision Log.md` (D-1–D-11), `RESEARCH_battery-management-feature-sweep_2026-07-28.md`, `PROJECT_SETUP_BMMP.md`  ·  **Feeds:** `docs/TAXONOMY.md`, `docs/TECHNICAL_SPEC.md`, `docs/ERD.md`, `docs/UX_SPEC.md`, `docs/SITE_ARCHITECTURE.md`, `docs/RUNBOOK.md`, every builder brief
 
@@ -9,6 +9,14 @@
 ---
 
 ## Changelog
+
+**v1.2 · 2026-10-28 — the label-vs-catalog check, and the B1a doc pass (`Decision Log.md` D-57, D-58, D-62, D-68)**
+
+- **New Rule 2.35** — the label-vs-catalog check, text half (D-56 level 2, D-68). Authored by planning in `SPEC_label-vs-catalog_2026-10-22.md`, transcribed by `b1a-08-leftovers`. It appends to the end of section 2.
+- **Rule 4.12 reworded** (D-57 #3): a split produces new containers, and the source never takes a later start date.
+- **Rule 5.3 lists every precondition the shipping paper checks** (D-58 #4): shipping identifiers, every mass known, current container labels and the rule data the paper is built from join the five it already named.
+- **Rule 5.7 reworded to the issued paper** (D-62 #4): a draft may print without the 24-hour number, with the gap stated in words.
+- **No rule was renumbered.** Rule 2.35 is the only new rule; Rules 4.12, 5.3 and 5.7 keep their numbers and subjects.
 
 **v1.1 · 2026-08-11 — status reconciliation against `TAXONOMY.md` v1.1**
 
@@ -485,6 +493,27 @@ Eleven entities have a status. Every one is listed here and every one has a matc
 
 **2.34** A record cannot enter classification until its identification is confirmed. See Rule 3.3.
 
+**2.35 — LABEL-VS-CATALOG CHECK.**
+
+- **When it runs.** A record gets a catalog entry, either by exact match (Rule 2.18) or by a human pick (Rule 2.19). At that point, every field that both the label read and the catalog entry carry is compared.
+- **On a disagreement.** The record routes to review with reason `label_catalog_mismatch`, and the review card shows each disagreeing field side by side: what the label says and what the catalog says.
+- **A reason to look, never a verdict.** It blocks nothing on its own and carries no score and no probability. A person decides: keep the match, pick another entry, or take the manual path (Rule 2.20).
+- **What doesn't count.** A field the label did not read is not a disagreement (Rule 2.11).
+- **Tolerances.** Numeric tolerances are the same platform configuration catalog match scoring already reads (D-43). There is no second set.
+- **No off switch.** No flag, role or setting turns the check off (Rule 2.17).
+- **History.** Every disagreement shown is kept on the record's history, with the values compared and the tolerance in force (Rule 12.15).
+
+**Fields compared** (T-09 field code → catalog entry column):
+
+- `manufacturer` → `manufacturer_name`, or `brand_name` when the entry has one. Normalized the way part numbers already are.
+- `model` → `part_number`, compared on `part_number_normalized`.
+- `voltage` → `nominal_voltage_v`
+- `capacity_ah` → `rated_capacity_ah`
+- `energy_wh` → `rated_energy_wh`
+- `chemistry_code` → `chemistry`. Only compared where the code resolves to one T-01 value through the resolution catalog matching already uses. A code with no resolution is not compared.
+
+No other field is compared.
+
 ---
 
 ### 3. Waste classification — light category vs full hazardous — B1a
@@ -575,7 +604,7 @@ Eleven entities have a status. Every one is listed here and every one has a matc
 
 **4.11** Consolidating two or more containers produces a container whose accumulation start date is the earliest among all consolidated contents.
 
-**4.12** Splitting a container produces containers that each inherit the earliest accumulation start date among their own contents. Splitting is never a way to shed an old start date.
+**4.12** Splitting a container produces new containers. The chosen batteries move into a fresh container, which inherits the earliest accumulation start date among what it received; the source keeps its own start date and never takes a later one. Splitting is never a way to shed an old start date.
 
 **4.13** Alerts fire on a configured ladder of remaining-time offsets held as configuration data, seeded with the roadmap's default tiers. The ladder is data; the existence of alerting is not. Tier names are owned by `TAXONOMY.md`.
 
@@ -627,7 +656,7 @@ Eleven entities have a status. Every one is listed here and every one has a matc
 
 **5.2** A shipment has exactly one origin site, one destination, one mode of transport and one shipping paper.
 
-**5.3** A shipping paper may be generated only when every one of these preconditions is satisfied, and each unmet precondition is listed by name to the user: every included record has a confirmed identification (section 2); every included record has an active classification decision (section 3); no included record carries an unresolved damaged-or-defective determination that conflicts with the selected mode (section 6); the organization has a verified 24-hour emergency contact number on file; and the destination and transporter details are recorded.
+**5.3** A shipping paper may be generated only when every one of these preconditions is satisfied, and each unmet precondition is listed by name to the user: every included record has a confirmed identification (section 2); every included record has an active classification decision (section 3); no included record carries an unresolved damaged-or-defective determination that conflicts with the selected mode (section 6); the organization has a verified 24-hour emergency contact number on file; the destination and transporter details are recorded; every included record's shipping identifiers resolve from its matched catalog entry (Rule 5.9); the mass of every included record is known, so the paper can state its quantity (Rule 5.8); every included container carries a current label (Rules 4.19, 4.22); and the rule data the paper is built from is on file for the site's jurisdiction on the shipment date (Rules 1.23, 5.5, 5.8).
 
 **5.4** Every shipment requires a shipping paper, regardless of whether its contents classified into the light waste category or as full hazardous. There is no shipment without one.
 
@@ -635,7 +664,7 @@ Eleven entities have a status. Every one is listed here and every one has a matc
 
 **5.6** The 24-hour emergency contact number must be recorded for the organization and verified before it can be used on a document. Verification is a recorded act with a date and an actor.
 
-**5.7** A missing, unverified or expired 24-hour emergency number blocks shipping-paper generation with a stated reason and a pointer to who can fix it (P2 or P6). It is never omitted from the document and never replaced with a placeholder.
+**5.7** A missing, unverified or expired 24-hour emergency number blocks issuing a shipping paper, with a stated reason and a pointer to who can fix it (P2 or P6). It is never omitted from an issued paper and never replaced with a placeholder. A draft (Rule 5.28) may print without it, with the gap stated as a sentence under its not-valid marking — never a number-shaped placeholder.
 
 **5.8** The basic description sequence, the required identifiers and their ordering are owned by `TAXONOMY.md` and by the applicable rule version. This document does not enumerate them.
 

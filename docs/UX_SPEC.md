@@ -277,7 +277,7 @@ This is the interaction the entire product rests on. Specify it exactly.
 | **Active** (pressing Confirm) | Button scales to 98%, 120ms, no colour change. |
 | **Disabled** (offline, or an expired P6 support grant) | Every confirm, edit and reject control disabled, `opacity-60`, with a single `Alert` at the top of the card stating why — *"You're offline — confirmations can't be saved until you reconnect"* (D-20), or *"Your support grant expired"* (Rule 1.28). Values stay fully readable. **This is not the read-only-role state:** the only roles that render this component are P1 and P6 (Rule 2.22), and P2 gets a different composition that does not include the card at all (§3.8b). Do not add a read-only mode to this component — there is no role that needs one. |
 | **Loading** (extraction running) | The card renders its shell with `Skeleton` rows and a text status with an estimate: *"Reading label — about 5 seconds"*. A **Cancel** is always available. Beyond 20 seconds, the copy changes to *"Still reading — you can wait or enter the details by hand"* and manual entry becomes available in place. |
-| **Error** (extraction failed) | `critical` `Alert` in place of the field rows, stating what failed in plain language, with **Try again** and **Enter details manually**. Photos are preserved. The session is never lost. |
+| **Error** (extraction failed) | `critical` `Alert` on step 1, beside the photos it was read from, stating what failed in plain language, with **Try again** and **Enter details manually**. The flow does not advance to the field rows on its own. Photos are preserved. The session is never lost. |
 | **Empty** (zero fields extracted) | The **no-read state**, distinct from low confidence. See §5, E-4. |
 
 #### 2.1.7 Accessibility
@@ -441,7 +441,7 @@ The shared list component behind `/batteries`, `/containers`, `/shipments`, `/ca
 | Error | `critical` `Alert`: *"This document couldn't be generated"* with the reason, **Retry**, and a link to the source record. A failed render never blocks reading the underlying record. |
 | Empty | n/a — the route requires a `document_render` |
 
-**Printing is a real browser print** against a dedicated print stylesheet: Letter by default, no app chrome, no navigation, no dark mode, black on white, hairline rules. Every print writes an `audit_event` (BR §12) — a reprint is a new render superseding the old, and both stay in the trail (Rules 4.20, 5.15).
+**Printing draws the stored PDF, then opens a real browser print.** Each page of the issued bytes is drawn with pdf.js, the render's status marking — draft, void, superseded — is stamped over every page, and the browser prints that: Letter by default, no app chrome, no navigation, no dark mode. What prints is the document that was issued, and the void marking survives printing. Every print writes an `audit_event` (BR §12). **A reprint never re-renders** (`TECHNICAL_SPEC.md` §8.4); a correction is a new render that supersedes the old, and both stay in the trail (Rules 4.20, 5.15).
 
 ---
 
@@ -749,6 +749,8 @@ Tabs:
 **What's on it.** Desktop: a two-pane layout — queue list left (sorted **oldest first**, with age, container context and a count of flagged fields), `ExtractionReviewCard` (§2.1) right. Mobile: the list; tapping opens the card full-screen with **Next** / **Previous**.
 
 **This is the same `ExtractionReviewCard` as `/batteries/new` step 2. Not a second implementation.** Selected item in the URL (`?item=`) so a dashboard alert deep-links to it.
+
+**Label disagrees with catalog** (Rule 2.35). When the reason includes `label_catalog_mismatch`, each disagreeing field shows two values side by side, **Label says** and **Catalog says**, with the catalog entry linked. No colour-coded score, no percentage, no "match strength" wording. The three choices are the ones the card already offers: keep this entry, pick another, or enter manually.
 
 Also holds: sessions abandoned mid-intake, sessions whose photo upload never completed (E-3), and re-match confirmations raised by an approved catalog entry (Flow F).
 
@@ -1234,7 +1236,7 @@ Entering by hand puts every field in the `Entered by you` source state; the thre
 
 - `HardBlockNotice` (§2.6): the block, the reason, every blocking record linked, and the permitted alternative.
 - The Air option is **visible and disabled**, never hidden.
-- If a damaged record enters the selection after air was chosen: the selection clears, a `critical` `Alert` names the record, **Continue** blocks.
+- With air already chosen, a damaged, defective or recalled record **cannot enter the selection**: step 1 shows its row refused, naming the record and the reason (Rules 6.7, 6.13). Nothing is cleared, because nothing invalid was ever selected.
 - **No override, for anyone, including P6.** No "proceed anyway", no bypass dialog, no support path.
 - Server re-checks at commit and rejects with the same stated reason.
 - If the constraint check fails or has not returned, **fail closed** — the option stays unavailable.
@@ -1250,7 +1252,7 @@ Entering by hand puts every field in the `Entered by you` source state; the thre
 |---|---|
 | Offline, reading | Cached data with a stated timestamp — *"Showing information from 14:22"*, never "recently" |
 | Offline, capturing | Photos capture and queue locally; each shows **Queued** |
-| Offline, extraction | Not run: *"We'll read this label when you're back online."* Manual entry available now. |
+| Offline, extraction | Not run: step 1's checklist reads *"Reconnect to read the label"*. Manual entry available now — offline it is the only way on. |
 | Offline, committing a hard-gated confirmation | **Blocked**, with the reason stated. Confirming chemistry against a stale catalog is not a confirmation. |
 | Offline, printing | An already-rendered `document_render` prints from cache. A new render is queued with the reason stated. |
 | Slow (> 3s) | Inline *"This is taking longer than usual"* + a working **Cancel** on every long operation |
@@ -1263,10 +1265,10 @@ Entering by hand puts every field in the `Entered by you` source state; the thre
 
 ### E-11 — The 24-hour emergency contact number is not set
 
-**Where:** `/shipments/new` step 3, `/settings/organization`.
+**Where:** `/shipments/new` step 3, the draft's `/shipments/[id]`, `/settings/organization`.
 
 - Step 3 blocks with an `attention` `Alert`: *"A 24-hour emergency contact number is required on every shipping paper. It isn't set for this organization yet."*
-- P2/P6 → **Set it now** → `/settings/organization`, returning to the draft.
+- P6 → **Set it now** from step 3. P2 → **Set it now** from the draft's `/shipments/[id]`, because P2 cannot reach `/shipments/new` (`SITE_ARCHITECTURE.md` §5.2). Both go to `/settings/organization` and return to where they came from.
 - **P1 cannot reach that route.** They see: *"Ask your Facility Manager or an Admin to add it in Organization settings."* **Never a link the role will be redirected away from.**
 - The shipment draft persists. Nothing is discarded.
 
@@ -1327,7 +1329,7 @@ B1a generates no hazardous waste manifest. The gap is **stated, never silent** (
 | **Filters exclude everything** | *"No results match these filters"* + **Clear filters**. **Never the zero-records onboarding copy.** |
 | **Search returns nothing** | *"No matches for '<query>'"* + a scoped suggestion. |
 | **Record not found / cross-tenant ID** | A plain not-found page with a route back. **Never disclose that the record exists in another organization** (`SITE_ARCHITECTURE.md` §5.3). |
-| **Session expired mid-flow** | The draft persists. On re-authentication the user returns to the exact step. *"You were signed out. Your work is here."* |
+| **Session expired mid-flow** | The draft persists. On re-authentication the user returns to the exact step. The sign-in page says *"You were signed out. Sign in again to pick up where you left off."* |
 | **Two people editing one record** | Last write wins, with a `neutral` `Alert` on the loser's screen naming who changed it and when, plus **Reload**. No silent overwrite. |
 | **Very long values** | Middle-ellipsis truncation with the full value in a tooltip and always copyable in full. Never a broken layout. |
 | **A status value the UI does not recognise** | Renders `neutral` with the raw value in mono and a console warning. **Never blank** (§2.3). |
