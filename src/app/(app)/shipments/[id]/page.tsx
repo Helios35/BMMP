@@ -440,10 +440,11 @@ function ContentsTab({
     >
       <SectionCard title={CONTENTS_CONTAINERS}>
         <ul className="grid gap-2">
-          {detail.scope.map(({ container, records }) => (
+          {detail.scope.map(({ container, records, lot }) => (
             <li
               key={container.id}
               data-shipment-container={container.containerCode}
+              data-shipment-container-lot={lot?.lotCode ?? undefined}
               className="flex flex-col gap-1"
             >
               {canOpenContainer ? (
@@ -459,7 +460,12 @@ function ContentsTab({
                 </span>
               )}
               <span className="text-caption text-muted-foreground">
-                {`${CONTAINER_TYPE_LABELS[container.containerType]} · ${records.length} ${records.length === 1 ? "record" : "records"}`}
+                {[
+                  CONTAINER_TYPE_LABELS[container.containerType],
+                  `${records.length} ${records.length === 1 ? "record" : "records"}`,
+                  // Rule 5.1 — a container that travels as part of a lot says which.
+                  ...(lot === null ? [] : [`lot ${lot.lotCode}`]),
+                ].join(" · ")}
               </span>
             </li>
           ))}

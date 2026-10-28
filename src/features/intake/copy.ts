@@ -155,6 +155,12 @@ export const BATTERY_LOGGED = "Battery logged";
 
 export const LOG_ANOTHER = "Log another";
 
+/** Step A4 — a lot holds containers (`ERD.md` §6.2). */
+export const LOT_NEEDS_CONTAINER =
+  "Choose a container first. A lot holds containers, so the battery joins a lot through the container it goes into.";
+export const LOT_NOT_OPEN =
+  "That lot is no longer open, so nothing can join it. Choose another, or start a new lot.";
+
 // --- reasons written to the audit log -------------------------------------------
 
 export const REASON_SAVED_TO_QUEUE = "session_saved_to_queue";

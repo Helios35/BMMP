@@ -29,13 +29,16 @@ import { nowIso } from "@/lib/auth/session";
 import { recordNotFound, recordWriteDenial } from "@/lib/auth/record-denial";
 import { DataIntegrityError, NotFoundError } from "@/lib/errors";
 import type { Uuid } from "@/types/common";
-import type { Container, StorageEvent } from "@/types/storage";
+import type { Container, Lot, StorageEvent } from "@/types/storage";
 
 import {
   containerIdSchema,
   createContainerSchema,
   editContainerDetailsSchema,
+  lotMembershipSchema,
+  lotStatusSchema,
   moveContentsSchema,
+  openLotSchema,
   recordInspectionSchema,
   recordRemediationSchema,
 } from "./schemas";
@@ -379,5 +382,72 @@ export async function generateLabel(
       );
       return { documentRenderId: issued.documentRender.id };
     },
+  );
+}
+
+// --- lots — T-25; the owner's call in b1a-08 puts their controls here ---------
+
+/**
+ * **New lot** — P1 or P6 (T-25), empty or started with one container. A lot
+ * holds containers, never batteries directly (`ERD.md` §6.2).
+ */
+export async function openLot(input: unknown): Promise<ActionResult<Lot>> {
+  return containerAction(
+    "manage_lot",
+    "openLot",
+    "create a lot",
+    openLotSchema,
+    input,
+    async (ctx, parsed, attribution) =>
+      data.lots.open(ctx, {
+        description: parsed.description,
+        containerId: parsed.containerId,
+        at: nowIso(),
+        attribution,
+      }),
+  );
+}
+
+/** A container joins or leaves an open lot (T-25). */
+export async function changeLotMembership(
+  input: unknown,
+): Promise<ActionResult<Lot>> {
+  return containerAction(
+    "manage_lot",
+    "changeLotMembership",
+    "change which lot a container is in",
+    lotMembershipSchema,
+    input,
+    async (ctx, parsed, attribution) =>
+      data.lots.changeMembership(ctx, {
+        lotId: parsed.lotId,
+        containerId: parsed.containerId,
+        change: parsed.change,
+        at: nowIso(),
+        attribution,
+      }),
+  );
+}
+
+/**
+ * Close, reopen or dissolve a lot (T-25). Dissolving returns its containers
+ * to their prior state — out of any lot — and keeps the lot row for audit.
+ */
+export async function changeLotStatus(
+  input: unknown,
+): Promise<ActionResult<Lot>> {
+  return containerAction(
+    "manage_lot",
+    "changeLotStatus",
+    "close, reopen or dissolve a lot",
+    lotStatusSchema,
+    input,
+    async (ctx, parsed, attribution) =>
+      data.lots.changeStatus(ctx, {
+        lotId: parsed.lotId,
+        status: parsed.status,
+        at: nowIso(),
+        attribution,
+      }),
   );
 }

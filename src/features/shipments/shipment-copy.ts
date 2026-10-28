@@ -56,13 +56,26 @@ export const STEP_LOCKED_REVIEW =
   "Save the contents and the transport details to reach review.";
 
 export const NEW_SHIPMENT_DESCRIPTION =
-  "Choose the containers, record how they travel, and review the shipping paper before it is generated.";
+  "Choose the lots, containers or single batteries, record how they travel, and review the shipping paper before it is generated.";
 
 // --- step 1 ----------------------------------------------------------------------------
 
 export const CONTENTS_TITLE = "Containers";
 export const CONTENTS_DESCRIPTION =
   "Choose the containers this shipment carries. A container that cannot ship says why.";
+/** Rule 5.1 — a shipment is built from lots, containers or single batteries, mixed. */
+export const LOTS_TITLE = "Lots";
+export const LOTS_DESCRIPTION =
+  "Choose a closed lot to ship its containers together. A lot that cannot ship says why.";
+export const LOT_MEMBERS = "Containers";
+export const LOT_EARLIEST_START = "Earliest accumulation start";
+export const LOT_NO_START = "No battery placed yet";
+export const LOT_OVERDUE = "Overdue";
+export const BATTERIES_TITLE = "Single batteries";
+export const BATTERIES_DESCRIPTION =
+  "Ship one battery on its own. It travels in its own labelled container, so choosing it chooses that container; a battery that shares one says how to split it out.";
+export const OPEN_ITS_CONTAINER = "Open its container";
+export const SHIPS_AS_CONTAINER = "Ships as";
 export const SUMMARY_TITLE = "In this shipment";
 export const SUMMARY_NOTHING = "Nothing chosen yet.";
 export const SUMMARY_RECORDS = "Records";

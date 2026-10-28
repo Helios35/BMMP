@@ -76,9 +76,13 @@ export interface TransportDefaults {
 export interface TransportStepProps {
   readonly modes: readonly TransportModeOption[];
   readonly defaults: TransportDefaults;
-  /** A new shipment carries its containers; an existing one its id. */
+  /** A new shipment carries its containers and lots; an existing one its id. */
   readonly target:
-    | { readonly kind: "new"; readonly containerIds: readonly string[] }
+    | {
+        readonly kind: "new";
+        readonly containerIds: readonly string[];
+        readonly lotIds: readonly string[];
+      }
     | { readonly kind: "existing"; readonly shipmentId: string };
 }
 
@@ -191,6 +195,7 @@ export function TransportStep({
         target.kind === "new"
           ? await assembleShipment({
               containerIds: target.containerIds,
+              lotIds: target.lotIds,
               ...fields,
             })
           : await recordTransport({ shipmentId: target.shipmentId, ...fields });

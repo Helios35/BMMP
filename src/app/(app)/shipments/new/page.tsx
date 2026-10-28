@@ -80,7 +80,7 @@ import {
   ZERO_CONTAINERS_BODY,
   ZERO_CONTAINERS_TITLE,
 } from "@/features/shipments/shipment-copy";
-import { readShipmentCandidates } from "@/features/shipments/server/candidates";
+import { readShipmentSources } from "@/features/shipments/server/candidates";
 import {
   activeOrganization,
   readShippingPaperBuild,
@@ -107,7 +107,8 @@ import type { Container } from "@/types/storage";
  * `/shipments/new` — `UX_SPEC.md` §3.12; `SITE_ARCHITECTURE.md` Flow B, D.
  *
  * Three steps on one route, the step in the URL: **Contents** (`?containers=`
- * — what `/containers/[id]`'s *Ship this container* sends), **Transport**,
+ * — what `/containers/[id]`'s *Ship this container* sends — and `?lots=`,
+ * lots, containers and single batteries mixed, Rule 5.1), **Transport**,
  * and **Review and generate** (`?shipment=`, once step 2 has written the
  * shipment — its destination is a required column). P1 and P6 only; the
  * guard redirects every other role with the restriction named.
@@ -161,6 +162,7 @@ export default async function NewShipmentPage({
   const step = stepOf(single(params.step));
   const shipmentId = single(params.shipment);
   const containerIds = idsOf(single(params.containers));
+  const lotIds = idsOf(single(params.lots));
   const modeParam = single(params.mode);
 
   let shipment: Shipment | null = null;
@@ -180,15 +182,15 @@ export default async function NewShipmentPage({
     shipment === null
       ? "/shipments/new"
       : `/shipments/new?shipment=${shipment.id}`;
-  const selection = containerIds.join(",");
+  const selection = selectionQuery(containerIds, lotIds);
   const hrefFor = (index: number): string => {
     if (shipment !== null) return `${base}&step=${index + 1}`;
     if (index === 0) {
       return selection === ""
         ? "/shipments/new"
-        : `/shipments/new?containers=${selection}`;
+        : `/shipments/new?${selection}`;
     }
-    return `/shipments/new?step=2&containers=${selection}`;
+    return `/shipments/new?step=2${selection === "" ? "" : `&${selection}`}`;
   };
   // Steps a shipment has actually recorded: a written shipment has its
   // contents and its transport; a new one has neither until step 2 saves it.
@@ -231,7 +233,10 @@ export default async function NewShipmentPage({
         completedThrough={completedThrough}
         hrefs={STEPS.map((_step, index) => hrefFor(index))}
         disabledReasons={STEPS.map((_step, index) =>
-          index === 1 && shipment === null && containerIds.length === 0
+          index === 1 &&
+          shipment === null &&
+          containerIds.length === 0 &&
+          lotIds.length === 0
             ? STEP_LOCKED_SELECT
             : index === 2 && shipment === null
               ? STEP_LOCKED_TRANSPORT
@@ -243,13 +248,19 @@ export default async function NewShipmentPage({
       />
 
       {step === 1 ? (
-        <StepOne ctx={ctx} shipment={shipment} containerIds={containerIds} />
+        <StepOne
+          ctx={ctx}
+          shipment={shipment}
+          containerIds={containerIds}
+          lotIds={lotIds}
+        />
       ) : null}
       {step === 2 ? (
         <StepTwo
           ctx={ctx}
           shipment={shipment}
           containerIds={containerIds}
+          lotIds={lotIds}
           modeParam={modeParam}
         />
       ) : null}
@@ -258,18 +269,37 @@ export default async function NewShipmentPage({
   );
 }
 
+/** `containers=…&lots=…`, each only where something is chosen. */
+function selectionQuery(
+  containerIds: readonly string[],
+  lotIds: readonly string[],
+): string {
+  return [
+    ...(containerIds.length === 0
+      ? []
+      : [`containers=${containerIds.join(",")}`]),
+    ...(lotIds.length === 0 ? [] : [`lots=${lotIds.join(",")}`]),
+  ].join("&");
+}
+
 // --- step 1 --------------------------------------------------------------------------------
 
 async function StepOne({
   ctx,
   shipment,
   containerIds,
+  lotIds,
 }: {
   readonly ctx: RequestContext;
   readonly shipment: Shipment | null;
   readonly containerIds: readonly string[];
+  readonly lotIds: readonly string[];
 }): Promise<ReactElement> {
-  const candidates = await readShipmentCandidates(ctx, shipment);
+  const [sources, organization] = await Promise.all([
+    readShipmentSources(ctx, shipment),
+    activeOrganization(ctx),
+  ]);
+  const candidates = sources.containers;
   if (candidates.length === 0) {
     // E-2 — the picker is replaced by an explanatory state, never an empty list.
     return (
@@ -287,18 +317,30 @@ async function StepOne({
     );
   }
   const known = new Set(candidates.map((candidate) => candidate.id));
-  const initialSelection =
-    containerIds.length > 0
-      ? containerIds.filter((id) => known.has(id))
-      : candidates
+  const knownLots = new Set(sources.lots.map((lot) => lot.id));
+  const fromUrl = containerIds.length > 0 || lotIds.length > 0;
+  const initialSelection = fromUrl
+    ? {
+        containers: containerIds.filter((id) => known.has(id)),
+        lots: lotIds.filter((id) => knownLots.has(id)),
+      }
+    : {
+        containers: candidates
           .filter((candidate) => candidate.onThisShipment)
-          .map((candidate) => candidate.id);
+          .map((candidate) => candidate.id),
+        lots: sources.lots
+          .filter((lot) => lot.onThisShipment)
+          .map((lot) => lot.id),
+      };
   const paperIssued = shipment?.status === "documents_issued";
   return (
     <ContentsStep
+      lots={sources.lots}
       candidates={candidates}
+      batteries={sources.batteries}
       initialSelection={initialSelection}
       shipment={shipment === null ? null : { id: shipment.id, paperIssued }}
+      timeZone={organization.timeZone}
     />
   );
 }
@@ -327,18 +369,35 @@ function ContentsChanged({ href }: { readonly href: string }): ReactElement {
   );
 }
 
+/**
+ * A new shipment's chosen containers: those chosen alone and every member of
+ * each lot chosen whole (Rule 5.1). Null when any of them is gone.
+ */
 async function readSelection(
   ctx: RequestContext,
   ids: readonly string[],
+  lotIds: readonly string[],
 ): Promise<readonly Container[] | null> {
-  const containers: Container[] = [];
+  const containers = new Map<string, Container>();
   for (const id of ids) {
     const container = await data.containers.get(ctx, id);
     if (container === null) return null;
-    containers.push(container);
+    containers.set(container.id, container);
   }
-  return containers;
+  for (const lotId of lotIds) {
+    const lot = await data.lots.get(ctx, lotId);
+    if (lot === null) return null;
+    const members = await data.containers.list(ctx, {
+      lotId: lot.id,
+      limit: LOT_MEMBER_LIMIT,
+    });
+    for (const member of members.items) containers.set(member.id, member);
+  }
+  return [...containers.values()];
 }
+
+/** An engineering bound on one lot's containers, not a regulatory figure. */
+const LOT_MEMBER_LIMIT = 200;
 
 function defaultsFor(
   shipment: Shipment | null,
@@ -379,19 +438,22 @@ async function StepTwo({
   ctx,
   shipment,
   containerIds,
+  lotIds,
   modeParam,
 }: {
   readonly ctx: RequestContext;
   readonly shipment: Shipment | null;
   readonly containerIds: readonly string[];
+  readonly lotIds: readonly string[];
   readonly modeParam: string | null;
 }): Promise<ReactElement> {
+  const selection = selectionQuery(containerIds, lotIds);
   const stepOneHref =
     shipment === null
-      ? `/shipments/new?containers=${containerIds.join(",")}`
+      ? `/shipments/new?${selection}`
       : `/shipments/new?shipment=${shipment.id}&step=1`;
 
-  if (shipment === null && containerIds.length === 0) {
+  if (shipment === null && containerIds.length === 0 && lotIds.length === 0) {
     redirect("/shipments/new");
   }
   if (shipment !== null && shipment.status === "documents_issued") {
@@ -402,7 +464,7 @@ async function StepTwo({
   const organization = await activeOrganization(ctx);
   const containers =
     shipment === null
-      ? await readSelection(ctx, containerIds)
+      ? await readSelection(ctx, containerIds, lotIds)
       : await shipmentContainers(ctx, shipment.id);
   if (containers === null || containers.length === 0) {
     return <ContentsChanged href={stepOneHref} />;
@@ -439,6 +501,7 @@ async function StepTwo({
                   siteTimeZone: first.siteTimeZone,
                   siteAddress: first.siteAddress,
                 },
+          shippingLotIds: lotIds,
         }).ok,
     );
     if (refused) return <ContentsChanged href={stepOneHref} />;
@@ -470,7 +533,7 @@ async function StepTwo({
 
   const currentHref =
     shipment === null
-      ? `/shipments/new?step=2&containers=${containerIds.join(",")}`
+      ? `/shipments/new?step=2&${selection}`
       : `/shipments/new?shipment=${shipment.id}&step=2`;
   const joiner = currentHref.includes("?") ? "&" : "?";
 
@@ -490,6 +553,7 @@ async function StepTwo({
           air={air}
           scope={scope}
           shipment={shipment}
+          lotIds={lotIds}
           groundHref={`${currentHref}${joiner}mode=ground`}
         />
       )}
@@ -502,7 +566,13 @@ async function StepTwo({
         )}
         target={
           shipment === null
-            ? { kind: "new", containerIds: containers.map((row) => row.id) }
+            ? {
+                kind: "new",
+                containerIds: containerIds.filter((id) =>
+                  containers.some((row) => row.id === id),
+                ),
+                lotIds,
+              }
             : { kind: "existing", shipmentId: shipment.id }
         }
       />
@@ -516,26 +586,43 @@ function AirBlock({
   air,
   scope,
   shipment,
+  lotIds,
   groundHref,
 }: {
   readonly ctx: RequestContext;
   readonly air: Extract<AirTransportAssessment, { readonly available: false }>;
   readonly scope: readonly ScopeContainer[];
   readonly shipment: Shipment | null;
+  readonly lotIds: readonly string[];
   readonly groundHref: string;
 }): ReactElement {
   const blocking = new Set(
     air.blockingRecords.map((record) => record.recordId),
   );
+  const blocked = scope.filter((entry) =>
+    entry.records.some(({ record }) => blocking.has(record.id)),
+  );
+  // A lot leaves whole or not at all: a lot holding a blocking record comes
+  // off with it, and so do its other containers.
+  const blockedLots = new Set(
+    blocked.flatMap((entry) =>
+      entry.container.lotId === null ? [] : [entry.container.lotId],
+    ),
+  );
   const remaining = scope
     .filter(
-      (entry) => !entry.records.some(({ record }) => blocking.has(record.id)),
+      (entry) =>
+        !blocked.includes(entry) &&
+        (entry.container.lotId === null ||
+          !lotIds.includes(entry.container.lotId)),
     )
     .map((entry) => entry.container.id);
+  const remainingLots = lotIds.filter((id) => !blockedLots.has(id));
+  const remainingQuery = selectionQuery(remaining, remainingLots);
   const removeHref =
     shipment === null
-      ? `/shipments/new?containers=${remaining.join(",")}`
-      : `/shipments/new?shipment=${shipment.id}&step=1&containers=${remaining.join(",")}`;
+      ? `/shipments/new?${remainingQuery}`
+      : `/shipments/new?shipment=${shipment.id}&step=1${remainingQuery === "" ? "" : `&${remainingQuery}`}`;
   const canOpenRecord = canReadRoute(ctx.role, "/batteries/[id]");
   const [first] = air.blockingRecords;
   return (

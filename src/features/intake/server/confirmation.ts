@@ -832,6 +832,9 @@ export function buildIntakeConfirmation(
             governingRuleVersionId: placementRuleVersionId,
           },
     containerAccumulationStartedAt,
+    // Step A4 — the lot the chosen container joins or opens, in the same
+    // commit. Nothing to group when the record is unplaced.
+    lot: container === null ? null : (draft.lotChoice ?? null),
     auditEvents,
   };
 

@@ -36,6 +36,7 @@ import {
   type ContainerPickerRow,
 } from "@/components/storage/container-picker";
 import { intakeStepHref } from "./intake-hrefs";
+import { LotChoiceForm, type LotPlacementView } from "./lot-choice-form";
 import type { UploadTransport } from "./photo-capture-step";
 import { SourceDeviceForm } from "./source-device-form";
 import { StateOfChargeForm } from "./state-of-charge-form";
@@ -118,6 +119,8 @@ export interface ConfirmAndPlaceStepProps {
   readonly stateOfCharge: DraftStateOfCharge | null;
   readonly sourceDevice: DraftSourceDevice | null;
   readonly placement: PlacementView;
+  /** Step A4's lot — the chosen container joins or opens one (T-25). */
+  readonly lot: LotPlacementView;
   readonly classification: {
     readonly preview: ClassificationResult;
     readonly jurisdictionLabel: string;
@@ -144,6 +147,7 @@ export function ConfirmAndPlaceStep({
   stateOfCharge,
   sourceDevice,
   placement,
+  lot,
   classification,
   clock,
   summary,
@@ -270,6 +274,7 @@ export function ConfirmAndPlaceStep({
           requiredTypeLabel={placement.requiredTypeLabel}
         />
         <ClockPreviewBlock preview={clock} />
+        <LotChoiceForm view={lot} onChoose={actions.chooseLot} />
       </SectionCard>
 
       <ClassificationOutcome

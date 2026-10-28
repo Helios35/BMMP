@@ -114,6 +114,7 @@ export async function assembleShipment(
         ctx,
         {
           containerIds: parsed.containerIds,
+          lotIds: parsed.lotIds,
           transport: transportDetails(parsed),
         },
         nowIso(),
@@ -139,6 +140,7 @@ export async function changeContents(
         {
           shipmentId: parsed.shipmentId,
           containerIds: parsed.containerIds,
+          lotIds: parsed.lotIds,
           reason: parsed.reason,
         },
         nowIso(),

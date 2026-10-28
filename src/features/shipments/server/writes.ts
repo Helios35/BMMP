@@ -81,6 +81,8 @@ export async function assembleShipment(
   ctx: RequestContext,
   input: {
     readonly containerIds: readonly Uuid[];
+    /** Lots chosen whole (Rule 5.1). Omitted means none. */
+    readonly lotIds?: readonly Uuid[];
     readonly transport: ShipmentTransportDetails;
   },
   at: IsoTimestamp,
@@ -88,6 +90,7 @@ export async function assembleShipment(
 ): Promise<Shipment> {
   const shipment = await data.shipments.assemble(ctx, {
     containerIds: input.containerIds,
+    lotIds: input.lotIds ?? [],
     transport: input.transport,
     at,
     attribution,
@@ -100,6 +103,7 @@ export async function changeShipmentContents(
   input: {
     readonly shipmentId: Uuid;
     readonly containerIds: readonly Uuid[];
+    readonly lotIds: readonly Uuid[];
     readonly reason: string | null;
   },
   at: IsoTimestamp,
@@ -108,6 +112,7 @@ export async function changeShipmentContents(
   const result = await data.shipments.changeContents(ctx, {
     shipmentId: input.shipmentId,
     containerIds: input.containerIds,
+    lotIds: input.lotIds,
     reason: input.reason,
     at,
     attribution,

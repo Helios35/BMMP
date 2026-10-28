@@ -31,6 +31,8 @@ import { readTaxonomyValue } from "@/domain/taxonomy/lookup";
 import { STORAGE_CLOCK_ALERT_BAND_LABELS } from "@/domain/taxonomy/storage-clock-alert-band";
 import { CopyButton } from "@/features/battery-record/copy-button";
 import { ContainerActions } from "@/features/containers/components/container-actions";
+import { ContainerLotControl } from "@/features/containers/components/lot-controls";
+import { FIELD_LOT, NOT_IN_A_LOT } from "@/features/containers/container-copy";
 import { ContentsPanel } from "@/features/containers/components/contents-panel";
 import { ClockCell } from "@/features/containers/container-columns";
 import {
@@ -75,6 +77,9 @@ import type { Container } from "@/types/storage";
  * the pinned alert, and a Contents tab whose move targets refuse it with the
  * two ways out stated (Rule 4.16).
  */
+
+/** An engineering bound on the open lots offered, not a regulatory figure. */
+const OPEN_LOT_LIMIT = 100;
 
 export async function generateMetadata({
   params,
@@ -178,6 +183,20 @@ export default async function ContainerPage({
   const can = (action: Parameters<typeof mayTakeContainerAction>[1]) =>
     mayTakeContainerAction(ctx.role, action);
   const canShip = can("ship_this_container");
+  // T-25 — the lot this container is in, and the open lots it could join.
+  const [lot, openLots] = await Promise.all([
+    container.lotId === null
+      ? Promise.resolve(null)
+      : data.lots.get(ctx, container.lotId),
+    data.lots.list(ctx, { status: "open", limit: OPEN_LOT_LIMIT }),
+  ]);
+  // A closed lot ships whole, so its container's Ship link carries the lot.
+  const shipHref =
+    lot !== null && (lot.status === "closed" || lot.status === "allocated")
+      ? `/shipments/new?lots=${lot.id}`
+      : `/shipments/new?containers=${container.id}`;
+  const cycleEnded =
+    container.status === "shipped" || container.status === "retired";
 
   const containerCodes = new Map(
     [container, ...detail.moveTargets.map((target) => target.container)].map(
@@ -212,10 +231,7 @@ export default async function ContainerPage({
           canShip && !isEmpty ? (
             // P1 and P6. The shipment is unit 05's; this is the link and nothing more.
             <Button asChild size="lg" className={ACTION_BUTTON_CLASS}>
-              <Link
-                href={`/shipments/new?containers=${container.id}`}
-                data-ship-this-container="true"
-              >
+              <Link href={shipHref} data-ship-this-container="true">
                 {SHIP_THIS_CONTAINER}
               </Link>
             </Button>
@@ -273,6 +289,38 @@ export default async function ContainerPage({
           />
         </SectionCard>
       </div>
+
+      <SectionCard
+        title={FIELD_LOT}
+        dataAttributes={{ "data-container-lot": lot?.lotCode ?? "none" }}
+      >
+        {lot === null ? (
+          <p className="text-body">{NOT_IN_A_LOT}</p>
+        ) : (
+          <p className="flex flex-wrap items-center gap-2 text-body">
+            <span className="font-mono text-body-strong">{lot.lotCode}</span>
+            {lot.description === null ? null : <span>{lot.description}</span>}
+            <StatusBadge system="lot_status" value={lot.status} size="sm" />
+          </p>
+        )}
+        {can("manage_lot") && !cycleEnded ? (
+          <ContainerLotControl
+            containerId={container.id}
+            lot={
+              lot === null
+                ? null
+                : { id: lot.id, lotCode: lot.lotCode, status: lot.status }
+            }
+            openLots={openLots.items
+              .filter((open) => open.id !== lot?.id)
+              .map((open) => ({
+                id: open.id,
+                lotCode: open.lotCode,
+                description: open.description,
+              }))}
+          />
+        ) : null}
+      </SectionCard>
 
       <ContainerActions
         containerId={container.id}

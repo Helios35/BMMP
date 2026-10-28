@@ -33,6 +33,8 @@ import type {
   ReviewPlaceholderImage,
 } from "@/features/intake/components/extraction-review-step";
 import type { ExistingIntakePhoto } from "@/features/intake/components/photo-capture-step";
+import type { LotPlacementView } from "@/features/intake/components/lot-choice-form";
+import { LOT_STATUS_LABELS } from "@/domain/taxonomy/lot-status";
 import {
   catalogEntryTitle,
   measurement,
@@ -383,6 +385,25 @@ export function containerRows(
       };
     },
   );
+}
+
+/** Step A4's lot, from the open lots and the chosen container's own. */
+export function lotPlacementView(view: IntakeStepView): LotPlacementView {
+  const container = view.placementPreview.chosen?.container ?? null;
+  const own = view.lots.ofChosenContainer;
+  return {
+    containerCode: container?.containerCode ?? null,
+    containerLot:
+      own === null
+        ? null
+        : { lotCode: own.lotCode, statusLabel: LOT_STATUS_LABELS[own.status] },
+    openLots: view.lots.open.map((lot) => ({
+      id: lot.id,
+      lotCode: lot.lotCode,
+      description: lot.description,
+    })),
+    choice: view.draft.lotChoice ?? null,
+  };
 }
 
 export function requiredTypeLabel(view: IntakeStepView): string | null {

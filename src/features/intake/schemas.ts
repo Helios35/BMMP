@@ -216,6 +216,23 @@ export const choosePlacementSchema = z.object({
   containerId: uuidField.nullable(),
 });
 
+/**
+ * Step A4's lot (`SITE_ARCHITECTURE.md` A4). `null` keeps the container's
+ * grouping as it is.
+ */
+export const chooseIntakeLotSchema = z.object({
+  sessionId: uuidField,
+  lot: z
+    .discriminatedUnion("kind", [
+      z.object({ kind: z.literal("join"), lotId: uuidField }),
+      z.object({
+        kind: z.literal("open"),
+        description: z.string().trim().max(MAX_TEXT_LENGTH).nullable(),
+      }),
+    ])
+    .nullable(),
+});
+
 export const createContainerForIntakeSchema = z.object({
   sessionId: uuidField,
   storageLocation: z

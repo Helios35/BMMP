@@ -50,7 +50,7 @@ import type {
   LabelExtraction,
 } from "@/types/intake";
 import type { Jurisdiction } from "@/types/rules-as-data";
-import type { Container, StorageClock } from "@/types/storage";
+import type { Container, Lot, StorageClock } from "@/types/storage";
 import type { Organization } from "@/types/tenancy";
 
 import { INTAKE_CLOSED, INTAKE_HAS_NO_RECORD, INTAKE_NOT_FOUND } from "../copy";
@@ -87,6 +87,7 @@ const PHOTO_LIMIT = 50;
 const EXTRACTION_LIMIT = 200;
 const CONTAINER_LIMIT = 100;
 const CLOCK_LIMIT = 100;
+const LOT_LIMIT = 100;
 const OPEN_SESSION_LIMIT = 20;
 
 /** Assessed condition is confirmed on step 3 as a condition, never typed on the card (Rule 6.2). */
@@ -379,6 +380,11 @@ export interface IntakeStepView {
     readonly entry: CatalogEntry;
     readonly comparison: LabelCatalogComparison;
   } | null;
+  /** Step A4 — the open lots, and the lot the chosen container is already in. */
+  readonly lots: {
+    readonly open: readonly Lot[];
+    readonly ofChosenContainer: Lot | null;
+  };
 }
 
 /**
@@ -533,6 +539,12 @@ export async function readIntakeStepView(
     draft.condition?.confirmedBy ?? null,
   ]);
   const viewer = await data.users.get(ctx, ctx.userId);
+  const [openLots, chosenLot] = await Promise.all([
+    data.lots.list(ctx, { status: "open", limit: LOT_LIMIT }),
+    chosenContainer === null || chosenContainer.lotId === null
+      ? Promise.resolve(null)
+      : data.lots.get(ctx, chosenContainer.lotId),
+  ]);
 
   // Rule 2.35 — the entry the record is matched to: a person's pick, or, until
   // one is made, the single exact match the read resolved to (Rule 2.18).
@@ -599,6 +611,12 @@ export async function readIntakeStepView(
       fullName: viewer?.fullName ?? viewer?.email ?? null,
     },
     duplicatePhotos: await readDuplicatePhotos(ctx, session, photos),
+    lots: {
+      open: [...openLots.items].sort((a, b) =>
+        a.lotCode.localeCompare(b.lotCode),
+      ),
+      ofChosenContainer: chosenLot,
+    },
     labelCatalog:
       matchedEntry === null
         ? null

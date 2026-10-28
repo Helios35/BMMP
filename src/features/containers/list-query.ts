@@ -10,6 +10,11 @@ import {
 } from "@/domain/taxonomy/container-status";
 import { isTaxonomyValue, optionsFor } from "@/domain/taxonomy/lookup";
 import {
+  LOT_STATUSES,
+  LOT_STATUS_LABELS,
+  type LotStatus,
+} from "@/domain/taxonomy/lot-status";
+import {
   STORAGE_CLOCK_ALERT_BANDS,
   STORAGE_CLOCK_ALERT_BAND_LABELS,
   type StorageClockAlertBand,
@@ -45,6 +50,54 @@ export const CONTAINER_FILTER_IDS = [
 /** `?filter=alerting` — the one value, named by Flow C2. */
 export const ALERTING = "alerting";
 
+/**
+ * `/containers`' two views, in the URL like every tab (`?tab=lots`): the
+ * containers, and the lots that group them (T-25; the owner's call in
+ * `b1a-08` — a lot has no route of its own).
+ */
+export const CONTAINER_VIEW_IDS = ["containers", "lots"] as const;
+export type ContainerViewId = (typeof CONTAINER_VIEW_IDS)[number];
+
+export function activeContainerView(query: ListQuery): ContainerViewId {
+  return query.tab === "lots" ? "lots" : "containers";
+}
+
+export const LOT_FILTER_IDS = ["status"] as const;
+
+/** The Lots view's URL contract — search and T-25's status. */
+export const LOT_LIST_SPEC: ListQuerySpec = {
+  sortableColumnIds: [],
+  defaultSort: "",
+  defaultDir: "desc",
+  filterIds: LOT_FILTER_IDS,
+  filterValues: { status: LOT_STATUSES },
+  perPageOptions: [CONTAINER_PAGE_SIZE, 50, 100],
+  tabIds: CONTAINER_VIEW_IDS,
+};
+
+export const LOT_FILTERS: readonly RecordTableFilter[] = [
+  {
+    id: "status",
+    label: "Status",
+    options: optionsFor(LOT_STATUSES, LOT_STATUS_LABELS),
+    anyLabel: "Any status",
+  },
+];
+
+export function lotListSelection(query: ListQuery): {
+  readonly search: string | null;
+  readonly status: LotStatus | null;
+} {
+  const status = query.filters.status;
+  return {
+    search: query.q,
+    status:
+      status !== undefined && isTaxonomyValue(LOT_STATUSES, status)
+        ? status
+        : null,
+  };
+}
+
 export function containerListSpec(locations: readonly string[]): ListQuerySpec {
   return {
     sortableColumnIds: [],
@@ -58,6 +111,7 @@ export function containerListSpec(locations: readonly string[]): ListQuerySpec {
       location: locations,
     },
     perPageOptions: [CONTAINER_PAGE_SIZE, 50, 100],
+    tabIds: CONTAINER_VIEW_IDS,
   };
 }
 
