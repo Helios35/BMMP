@@ -84,6 +84,15 @@ export async function buildShipmentToStepThree(
   await expect(
     page.locator(`[data-candidate="${containerId}"]`),
   ).toHaveAttribute("data-admission", "ok");
+  return continueByGroundToStepThree(page);
+}
+
+/**
+ * From step 1 with the contents already selected: **Continue**, then step 2
+ * by ground to a run-unique facility; resolves on step 3 with the shipment's
+ * id. A spec that ships a lot selects it on step 1 and starts here.
+ */
+export async function continueByGroundToStepThree(page: Page): Promise<string> {
   await page.locator("[data-contents-continue]").click();
   await page.waitForURL(/step=2/);
   const fields: Readonly<Record<string, string>> = {
