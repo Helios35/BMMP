@@ -1,6 +1,7 @@
 import { data } from "@/data";
 import type { CreateDamageAssessment, RequestContext } from "@/data/contracts";
 import { assessDamage, validateFindings } from "@/domain/condition/damage";
+import { prohibitsAir, withDamageFlags } from "@/domain/recalls/recalled-flag";
 import type { DamageFindingType } from "@/domain/taxonomy/damage-finding-type";
 import type { DdrFlag } from "@/domain/taxonomy/ddr-flag";
 import { ValidationError } from "@/lib/errors";
@@ -221,13 +222,18 @@ export async function recordDamageAssessmentFor(
   }
 
   const flagsBefore = record.ddrFlags;
+  // `recalled` is not a finding (T-30): the record keeps its own, and air
+  // stays prohibited while any flag stands — clearing damage never reopens
+  // air on a recalled record (Rule 6.24).
+  const ddrFlags = withDamageFlags(record.ddrFlags, determination.ddrFlags);
   const updated = await data.batteryRecords.applyConditionOutcome(
     ctx,
     record.id,
     {
       assessedCondition: determination.assessedCondition,
-      ddrFlags: determination.ddrFlags,
-      isAirTransportProhibited: determination.isAirTransportProhibited,
+      ddrFlags,
+      isAirTransportProhibited:
+        determination.isAirTransportProhibited || prohibitsAir(ddrFlags),
       conditionRuleVersionId: rule.ruleVersionId,
       conditionConfirmedBy: ctx.userId,
       conditionConfirmedAt: at,

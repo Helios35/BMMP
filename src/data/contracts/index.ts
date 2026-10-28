@@ -34,6 +34,7 @@ import type {
   ShippingPaperRepository,
 } from "./documents";
 import type { DamageAssessmentRepository } from "./condition";
+import type { RecallRepository } from "./recalls";
 import type { AuditEventRepository } from "./audit";
 import type { IdentityRepository } from "./identity";
 import type { PlatformConfigurationRepository } from "./platform-configuration";
@@ -144,8 +145,10 @@ export interface DataAdapter {
   readonly containerLabels: ContainerLabelRepository;
   readonly documentRenders: DocumentRenderRepository;
 
-  // Condition — ERD.md §8.1. grade, hazard_ranking and recall_match are B2 (D-24).
+  // Condition — ERD.md §8.1, §8.4. grade and hazard_ranking are B2 (D-24);
+  // recall_match and its check runs are b2-09's (D-73).
   readonly damageAssessments: DamageAssessmentRepository;
+  readonly recalls: RecallRepository;
 
   // Evidence and audit — ERD.md §10.2. evidence_pack is B1b (D-24).
   readonly auditEvents: AuditEventRepository;
@@ -187,3 +190,4 @@ export * from "./condition";
 export * from "./audit";
 export * from "./platform-configuration";
 export * from "./jobs";
+export * from "./recalls";

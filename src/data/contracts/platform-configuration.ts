@@ -1,6 +1,7 @@
 import type { RequestContext } from "./context";
 import type { IntakeGateConfiguration } from "@/domain/intake/thresholds";
 import type { EmergencyContactConfiguration } from "@/domain/transport/emergency-verification";
+import type { RecallMatchConfiguration } from "@/domain/recalls/configuration";
 
 /**
  * Platform configuration — the values P6 owns that are neither jurisdiction
@@ -49,4 +50,17 @@ export interface PlatformConfigurationRepository {
   readEmergencyContactConfiguration(
     ctx: RequestContext,
   ): Promise<EmergencyContactConfiguration>;
+
+  /**
+   * How recall matching reads a name — Rule 10.12; D-73. The maker words a
+   * name may carry without changing who the maker is, and the phrases that
+   * make a vehicle recall's component the propulsion or traction battery.
+   * **Read here and nowhere else** (Rule 1.23): a word list in a TypeScript
+   * conditional is a rule in code. Validated with
+   * `validateRecallMatchConfiguration`; an invalid row throws
+   * `DataIntegrityError`, never a default.
+   */
+  readRecallMatchConfiguration(
+    ctx: RequestContext,
+  ): Promise<RecallMatchConfiguration>;
 }

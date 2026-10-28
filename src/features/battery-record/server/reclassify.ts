@@ -1,6 +1,7 @@
 import { data } from "@/data";
 import type {
   CreateClassificationDecision,
+  ReclassificationWrite,
   RequestContext,
 } from "@/data/contracts";
 import {
@@ -66,7 +67,8 @@ const CONTAINER_SCAN_LIMIT = 100;
 /** Bounded read — one record carries a handful of decisions over its life. */
 const DECISIONS_PER_RECORD_LIMIT = 50;
 
-export type ReclassificationTrigger = "condition_change" | "catalog_rematch";
+export type ReclassificationTrigger =
+  "condition_change" | "catalog_rematch" | "recall_change";
 
 export interface RecordSite {
   readonly jurisdictionId: Uuid | null;
@@ -296,14 +298,30 @@ function settledStatus(
 }
 
 /**
- * Append a superseding decision and settle the record's status.
+ * What a re-classification will write, computed from reads only.
  *
- * The status passes through `reclassifying` while the decision is being made.
- * The mock is not transactional, so a throw between the two updates leaves
- * the record saying exactly what happened to it — which is more honest than a
- * record that says `classified` beside a decision that was never written.
+ * `reclassifyRecord` writes it as the person who changed the input. A recall
+ * decision hands it to its own definer door instead, so the decision and the
+ * re-classification it causes land as one operation for every role that may
+ * decide — P2 included, who writes no `classification_decision` of their own
+ * (`TECHNICAL_SPEC.md` §9.5; Rule 10.14). One computation, two writers that
+ * write the same rows.
+ *
+ * `record` is the record **as it will stand** — for a recall decision, with
+ * the flags the decision gives it — so the decision is made from the input
+ * that changed.
  */
-export async function reclassifyRecord(
+export type ReclassificationPlan =
+  | {
+      readonly kind: "unresolved";
+      readonly missingInput: ClassificationMissingInput | null;
+    }
+  | {
+      readonly kind: "decided" | "blocked";
+      readonly write: ReclassificationWrite;
+    };
+
+export async function planReclassification(
   ctx: RequestContext,
   input: {
     readonly record: BatteryRecord;
@@ -311,10 +329,8 @@ export async function reclassifyRecord(
     readonly at: IsoTimestamp;
     readonly trigger: ReclassificationTrigger;
   },
-): Promise<ReclassificationOutcome> {
+): Promise<ReclassificationPlan> {
   const { record, rule, at, trigger } = input;
-  const statusBefore = record.status;
-  const actorLabel = `reclassification:${trigger}`;
 
   const result = classifyWasteStream(
     {
@@ -331,13 +347,7 @@ export async function reclassifyRecord(
   if (result.kind === "unresolved") {
     // Rule 3.10 — no decision, no default, and the record keeps the status it
     // had. The caller reports which input is missing and who can supply it.
-    return {
-      kind: "unresolved",
-      decisionId: null,
-      supersededDecisionIds: [],
-      missingInput: result.missingInput,
-      record,
-    };
+    return { kind: "unresolved", missingInput: result.missingInput };
   }
 
   // `resolved` narrowed by the result: an unresolved rule cannot produce a
@@ -354,9 +364,62 @@ export async function reclassifyRecord(
     limit: DECISIONS_PER_RECORD_LIMIT,
   });
   const live = existing.items.filter((row) => row.status !== "superseded");
-  const supersedes = newestDecision(live)?.id ?? null;
+  const newest = newestDecision(live);
 
-  const reclassifying = await data.batteryRecords.update(ctx, record.id, {
+  return {
+    kind: result.kind,
+    write: {
+      forDdrFlags: [...record.ddrFlags],
+      trigger,
+      governingDate: rule.asOf,
+      decision: decisionRow(
+        record,
+        result,
+        resolvedRule,
+        newest?.id ?? null,
+        at,
+      ),
+      supersedeDecisionIds: live.map((row) => row.id),
+      priorWasteClassification: newest?.wasteClassification ?? null,
+      settledStatus: settledStatus(record, result.kind),
+    },
+  };
+}
+
+/**
+ * Append a superseding decision and settle the record's status.
+ *
+ * The status passes through `reclassifying` while the decision is being made.
+ * The mock is not transactional, so a throw between the two updates leaves
+ * the record saying exactly what happened to it — which is more honest than a
+ * record that says `classified` beside a decision that was never written.
+ */
+export async function reclassifyRecord(
+  ctx: RequestContext,
+  input: {
+    readonly record: BatteryRecord;
+    readonly rule: ClassificationRuleContext;
+    readonly at: IsoTimestamp;
+    readonly trigger: ReclassificationTrigger;
+  },
+): Promise<ReclassificationOutcome> {
+  const { record, at, trigger } = input;
+  const statusBefore = record.status;
+  const actorLabel = `reclassification:${trigger}`;
+
+  const plan = await planReclassification(ctx, input);
+  if (plan.kind === "unresolved") {
+    return {
+      kind: "unresolved",
+      decisionId: null,
+      supersededDecisionIds: [],
+      missingInput: plan.missingInput,
+      record,
+    };
+  }
+  const { write } = plan;
+
+  await data.batteryRecords.update(ctx, record.id, {
     status: "reclassifying",
   });
 
@@ -380,14 +443,14 @@ export async function reclassifyRecord(
 
   const decision = await data.classificationDecisions.append(
     ctx,
-    decisionRow(reclassifying, result, resolvedRule, supersedes, at),
+    write.decision,
   );
 
-  for (const row of live) {
+  for (const id of write.supersedeDecisionIds) {
     // TODO(T-43) — a supersession has no event type of its own
     // (`classification_decision.superseded`); the `recorded` row below names
     // the superseded ids in its before-state instead. Raised.
-    await data.classificationDecisions.markSuperseded(ctx, row.id, decision.id);
+    await data.classificationDecisions.markSuperseded(ctx, id, decision.id);
   }
 
   await writeAuditEvent(
@@ -398,18 +461,17 @@ export async function reclassifyRecord(
       entityId: decision.id,
       occurredAt: at,
       beforeState:
-        live.length === 0
+        write.supersedeDecisionIds.length === 0
           ? null
           : {
-              supersededDecisionIds: live.map((row) => row.id),
-              wasteClassification:
-                newestDecision(live)?.wasteClassification ?? null,
+              supersededDecisionIds: [...write.supersedeDecisionIds],
+              wasteClassification: write.priorWasteClassification,
             },
       afterState: {
         wasteClassification: decision.wasteClassification,
         status: decision.status,
         basisCodes: [...decision.basisCodes],
-        governingDate: rule.asOf,
+        governingDate: write.governingDate,
         trigger,
       },
       governingRuleVersionId: decision.governingRuleVersionId,
@@ -418,7 +480,7 @@ export async function reclassifyRecord(
     }),
   );
 
-  const status = settledStatus(reclassifying, result.kind);
+  const status = write.settledStatus;
   const settled = await data.batteryRecords.update(ctx, record.id, { status });
 
   // The second move, off `reclassifying` — written even when the record
@@ -440,9 +502,9 @@ export async function reclassifyRecord(
   );
 
   return {
-    kind: result.kind,
+    kind: plan.kind,
     decisionId: decision.id,
-    supersededDecisionIds: live.map((row) => row.id),
+    supersededDecisionIds: [...write.supersedeDecisionIds],
     missingInput: null,
     record: settled,
   };

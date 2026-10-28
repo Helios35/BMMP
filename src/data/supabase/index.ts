@@ -102,6 +102,7 @@ export const supabaseAdapter: DataAdapter = {
   platformConfiguration: unimplemented("platformConfiguration", [
     "readIntakeGateConfiguration",
     "readEmergencyContactConfiguration",
+    "readRecallMatchConfiguration",
   ]),
 
   jurisdictions: unimplemented("jurisdictions", [...CRUD, "chainFrom"]),
@@ -177,6 +178,14 @@ export const supabaseAdapter: DataAdapter = {
     ...APPEND_ONLY,
     "markSuperseded",
   ]),
+  recalls: unimplemented("recalls", [
+    "listMatches",
+    "listCheckRuns",
+    "recordCheck",
+    "confirm",
+    "dismiss",
+    "record",
+  ]),
   // `write` is the `security definer` door (§10.5, `app.write_audit_event()`).
   // It refuses here like everything else — an adapter that answered it silently
   // would be an audit trail nobody could tell was empty.
@@ -184,5 +193,9 @@ export const supabaseAdapter: DataAdapter = {
 
   objects: unimplemented("objects", ["put", "get", "signedUrl"]),
 
-  jobs: unimplemented("jobs", ["runStorageClockAlerts"]),
+  jobs: unimplemented("jobs", [
+    "runStorageClockAlerts",
+    "recallSyncPlan",
+    "recordRecallCheck",
+  ]),
 };

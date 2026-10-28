@@ -17,6 +17,12 @@ import type { HazardRankingBand } from "@/domain/taxonomy/hazard-ranking-band";
 import type { RecallMatchStatus } from "@/domain/taxonomy/recall-match-status";
 import type { RecallSource } from "@/domain/taxonomy/recall-source";
 import type { AppliedRuleVersion } from "@/domain/rules/outcome";
+import type { RecallSearchSource } from "@/domain/recalls/hit";
+import type { RecallIdentityKind } from "@/domain/recalls/identity";
+import type {
+  RecallCheckOutcome,
+  RecallCheckTrigger,
+} from "@/domain/recalls/standing";
 
 /**
  * Condition — `ERD.md` §8.
@@ -181,11 +187,19 @@ export interface HazardRanking extends TenantScoped, Created {
 }
 
 /**
- * Candidate recall matches from the free government sources · B2.
+ * Recall associations — candidates from the government sources and recalls a
+ * person recorded by hand · B2 (`b2-09-recalls`; Rules 10.13–10.16, 6.23,
+ * 6.24; D-73).
  *
- * Mutable, because a human confirms or dismisses. **A match is a candidate, not
- * a fact** (Rule 10.7), and **a failed check is recorded as a pending state with
- * a reason, never as an absent row**.
+ * Mutable, because a human confirms, dismisses or withdraws. **A match is a
+ * candidate, not a fact** (Rule 10.7). **One row per record, source and
+ * recall**: a recall found again on a later run makes no second row (Rule
+ * 10.18). Rows hold `possible_match`, `confirmed_match` or `dismissed` only —
+ * `not_checked` and `no_match` are a record's standing, derived from its
+ * check runs (`RecallCheckRun`), never a row; a failed check is a failed run.
+ *
+ * A withdrawn recall is a `dismissed` row that still carries its confirmation,
+ * so both stay visible (Rule 6.24).
  */
 export interface RecallMatch extends TenantScoped, Timestamped {
   readonly id: Uuid;
@@ -194,9 +208,15 @@ export interface RecallMatch extends TenantScoped, Timestamped {
   readonly source: RecallSource;
   /** The recall's own identifier. */
   readonly providerRecordId: string;
-  /** Which fields produced the match. */
+  /**
+   * Which fields agreed — `{ identity, fields }`, rendered in words by
+   * `matchedOnWords` (Rule 10.13). Empty for a recall recorded by hand.
+   */
   readonly matchedOn: JsonObject;
+  /** **Never written** (Rule 10.13). Kept so the type reads as `ERD.md` §8.4 until unit 17 drops the column. */
   readonly matchConfidence: Decimal | null;
+  /** The identity a check matched on; null for a recall recorded by hand (Rule 10.15). */
+  readonly identity: RecallIdentityKind | null;
   /** T-35. */
   readonly status: RecallMatchStatus;
   readonly recallNumber: string | null;
@@ -217,4 +237,34 @@ export interface RecallMatch extends TenantScoped, Timestamped {
   readonly confirmedAt: IsoTimestamp | null;
   readonly dismissedBy: Uuid | null;
   readonly dismissedReason: string | null;
+  /** Not in `ERD.md` §8.4 — argued in `b2-09`'s build-notes. */
+  readonly dismissedAt: IsoTimestamp | null;
+}
+
+/**
+ * One recall check run — Rules 10.17, 10.18; D-73 #3. **Append-only.**
+ *
+ * Not in `ERD.md`: the `recall_check` table is argued in `b2-09`'s
+ * build-notes for unit 17. Every run is kept — when, which source, which
+ * identity, why it ran and what it concluded — and a failed run carries its
+ * reason code, so a failure is never read as "no match". **No number**: a run
+ * names the match rows it found rather than counting them.
+ */
+export interface RecallCheckRun extends TenantScoped, Created {
+  readonly id: Uuid;
+  readonly batteryRecordId: Uuid;
+  /** Null on a run that found nothing to match against. */
+  readonly source: RecallSearchSource | null;
+  readonly identity: RecallIdentityKind | null;
+  readonly trigger: RecallCheckTrigger;
+  readonly outcome: RecallCheckOutcome;
+  /** Set only on `failed` (Rule 10.17). */
+  readonly checkErrorCode: string | null;
+  /** The match rows this run found — new ones and ones found again. */
+  readonly matchIds: readonly Uuid[];
+  /** The recall-match configuration the run applied (Rule 12.15). */
+  readonly configurationVersion: string | null;
+  readonly ranAt: IsoTimestamp;
+  /** The person whose act ran it; null for the nightly job. */
+  readonly ranBy: Uuid | null;
 }

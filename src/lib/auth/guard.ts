@@ -165,3 +165,49 @@ export async function requireWrite(
 export type WriteGuardResult =
   | { readonly ok: true; readonly ctx: RequestContext }
   | Extract<ActionResult<never>, { ok: false }>;
+
+/**
+ * A write a role holds **on a route it only reads** — the recall decisions on
+ * `/batteries/[id]`, which P2 may confirm and record although the route is
+ * read-only for P2 (Rules 6.23, 10.14; `SITE_ARCHITECTURE.md` §5.2).
+ *
+ * The same signed-out answer as {@link requireWrite}, then two checks: the
+ * role can read the route at all, and the caller's own action map permits
+ * the act (`mayAct`). A refusal is audited as a write denial and states the
+ * caller's `refusal` sentence (Rules 1.16, 1.26, 12.6).
+ */
+export async function requireActionOn(
+  route: AppRoute,
+  attempted: string,
+  mayAct: (role: RequestContext["role"]) => boolean,
+  refusal: string,
+): Promise<WriteGuardResult> {
+  const resolution = await resolveRequestContext();
+
+  if (resolution.kind !== "resolved") {
+    const pub = await publicContext();
+    return {
+      ok: false,
+      error: {
+        code: "UNAUTHENTICATED",
+        message: "You were signed out. Sign in again and try that once more.",
+        correlationId: pub.correlationId,
+      },
+    };
+  }
+
+  const { ctx } = resolution.session;
+  if (!canRead(capabilityFor(ctx.role, route)) || !mayAct(ctx.role)) {
+    await recordWriteDenial(ctx, route, attempted);
+    return {
+      ok: false,
+      error: {
+        code: "FORBIDDEN",
+        message: refusal,
+        correlationId: ctx.correlationId,
+      },
+    };
+  }
+
+  return { ok: true, ctx };
+}

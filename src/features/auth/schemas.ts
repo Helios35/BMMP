@@ -130,21 +130,5 @@ export const acceptInvitationSchema = z.object({
 
 export type AcceptInvitationInput = z.infer<typeof acceptInvitationSchema>;
 
-/**
- * The first issue a parse produced, as a field name and a message.
- *
- * One issue at a time, on the field it belongs to (§10.3 — never a page
- * replacement). Returning every issue at once on a four-field form buries the
- * one the person is looking at.
- */
-export function firstIssue(error: z.ZodError): {
-  readonly field: string | undefined;
-  readonly message: string;
-} {
-  const issue = error.issues[0];
-  const path = issue?.path[0];
-  return {
-    field: typeof path === "string" ? path : undefined,
-    message: issue?.message ?? "Check the details and try again.",
-  };
-}
+/** One issue at a time, on its field — `src/lib/first-issue.ts`. */
+export { firstIssue } from "@/lib/first-issue";

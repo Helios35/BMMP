@@ -8,7 +8,11 @@ import type {
 import type { AuditEvent } from "@/types/audit";
 import type { BatteryRecord } from "@/types/battery-record";
 import type { CatalogEntry } from "@/types/catalog";
-import type { DamageAssessment } from "@/types/condition";
+import type {
+  DamageAssessment,
+  RecallCheckRun,
+  RecallMatch,
+} from "@/types/condition";
 import type {
   ClassificationDecision,
   ContainerLabel,
@@ -36,6 +40,7 @@ import type {
 } from "@/types/tenancy";
 import type { AppliedRuleVersion } from "@/domain/rules/outcome";
 import * as B1A_08 from "./b1a-08";
+import * as B2_09 from "./b2-09";
 import * as ID from "./ids";
 import { INVITE_TOKEN_HASHES } from "./invite-tokens";
 
@@ -3254,4 +3259,12 @@ export const auditEvents: readonly AuditEvent[] = [
   },
   // Added by b1a-08 — never an edit to a row above (STATE §7.1).
   ...B1A_08.auditEvents,
+];
+
+// --- b2-09: recall matching — every row here is new (STATE §7.1) ------------
+
+export const recallMatches: readonly RecallMatch[] = [...B2_09.recallMatches];
+
+export const recallCheckRuns: readonly RecallCheckRun[] = [
+  ...B2_09.recallCheckRuns,
 ];

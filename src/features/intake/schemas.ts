@@ -296,18 +296,5 @@ export const intakePhotoUploadSchema = z.object({
 
 export type IntakePhotoUploadInput = z.infer<typeof intakePhotoUploadSchema>;
 
-/**
- * The first issue a parse produced, as a field name and a message — one at a
- * time, on the field it belongs to (§10.3).
- */
-export function firstIssue(error: z.ZodError): {
-  readonly field: string | undefined;
-  readonly message: string;
-} {
-  const issue = error.issues[0];
-  const path = issue?.path[0];
-  return {
-    field: typeof path === "string" ? path : undefined,
-    message: issue?.message ?? "Check the details and try again.",
-  };
-}
+/** One issue at a time, on its field — `src/lib/first-issue.ts`. */
+export { firstIssue } from "@/lib/first-issue";

@@ -174,6 +174,23 @@ import {
   ValidationError,
 } from "@/lib/errors";
 import { mockPlatformConfiguration } from "./platform-configuration";
+import {
+  mockRecalls,
+  recallSyncPlan,
+  recordRecallCheckForJob,
+} from "./recall-writes";
+import { prohibitsAir, withDamageFlags } from "@/domain/recalls/recalled-flag";
+
+/**
+ * The condition door carries no request attribution (`ConditionOutcome`), so
+ * the Rule 6.14 rows it sets running carry none either; the actor and the
+ * correlation id still tie them to the person's act.
+ */
+const NO_REQUEST_ATTRIBUTION = {
+  requestId: null,
+  ipAddress: null,
+  userAgent: null,
+} as const;
 import { assertPolicy } from "./policy";
 import { sequenceStart } from "./sequence-start";
 import { mockStore, type TenantAuditEvent } from "./store";
@@ -206,6 +223,7 @@ import {
   buildShipmentRow,
   changeContents,
   currentIssuedPaperWithBytes,
+  holdAirShipmentsFor,
   issueShippingPaper,
   recordArrival,
   recordDeparture,
@@ -859,6 +877,12 @@ const guardedBatteryRecords: BatteryRecordRepository = {
    * determination the domain produced from a confirmed assessment. A caller
    * cannot hand this a flag without also handing it the person who confirmed
    * the finding (Rules 6.4, 6.5, 6.6).
+   *
+   * **`recalled` is not a finding** (T-30): the record's own `recalled`
+   * stands whatever the assessment says, and air stays prohibited while any
+   * flag does (Rule 6.24). And Rule 6.14 follows the write, as the trigger on
+   * the record's flags would: a record now barred from air on an air
+   * shipment that has not departed holds that shipment (D-73 #5).
    */
   async applyConditionOutcome(ctx, id, outcome) {
     if (outcome.conditionConfirmedBy.trim() === "") {
@@ -869,14 +893,27 @@ const guardedBatteryRecords: BatteryRecordRepository = {
         context: { rule: "6.6", batteryRecordId: id },
       });
     }
-    return batteryRecords.update(ctx, id, {
+    const before = await store().batteryRecords.getOrThrow(ctx, id);
+    const ddrFlags = withDamageFlags(before.ddrFlags, outcome.ddrFlags);
+    const updated = await batteryRecords.update(ctx, id, {
       assessedCondition: outcome.assessedCondition,
-      ddrFlags: outcome.ddrFlags,
-      isAirTransportProhibited: outcome.isAirTransportProhibited,
+      ddrFlags,
+      isAirTransportProhibited:
+        outcome.isAirTransportProhibited || prohibitsAir(ddrFlags),
       conditionRuleVersionId: outcome.conditionRuleVersionId,
       conditionConfirmedBy: outcome.conditionConfirmedBy,
       conditionConfirmedAt: outcome.conditionConfirmedAt,
     } as Partial<BatteryRecord>);
+    if (!before.isAirTransportProhibited && updated.isAirTransportProhibited) {
+      await holdAirShipmentsFor(
+        ctx,
+        updated,
+        "damage",
+        outcome.conditionConfirmedAt,
+        NO_REQUEST_ATTRIBUTION,
+      );
+    }
+    return updated;
   },
 };
 
@@ -2605,11 +2642,16 @@ export const mockAdapter: DataAdapter = {
   documentRenders,
 
   damageAssessments,
+  recalls: mockRecalls,
   auditEvents,
 
   objects,
 
-  jobs: { runStorageClockAlerts },
+  jobs: {
+    runStorageClockAlerts,
+    recallSyncPlan,
+    recordRecallCheck: recordRecallCheckForJob,
+  },
 };
 
 /** Re-exported for tests: `Page` and `PageRequest` are the shapes every list returns. */

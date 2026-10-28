@@ -67,6 +67,14 @@ import {
   ValidationError,
 } from "@/lib/errors";
 
+import type { AirShipmentInvalidation } from "@/data/contracts/recalls";
+import {
+  airShipmentHeldAlert,
+  airShipmentVoidReason,
+  type AirShipmentCause,
+} from "@/domain/recalls/alerts";
+
+import { raiseDraftAlert } from "./alert-rows";
 import { writeTriggerAudit as audit } from "./audit-row";
 import {
   DOCUMENTS_BUCKET,
@@ -1723,4 +1731,117 @@ export async function recordArrival(
     });
     return closed;
   });
+}
+
+// --- Rule 6.14 ------------------------------------------------------------------------------------
+
+/**
+ * Rule 6.14, for damage and recall both (D-73 #5) — a record barred from air
+ * whose container is on an air shipment that has not departed:
+ *
+ * - an issued paper is voided per Rule 5.13 (the packet with it), kept and
+ *   marked, the reason naming the record and the rule;
+ * - the shipment returns to `draft`, where a paper must be generated again;
+ * - P1 and P2 are alerted with the reason;
+ * - departure is refused — by `admitDeparture`, which already holds air for a
+ *   barred record, and by the paper being gone.
+ *
+ * **The record is not taken off the shipment.** It leaves when a person moves
+ * it to quarantine (Rule 6.17); a container is the unit a shipment carries
+ * (D-72 #1). **A departed shipment is never changed** — only open shipments
+ * are read here. Written through the definer doors, because a P2 confirming a
+ * recall sets this running and P2 writes no shipment (`TECHNICAL_SPEC.md`
+ * §9.5) — under Postgres, the trigger on the record's flags.
+ */
+export async function holdAirShipmentsFor(
+  ctx: RequestContext,
+  record: BatteryRecord,
+  cause: AirShipmentCause,
+  at: IsoTimestamp,
+  attribution: StorageWriteAttribution,
+): Promise<readonly AirShipmentInvalidation[]> {
+  if (!record.isAirTransportProhibited || record.containerId === null) {
+    return [];
+  }
+  const s = store();
+  const container = s.containers
+    .all()
+    .find(
+      (row) =>
+        row.id === record.containerId &&
+        row.organizationId === ctx.organizationId,
+    );
+  if (container === undefined || container.shipmentId === null) return [];
+  const shipment = s.shipments
+    .all()
+    .find(
+      (row) =>
+        row.id === container.shipmentId &&
+        row.organizationId === ctx.organizationId,
+    );
+  if (
+    shipment === undefined ||
+    shipment.transportMode !== "air" ||
+    !OPEN_SHIPMENT_STATUSES.includes(shipment.status)
+  ) {
+    return [];
+  }
+
+  const reason = airShipmentVoidReason({
+    recordNumber: record.recordNumber,
+    cause,
+  });
+  const issued =
+    shipment.status === "documents_issued"
+      ? currentPaper(ctx, shipment.id)
+      : null;
+  const paperVoided = issued !== null && issued.render.status === "issued";
+  if (paperVoided) {
+    // Writes the render's and the packet's voids and the shipment's move to
+    // `draft`, each with this reason.
+    await voidIssuedPaper(ctx, at, attribution, shipment, issued, reason, {
+      voided: "rule_6_14",
+      batteryRecordId: record.id,
+    });
+  } else if (shipment.status !== "draft") {
+    await audit(ctx, at, attribution, {
+      eventType: "shipment.status_changed",
+      entityTable: "shipment",
+      entityId: shipment.id,
+      beforeState: { status: shipment.status },
+      afterState: { status: "draft", batteryRecordId: record.id },
+      changedFields: ["status"],
+      reason,
+    });
+  }
+  if (shipment.status !== "draft") {
+    await s.shipments.updateAsDefiner(ctx, shipment.id, {
+      status: "draft",
+      offeredAt: null,
+      updatedAt: now(),
+      updatedBy: ctx.userId,
+    });
+  }
+
+  await raiseDraftAlert(
+    ctx,
+    airShipmentHeldAlert({
+      shipmentId: shipment.id,
+      shipmentNumber: shipment.shipmentNumber,
+      recordId: record.id,
+      recordNumber: record.recordNumber,
+      cause,
+      paperVoided,
+      raisedAt: at,
+    }),
+    { shipmentId: shipment.id },
+  );
+
+  return [
+    {
+      shipmentId: shipment.id,
+      shipmentNumber: shipment.shipmentNumber,
+      paperVoided,
+    },
+  ];
 }
