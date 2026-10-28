@@ -43,6 +43,11 @@
  * approved by the owner in `b1a-08-leftovers` and added at TAXONOMY.md v1.7:
  * a lot's creation, its T-25 moves, and a container joining or leaving it.
  * A lot holds containers, so a battery joins one by its container.
+ * **`recall_check.completed`, `recall_check.failed`, `recall_match.found`,
+ * `recall_match.confirmed`, `recall_match.recorded` and
+ * `recall_match.dismissed`** were authored by planning (D-73) and added at
+ * TAXONOMY.md v1.8: every check run, a candidate written as a possible match,
+ * and the three human decisions on one (Rules 10.14–10.18).
  *
  * **Never invent a value.** If one is needed and is not here, it does not exist
  * yet — raise it to P6 (TAXONOMY.md §1.1).
@@ -62,6 +67,12 @@ export const AUDIT_EVENT_TYPES = [
   "classification_decision.recorded",
   "damage_assessment.recorded",
   "battery_record.ddr_flag_set",
+  "recall_check.completed",
+  "recall_check.failed",
+  "recall_match.found",
+  "recall_match.confirmed",
+  "recall_match.recorded",
+  "recall_match.dismissed",
   "container.status_changed",
   "lot.created",
   "lot.status_changed",
@@ -113,6 +124,12 @@ export const AUDIT_EVENT_TYPE_LABELS: Readonly<Record<AuditEventType, string>> =
     "classification_decision.recorded": "Waste classification recorded",
     "damage_assessment.recorded": "Damage assessment recorded",
     "battery_record.ddr_flag_set": "DDR flag set",
+    "recall_check.completed": "Recall check completed",
+    "recall_check.failed": "Recall check failed",
+    "recall_match.found": "Possible recall match found",
+    "recall_match.confirmed": "Recall confirmed",
+    "recall_match.recorded": "Recall recorded",
+    "recall_match.dismissed": "Recall dismissed",
     "container.status_changed": "Container status changed",
     "lot.created": "Lot created",
     "lot.status_changed": "Lot status changed",

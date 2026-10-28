@@ -355,6 +355,31 @@ describe("the label-vs-catalog check and the lot's audit trail (D-68, TAXONOMY.m
     );
   });
 
+  it("gives T-43 the six recall events, labelled as authored (D-73, TAXONOMY.md v1.8)", () => {
+    expect(
+      [
+        "recall_check.completed",
+        "recall_check.failed",
+        "recall_match.found",
+        "recall_match.confirmed",
+        "recall_match.recorded",
+        "recall_match.dismissed",
+      ].map(
+        (value) =>
+          taxonomy.AUDIT_EVENT_TYPE_LABELS[
+            value as (typeof taxonomy.AUDIT_EVENT_TYPES)[number]
+          ],
+      ),
+    ).toEqual([
+      "Recall check completed",
+      "Recall check failed",
+      "Possible recall match found",
+      "Recall confirmed",
+      "Recall recorded",
+      "Recall dismissed",
+    ]);
+  });
+
   it("gives T-43 the three lot events, labelled as authored", () => {
     expect(taxonomy.AUDIT_EVENT_TYPE_LABELS["lot.created"]).toBe("Lot created");
     expect(taxonomy.AUDIT_EVENT_TYPE_LABELS["lot.status_changed"]).toBe(

@@ -34,6 +34,7 @@ concurrency:
 env:
   DATA_ADAPTER: mock
   VISION_PROVIDER: fixture
+  RECALL_PROVIDER: fixture
 
 # Job names are the status-check names. These seven are the set branch
 # protection requires on main, the only long-lived branch (D-29).

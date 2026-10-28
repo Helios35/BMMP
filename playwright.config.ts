@@ -107,6 +107,7 @@ export default defineConfig({
       // pins the same value; stating it here keeps a developer's shell from
       // pointing the suite at a vendor.
       VISION_PROVIDER: "fixture",
+      RECALL_PROVIDER: "fixture",
       MOCK_LATENCY_MS: "",
       MOCK_SEEDED_FAILURES: "",
       NEXT_PUBLIC_APP_URL: baseURL,
