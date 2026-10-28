@@ -30,6 +30,12 @@ import { detailLine } from "./json-text";
  * human assessment (Rule 6.11), offered only to the roles that may record one;
  * the control itself sits directly beneath, in `RecordActions`. No
  * probability, likelihood or score appears here or near it (Rule 1.25).
+ *
+ * **A confirmed recall blocks identically and is named as a recall** (§2.6,
+ * Rule 6.5): the notice says which recall, and its way forward is the
+ * record's Recalls section — a damage re-assessment says nothing about a
+ * recall (T-30), so that path is offered only where there is damage to
+ * re-assess.
  */
 
 const AIR_TRANSPORT_BLOCK =
@@ -40,6 +46,16 @@ const QUARANTINE_ROUTING =
 const MISSING_CITATION =
   "No citation is on file for this prohibition in the governing rule version. The block holds regardless; a Platform Admin must add the citation.";
 const PATH_REASSESS = "Re-assess the damage on this record";
+const PATH_RECALLS = "See the recall on this record";
+
+/** Where the record's Recalls section is, on the Overview tab. */
+export const RECALLS_ANCHOR = "recalls";
+
+function recallSentence(recallNumbers: readonly string[]): string {
+  return recallNumbers.length === 1
+    ? `A recall is confirmed on this record: ${recallNumbers[0]}.`
+    : `Recalls are confirmed on this record: ${recallNumbers.join(", ")}.`;
+}
 
 /** Where the record's actions are — the re-assess control. */
 export const RECORD_ACTIONS_ANCHOR = "record-actions";
@@ -49,6 +65,7 @@ export function DdrBlockNotice({
   assessment,
   citation,
   canReassess,
+  confirmedRecalls = [],
 }: {
   readonly record: BatteryRecord;
   /** The current assessment, where one has been recorded. */
@@ -57,6 +74,8 @@ export function DdrBlockNotice({
   readonly citation: string | null;
   /** The role holds the condition write (P1, P6). Decided by the caller's map. */
   readonly canReassess: boolean;
+  /** The numbers of the recalls confirmed on the record (Rules 6.5, 10.14). */
+  readonly confirmedRecalls?: readonly string[];
 }): ReactElement | null {
   const air = assessAirTransport([
     {
@@ -72,6 +91,17 @@ export function DdrBlockNotice({
 
   const findingLine =
     assessment === undefined ? null : detailLine(assessment.findingDetail);
+  const recalled = record.ddrFlags.includes("recalled");
+  const damaged = record.ddrFlags.some((flag) => flag !== "recalled");
+  const statement = [
+    QUARANTINE_ROUTING,
+    findingLine === null ? null : `The finding as recorded: ${findingLine}`,
+    recalled && confirmedRecalls.length > 0
+      ? recallSentence(confirmedRecalls)
+      : null,
+  ]
+    .filter((part): part is string => part !== null)
+    .join(" ");
 
   return (
     <HardBlockNotice
@@ -80,11 +110,7 @@ export function DdrBlockNotice({
       title={
         record.isAirTransportProhibited ? AIR_TRANSPORT_BLOCK : DDR_FINDING
       }
-      statement={
-        findingLine === null
-          ? QUARANTINE_ROUTING
-          : `${QUARANTINE_ROUTING} The finding as recorded: ${findingLine}`
-      }
+      statement={statement}
       citations={air.citations}
       missingCitation={MISSING_CITATION}
       items={air.blockingRecords.map((blocking) => ({
@@ -94,8 +120,8 @@ export function DdrBlockNotice({
         href: null,
         indicators: blocking.indicators.map(airBlockIndicatorText),
       }))}
-      paths={
-        canReassess
+      paths={[
+        ...(canReassess && (damaged || !recalled)
           ? [
               {
                 id: "reassess",
@@ -103,8 +129,17 @@ export function DdrBlockNotice({
                 href: `#${RECORD_ACTIONS_ANCHOR}`,
               },
             ]
-          : []
-      }
+          : []),
+        ...(recalled
+          ? [
+              {
+                id: "recalls",
+                label: PATH_RECALLS,
+                href: `/batteries/${record.id}#${RECALLS_ANCHOR}`,
+              },
+            ]
+          : []),
+      ]}
     />
   );
 }

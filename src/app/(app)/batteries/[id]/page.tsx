@@ -80,6 +80,9 @@ import type { BatteryRecord } from "@/types/battery-record";
  * **A title is not an existence oracle**: an id that resolves to nothing gets
  * the route's own name and discloses nothing about the record (Rule 1.2).
  */
+/** Bounded read — a record carries a handful of recalls. */
+const CONFIRMED_RECALL_LIMIT = 50;
+
 export async function generateMetadata({
   params,
 }: PageProps<"/batteries/[id]">): Promise<Metadata> {
@@ -151,6 +154,16 @@ export default async function BatteryRecordPage({
       : null;
 
   const canReassess = canWriteRoute(ctx.role, "/batteries/[id]");
+  // §2.6 — a recall is named as a recall, by its number.
+  const confirmedRecalls = record.ddrFlags.includes("recalled")
+    ? (
+        await data.recalls.listMatches(ctx, {
+          batteryRecordId: record.id,
+          status: "confirmed_match",
+          limit: CONFIRMED_RECALL_LIMIT,
+        })
+      ).items.map((match) => match.recallNumber ?? match.providerRecordId)
+    : [];
   const recordActions = (
     <RecordActions
       role={ctx.role}
@@ -210,6 +223,7 @@ export default async function BatteryRecordPage({
               assessment={currentAssessment}
               citation={conditionCitation}
               canReassess={canReassess}
+              confirmedRecalls={confirmedRecalls}
             />
 
             {/* E-8a's disabled controls sit inside the header rather than in a

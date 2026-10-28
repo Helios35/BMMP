@@ -15,6 +15,10 @@ import {
 } from "@/domain/taxonomy/chemistry";
 import { isTaxonomyValue, optionsFor } from "@/domain/taxonomy/lookup";
 import {
+  RECALL_MATCH_STATUS_LABELS,
+  type RecallMatchStatus,
+} from "@/domain/taxonomy/recall-match-status";
+import {
   STORAGE_CLOCK_ALERT_BANDS,
   STORAGE_CLOCK_ALERT_BAND_LABELS,
   type StorageClockAlertBand,
@@ -68,11 +72,24 @@ export const BATTERY_FILTER_IDS = [
   "container",
   "tier",
   "matched",
+  "recall",
   "from",
   "to",
 ] as const;
 
 const MATCHED_VALUES = ["yes", "no"] as const;
+
+/**
+ * The Recall filter (`UX_SPEC.md` §3.5; Rule 10.18): possible match or
+ * confirmed — the two T-35 values a person acts on, stored values in the URL,
+ * T-35 labels on screen.
+ */
+const RECALL_FILTER_VALUES = [
+  "possible_match",
+  "confirmed_match",
+] as const satisfies readonly RecallMatchStatus[];
+
+export type RecallFilterValue = (typeof RECALL_FILTER_VALUES)[number];
 
 /** `YYYY-MM-DD`, and nothing else reaches the adapter. */
 const CIVIL_DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -99,6 +116,7 @@ export function batteryListSpec(
       container: containerCodes,
       tier: STORAGE_CLOCK_ALERT_BANDS,
       matched: MATCHED_VALUES,
+      recall: RECALL_FILTER_VALUES,
     },
     perPageOptions: [BATTERY_PAGE_SIZE, 50, 100],
   };
@@ -157,6 +175,12 @@ export function batteryFilters(
       ],
       anyLabel: "Any",
     },
+    {
+      id: "recall",
+      label: "Recall",
+      options: optionsFor(RECALL_FILTER_VALUES, RECALL_MATCH_STATUS_LABELS),
+      anyLabel: "Any",
+    },
   ];
 }
 
@@ -170,6 +194,7 @@ export interface BatteryListSelection {
   readonly containerCode: string | undefined;
   readonly tier: StorageClockAlertBand | undefined;
   readonly isCatalogMatched: boolean | undefined;
+  readonly recallStatus: RecallFilterValue | undefined;
   readonly loggedAfter: IsoTimestamp | undefined;
   readonly loggedBefore: IsoTimestamp | undefined;
 }
@@ -189,6 +214,7 @@ export function batteryListSelection(query: ListQuery): BatteryListSelection {
   const chemistry = query.filters.chemistry;
   const tier = query.filters.tier;
   const matched = query.filters.matched;
+  const recall = query.filters.recall;
 
   return {
     search: query.q ?? undefined,
@@ -205,6 +231,10 @@ export function batteryListSelection(query: ListQuery): BatteryListSelection {
         ? tier
         : undefined,
     isCatalogMatched: matched === undefined ? undefined : matched === "yes",
+    recallStatus:
+      recall !== undefined && isTaxonomyValue(RECALL_FILTER_VALUES, recall)
+        ? recall
+        : undefined,
     loggedAfter: dayStart(query.filters.from),
     loggedBefore: dayEnd(query.filters.to),
   };

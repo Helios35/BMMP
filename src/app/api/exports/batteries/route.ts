@@ -14,6 +14,7 @@ import {
   readEveryPage,
   serveCsvExport,
 } from "@/lib/export/csv-export";
+import type { RecallMatch } from "@/types/condition";
 
 /**
  * `GET /api/exports/batteries` — `/batteries` as CSV (`UX_SPEC.md` §3.5; D-50;
@@ -50,11 +51,25 @@ export async function GET(request: Request): Promise<Response> {
         data.batteryRecords.list(ctx, { ...request.query, ...page }),
       );
       if (read.kind === "too_large") return read;
+      // Rules 6.24, 10.16 — every association, dismissed and withdrawn ones
+      // included, beside the record it is on.
+      const recalls = await readEveryPage((page) =>
+        data.recalls.listMatches(ctx, page),
+      );
+      if (recalls.kind === "too_large") return recalls;
+      const recallsByRecordId = new Map<string, RecallMatch[]>();
+      for (const match of recalls.rows) {
+        const list = recallsByRecordId.get(match.batteryRecordId) ?? [];
+        list.push(match);
+        recallsByRecordId.set(match.batteryRecordId, list);
+      }
       return {
         kind: "file",
         file: {
           headers: BATTERY_CSV_HEADERS,
-          rows: read.rows.map((record) => batteryCsvRow(record, request)),
+          rows: read.rows.map((record) =>
+            batteryCsvRow(record, { ...request, recallsByRecordId }),
+          ),
           scope: exportScope(
             request.listQuery.filters,
             BATTERY_FILTER_IDS,

@@ -650,6 +650,7 @@ async function ruleCandidates(
           appliesToApplicationClasses: rule.appliesToApplicationClasses,
           publishedAt: version.publishedAt,
           isRuleActive: rule.isActive,
+          supersedesRuleVersionId: version.supersedesRuleVersionId,
         },
       ];
     });
@@ -767,6 +768,14 @@ function matchesBatteryRecord(
     eq(query.catalogEntryId, row.catalogEntryId ?? undefined) &&
     (query.isCatalogMatched === undefined ||
       query.isCatalogMatched === (row.catalogEntryId !== null)) &&
+    (query.recallStatus === undefined ||
+      store()
+        .recallMatches.all()
+        .some(
+          (match) =>
+            match.batteryRecordId === row.id &&
+            match.status === query.recallStatus,
+        )) &&
     eq(query.intakeSessionId, row.intakeSessionId ?? undefined) &&
     eq(query.chemistry, row.chemistry ?? undefined) &&
     eq(query.applicationClass, row.applicationClass) &&

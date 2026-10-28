@@ -28,7 +28,14 @@ import {
   manufactureDateSource,
   type FieldSourceInput,
 } from "./field-source";
-import { absoluteInstant, civilDateLabel } from "./format-instant";
+import { RecallsSection } from "@/features/recalls/components/recalls-section";
+import { readRecallSection } from "@/features/recalls/server/read-recalls";
+
+import {
+  absoluteInstant,
+  civilDateLabel,
+  UNPLACED_RECORD_TIME_ZONE,
+} from "./format-instant";
 import { jsonText } from "./json-text";
 import {
   DetailCard,
@@ -112,6 +119,12 @@ export async function OverviewTab({
         ).items[0];
 
   const names = await resolveUserNames(ctx, [record.conditionConfirmedBy]);
+  // Rules 10.13–10.18 — the Recalls section, in the record's own zone.
+  const recalls = await readRecallSection(
+    ctx,
+    record,
+    container?.siteTimeZone ?? UNPLACED_RECORD_TIME_ZONE,
+  );
 
   const sourceInput: FieldSourceInput = {
     extractedFieldCodes: new Set(
@@ -333,6 +346,8 @@ export async function OverviewTab({
           relative ranking with a stated basis per factor, and the shape it may
           never take is Rule 1.25 and _ANCHORS.md §7.1. B1a renders nothing here:
           no heading, no placeholder, no "coming soon", no empty card. */}
+
+      <RecallsSection view={recalls} />
     </div>
   );
 }
