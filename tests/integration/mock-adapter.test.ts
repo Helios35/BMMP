@@ -187,8 +187,9 @@ describe("tenant isolation", () => {
     expect(created.organizationId).toBe(ID.ORG.cascade);
     // And the counter is per-organization, allocated inside the insert.
     // The next code after every fixture container — C-0004 to C-0006 were
-    // added by b1a-08 — so a new container never repeats one on file.
-    expect(created.containerCode).toBe("C-0007");
+    // added by b1a-08, C-0007 to C-0009 by b2-09 — so a new container never
+    // repeats one on file.
+    expect(created.containerCode).toBe("C-0010");
     // The accumulation start date is not settable by any caller: it is set by
     // the first placement and travels with the records (Rule 4.4).
     expect(created.accumulationStartedAt).toBeNull();
@@ -455,8 +456,9 @@ describe("the awkward fixtures", () => {
     });
     expect(created.ddrFlags).toEqual([]);
     expect(created.isAirTransportProhibited).toBe(false);
-    // BR-0006 to BR-0008 are b1a-08 fixtures; the counter starts above them.
-    expect(created.recordNumber).toBe("BR-0009");
+    // BR-0006 to BR-0008 are b1a-08 fixtures and BR-0009 to BR-0014 b2-09's;
+    // the counter starts above them.
+    expect(created.recordNumber).toBe("BR-0015");
   });
 
   it("carries a container past its accumulation period in the hard overdue state", async () => {

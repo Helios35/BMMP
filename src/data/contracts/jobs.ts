@@ -1,4 +1,10 @@
-import type { IsoTimestamp } from "@/types/common";
+import type { IsoTimestamp, Uuid } from "@/types/common";
+
+import type {
+  RecallCheckRecorded,
+  RecallCheckRecording,
+  RecallSyncPlan,
+} from "./recalls";
 
 /**
  * Scheduled jobs — `TECHNICAL_SPEC.md` §7.2 (`POST /api/jobs/*`), §11.2.
@@ -17,7 +23,7 @@ import type { IsoTimestamp } from "@/types/common";
  */
 export interface ScheduledJobContext {
   /** T-60 `actor_label` on every row the job writes. */
-  readonly job: "storage-clock-alerts";
+  readonly job: "storage-clock-alerts" | "recall-sync";
   /** Threads one run through every row it writes. */
   readonly correlationId: string;
 }
@@ -31,6 +37,26 @@ export interface StorageClockAlertRun {
 }
 
 export interface ScheduledJobRepository {
+  /**
+   * The nightly recall check's reading half — Rule 10.10; D-73 #6. Every
+   * record in `confirmed`, `classified`, `reclassifying`, `stored`,
+   * `quarantined` or `staged`, across organizations, with its catalog entry,
+   * and the recall-match configuration the run applies. The sources are
+   * asked outside this seam; the run is written back one record at a time
+   * with `recordRecallCheck`.
+   */
+  recallSyncPlan(job: ScheduledJobContext): Promise<RecallSyncPlan>;
+
+  /**
+   * One record's nightly check, written as the job — T-60 `scheduled_job`,
+   * no person — inside the organization that owns the record.
+   */
+  recordRecallCheck(
+    job: ScheduledJobContext,
+    organizationId: Uuid,
+    input: RecallCheckRecording,
+  ): Promise<RecallCheckRecorded>;
+
   /**
    * Fire every due storage-clock alert — Rules 4.13–4.15, 4.6.
    *

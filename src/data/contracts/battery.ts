@@ -93,6 +93,12 @@ export interface BatteryRecordQuery
   readonly catalogEntryId?: Uuid;
   /** `catalog_entry_id is not null` — the catalog-matched filter on `/batteries`. */
   readonly isCatalogMatched?: boolean;
+  /**
+   * The Recall filter on `/batteries` (Rule 10.18): records holding a recall
+   * association at this T-35 status — `exists` over `recall_match`, never a
+   * column on the record.
+   */
+  readonly recallStatus?: "possible_match" | "confirmed_match";
   readonly intakeSessionId?: Uuid;
   readonly chemistry?: Chemistry;
   /** A small mobility pack and a vehicle pack sit in the same list; this narrows it. */

@@ -60,3 +60,33 @@ export const PLATFORM_EMERGENCY_CONTACT_CONFIGURATION = {
   configurationVersion: "platform-default-2026-10",
   reverificationIntervalMonths: 12,
 } as const;
+
+/**
+ * Recall matching's configuration (Rule 10.12; D-73) — **the only place in
+ * `src/` these words exist.** The maker words a name may carry without
+ * changing who the maker is (a legal form, not part of the name), and the
+ * phrases that make a vehicle recall's component the propulsion or traction
+ * battery. Stamped on every check run by its version. Validated on every read
+ * by `validateRecallMatchConfiguration`.
+ */
+export const PLATFORM_RECALL_MATCH_CONFIGURATION = {
+  configurationVersion: "recall-match-2026-10",
+  makerWordsIgnored: [
+    "Inc",
+    "Incorporated",
+    "LLC",
+    "Ltd",
+    "Limited",
+    "Corp",
+    "Corporation",
+    "Co",
+    "Company",
+    "GmbH",
+  ],
+  tractionBatteryComponentTerms: [
+    "propulsion battery",
+    "traction battery",
+    "high voltage battery",
+    "high-voltage battery",
+  ],
+} as const;

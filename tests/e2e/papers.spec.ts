@@ -52,7 +52,8 @@ import { storageStateFor, type PersonaKey } from "./support/roles";
  * after the first test has left the number verified. `b1a-08`'s second test
  * ships a lot and departs a damaged/defective lithium shipment with its
  * packet; it re-verifies first if a retry left the number unverified, and
- * never changes it.
+ * never changes it. `b2-09`'s third issues an air paper and records a recall
+ * on its record, which voids the paper (Rule 6.14).
  */
 test.describe.configure({ mode: "serial" });
 
@@ -487,6 +488,92 @@ test("with the number verified: a lot started at step A4 ships whole, and a dama
 
       await page.goto(`/shipments/${ddrShipmentId}`);
       await depart(page);
+    });
+  } finally {
+    await Promise.all([manager.close(), handler.close()]);
+  }
+});
+
+test("Rule 6.14: a recall recorded on a record on an air shipment voids its issued paper and holds departure", async ({
+  browser,
+}) => {
+  test.setTimeout(300_000);
+
+  const manager = await as(browser, "p2");
+  const handler = await as(browser, "p1");
+
+  try {
+    let containerId = "";
+    let recordId = "";
+    let shipmentId = "";
+
+    await test.step("P2 finds the number verified, or verifies it as it stands", async () => {
+      await ensureVerified(manager.page);
+    });
+
+    await test.step("P1 logs a sound lithium pack into a new container, labels it and builds an air shipment", async () => {
+      const page = handler.page;
+      containerId = await createContainer(page, "air-6-14");
+      ({ recordId } = await logCleanBattery(page, { containerId }));
+      await generateLabel(page, containerId);
+
+      await page.goto(`/shipments/new?containers=${containerId}`);
+      await expect(
+        page.locator(`[data-candidate="${containerId}"]`),
+      ).toHaveAttribute("data-admission", "ok");
+      await page.locator("[data-contents-continue]").click();
+      await page.waitForURL(/step=2/);
+      await page.locator('[data-mode-option="air"]').getByRole("radio").click();
+      const fields: Readonly<Record<string, string>> = {
+        destinationFacilityName: `e2e air 6.14 ${Date.now().toString(36)}`,
+        line1: "1 Airport Way",
+        city: "Spokane",
+        region: "WA",
+        postalCode: "99224",
+        carrierName: "Coleridge Air",
+      };
+      for (const [name, value] of Object.entries(fields)) {
+        await page.locator(`[data-transport-field="${name}"]`).fill(value);
+      }
+      await page.locator("[data-transport-save]").click();
+      await page.waitForURL(/shipment=.*step=3/);
+      shipmentId = new URL(page.url()).searchParams.get("shipment") ?? "";
+      expect(shipmentId).not.toBe("");
+    });
+
+    await test.step("the air paper issues", async () => {
+      await generatePaper(handler.page, shipmentId);
+      await expect(handler.page.locator("[data-paper-voided]")).toHaveCount(0);
+      await expect(handler.page.locator("[data-depart]")).toBeVisible();
+    });
+
+    await test.step("P2 records a manufacturer's recall on the record", async () => {
+      const page = manager.page;
+      await page.goto(`/batteries/${recordId}`);
+      await page.locator("[data-record-recall-trigger]").click();
+      const dialog = page.locator("[data-record-recall-dialog]");
+      await dialog
+        .locator("[data-record-recall-reference]")
+        .fill(`NV-AIR-E2E-${Date.now().toString(36)}`);
+      // Inside the dialog, as every spec clicks a dialog confirm: the open
+      // animation is still scaling it when the 44px check would measure.
+      await dialog.locator("[data-record-recall-submit]").click();
+      await expect(page.locator("[data-recalls-section]")).toHaveAttribute(
+        "data-recall-standing",
+        "confirmed_match",
+      );
+    });
+
+    await test.step("the paper is void, the shipment needs a new one, departure is gone, and P2 is told", async () => {
+      const page = handler.page;
+      await page.goto(`/shipments/${shipmentId}`);
+      await expect(page.locator("[data-paper-voided]")).toBeVisible();
+      await expect(page.locator("[data-depart]")).toHaveCount(0);
+
+      await manager.page.goto("/");
+      await expect(
+        manager.page.locator('[data-alert-type="ddr_quarantine"]').first(),
+      ).toBeVisible();
     });
   } finally {
     await Promise.all([manager.close(), handler.close()]);

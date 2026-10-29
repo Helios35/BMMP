@@ -105,6 +105,8 @@ export type DdrPacketContent = {
   readonly packaging: readonly DdrPackagingItem[];
   /** The rule's packing level, or the statement that it is not on file. */
   readonly packingLevelText: string;
+  /** The packing level's own citation, where the rule version carries one (v2). */
+  readonly packingLevelCitation: string | null;
   readonly markingMinimumHeight: string;
   readonly markingMinimumHeightCitation: string;
   readonly air: { readonly requirement: string; readonly citation: string };
@@ -207,7 +209,8 @@ export function buildDdrPacketContent(input: DdrPacketInput): DdrPacketBuild {
         timeZone: input.timeZone,
         records,
         packaging: rule.packaging,
-        packingLevelText: rule.packingLevel ?? PACKING_LEVEL_NOT_ON_FILE,
+        packingLevelText: rule.packingLevel?.text ?? PACKING_LEVEL_NOT_ON_FILE,
+        packingLevelCitation: rule.packingLevel?.citation ?? null,
         markingMinimumHeight: rule.marking.minimumHeight,
         markingMinimumHeightCitation: rule.marking.minimumHeightCitation,
         air: rule.air,

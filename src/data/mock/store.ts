@@ -11,7 +11,11 @@ import type {
 import type { AuditEvent } from "@/types/audit";
 import type { BatteryRecord } from "@/types/battery-record";
 import type { CatalogEntry } from "@/types/catalog";
-import type { DamageAssessment } from "@/types/condition";
+import type {
+  DamageAssessment,
+  RecallCheckRun,
+  RecallMatch,
+} from "@/types/condition";
 import type {
   ClassificationDecision,
   ContainerLabel,
@@ -86,6 +90,8 @@ export interface MockStore {
   readonly documentRenders: TenantTable<DocumentRender>;
 
   readonly damageAssessments: TenantTable<DamageAssessment>;
+  readonly recallMatches: TenantTable<RecallMatch>;
+  readonly recallCheckRuns: TenantTable<RecallCheckRun>;
   readonly auditEvents: TenantTable<TenantAuditEvent>;
 
   /** Object bytes, keyed `bucket:path`. */
@@ -235,6 +241,16 @@ function buildStore(): MockStore {
       "damageAssessments",
       FIXTURES.damageAssessments,
     ),
+    recallMatches: new TenantTable(
+      "recall_match",
+      "recallMatches",
+      FIXTURES.recallMatches,
+    ),
+    recallCheckRuns: new TenantTable(
+      "recall_check",
+      "recallCheckRuns",
+      FIXTURES.recallCheckRuns,
+    ),
     auditEvents: new TenantTable(
       "audit_event",
       "auditEvents",
@@ -290,6 +306,8 @@ export function resetMockStore(): MockStore {
   store.documentRenders.replaceAll(FIXTURES.documentRenders);
 
   store.damageAssessments.replaceAll(FIXTURES.damageAssessments);
+  store.recallMatches.replaceAll(FIXTURES.recallMatches);
+  store.recallCheckRuns.replaceAll(FIXTURES.recallCheckRuns);
   store.auditEvents.replaceAll(seededAuditEvents);
 
   store.objects.clear();

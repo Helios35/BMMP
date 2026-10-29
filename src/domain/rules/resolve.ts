@@ -58,6 +58,12 @@ export interface RuleVersionCandidate {
   /** `null` while draft. A version with no publication is never resolvable. */
   readonly publishedAt: string | null;
   readonly isRuleActive: boolean;
+  /**
+   * The version this one supersedes (`rule_version.supersedes_rule_version_id`).
+   * A **published** successor closes its predecessor on its own effective date
+   * — see {@link closedBySuccessors}.
+   */
+  readonly supersedesRuleVersionId?: Uuid | null;
 }
 
 export interface RuleResolutionRequest {
@@ -151,6 +157,49 @@ export function isInForceOn(
   return true;
 }
 
+/**
+ * Where a published successor ends the version it supersedes — Rule 12.22,
+ * `ERD.md` §4.3.
+ *
+ * A published version is immutable (`TECHNICAL_SPEC.md` §9.5: `rule_version`
+ * UPDATE only while unpublished), so an open-ended version can never be given
+ * an `expires_on` after it is published. Publishing a successor that names it
+ * is how it ends: from the successor's `effective_on`, the predecessor is no
+ * longer in force. Without this, a successor to any open-ended version would
+ * overlap it, and the exclusion below refuses overlap. A draft successor ends
+ * nothing (T-42). Raised in `b2-09`'s build-notes with the migration this
+ * needs (D-72 #9 added the first published successor).
+ */
+export function closedBySuccessors(
+  candidates: readonly RuleVersionCandidate[],
+): ReadonlyMap<Uuid, IsoDate> {
+  const closed = new Map<Uuid, IsoDate>();
+  for (const candidate of candidates) {
+    const predecessor = candidate.supersedesRuleVersionId ?? null;
+    if (predecessor === null || candidate.publishedAt === null) continue;
+    const existing = closed.get(predecessor);
+    if (existing === undefined || candidate.effectiveOn < existing) {
+      closed.set(predecessor, candidate.effectiveOn);
+    }
+  }
+  return closed;
+}
+
+function withSuccessorClosing(
+  candidate: RuleVersionCandidate,
+  closed: ReadonlyMap<Uuid, IsoDate>,
+): Pick<RuleVersionCandidate, "effectiveOn" | "expiresOn"> {
+  const closedOn = closed.get(candidate.ruleVersionId);
+  if (closedOn === undefined) return candidate;
+  return {
+    effectiveOn: candidate.effectiveOn,
+    expiresOn:
+      candidate.expiresOn === null || closedOn < candidate.expiresOn
+        ? closedOn
+        : candidate.expiresOn,
+  };
+}
+
 function governsClass(
   candidate: RuleVersionCandidate,
   applicationClass: ApplicationClass | undefined,
@@ -203,12 +252,13 @@ export function resolveRules(
     }
 
     // Most specific jurisdiction first. The chain is walked, never enumerated.
+    const closed = closedBySuccessors(published);
     let matched: ResolvedRule | undefined;
     for (const jurisdiction of request.jurisdictionChain) {
       const inForce = applicable.filter(
         (candidate) =>
           candidate.jurisdictionId === jurisdiction.id &&
-          isInForceOn(candidate, request.asOf),
+          isInForceOn(withSuccessorClosing(candidate, closed), request.asOf),
       );
       const [version] = inForce;
       if (version === undefined) continue;

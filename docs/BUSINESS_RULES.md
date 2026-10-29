@@ -1,5 +1,5 @@
 # Business Rules — BMMP
-**Version:** 1.2 · **Date:** 2026-10-28 · **Owner:** Nathan Ivy / Next Sketch LLC
+**Version:** 1.3 · **Date:** 2026-10-28 · **Owner:** Nathan Ivy / Next Sketch LLC
 **Answers:** What decisions does the system make, and on what basis?
 **Reads from:** `docs/_ANCHORS.md`, `docs/PRD.md`, `ROADMAP_BMMP_2026-07-28.md` (v3.0), `Decision Log.md` (D-1–D-11), `RESEARCH_battery-management-feature-sweep_2026-07-28.md`, `PROJECT_SETUP_BMMP.md`  ·  **Feeds:** `docs/TAXONOMY.md`, `docs/TECHNICAL_SPEC.md`, `docs/ERD.md`, `docs/UX_SPEC.md`, `docs/SITE_ARCHITECTURE.md`, `docs/RUNBOOK.md`, every builder brief
 
@@ -9,6 +9,13 @@
 ---
 
 ## Changelog
+
+**v1.3 · 2026-10-28 — recall matching (`Decision Log.md` D-66, D-72, D-73)**
+
+- **New Rules 10.10–10.18** — recall matching: when a check runs, what is matched, what counts as a candidate, deciding a possible match, recording a recall by hand, withdrawing one, a failed check, and the history. Authored by planning in `SPEC_recalls_2026-10-28.md`, transcribed by `b2-09-recalls`. They append to the end of section 10, whose header no longer reads "STUB"; everything else in section 10 stays reserved under 10.2.
+- **Rule 6.14 amended** (D-73 #5): it now covers a confirmed recall association as well as a damage indicator, and the record leaves an air shipment when it is moved to quarantine rather than automatically.
+- **The `battery_record` status table's `quarantined` row** gains the path back to `stored` when a withdrawn recall association leaves no DDR flag (Rule 10.16).
+- **No rule was renumbered.** Rules 10.10–10.18 are the only new rules.
 
 **v1.2 · 2026-10-28 — the label-vs-catalog check, and the B1a doc pass (`Decision Log.md` D-57, D-58, D-62, D-68)**
 
@@ -227,7 +234,7 @@ Eleven entities have a status. Every one is listed here and every one has a matc
 | `classified` | Classified | An active classification decision exists (section 3). | Classification runs after identification (Rule 3.3). | `stored`, `reclassifying`, `voided` | No |
 | `reclassifying` | Reclassifying | A change invalidated the classification; a new decision is being made. | Corrected identification, jurisdiction change, rule version change, handler size-class change, or damage reclassification (Rule 3.15). | `classified`, `voided` | No |
 | `stored` | In storage | The record sits in a container with a running storage clock. | Placed into a container (Rule 4.4). | `staged`, `stored` (moved), `quarantined`, `reclassifying`, `voided` | No |
-| `quarantined` | Quarantined | Damaged, defective or recalled; segregated from sound stock. | A damaged-or-defective determination (Rule 6.17) or a confirmed recall association (Rules 6.5, 6.23). | `stored` (only on a corrected assessment, Rule 6.11), `staged` (non-air only, Rule 6.7), `voided` | No |
+| `quarantined` | Quarantined | Damaged, defective or recalled; segregated from sound stock. | A damaged-or-defective determination (Rule 6.17) or a confirmed recall association (Rules 6.5, 6.23). | `stored` (only on a corrected assessment, Rule 6.11, or a withdrawn recall association that leaves no DDR flag, Rule 10.16), `staged` (non-air only, Rule 6.7), `voided` | No |
 | `staged` | Staged for shipment | Assigned to a shipment that has not yet departed. | Added to a shipment (Rule 5.1). | `stored` (removed), `shipped`, `voided` | No |
 | `shipped` | Shipped | The shipment carrying it has departed. | Shipment departure recorded (Rule 5.17). | `closed` | No |
 | `closed` | Closed | Arrival confirmed at the destination; the record's operational life is over. | Shipment arrival recorded (Rule 5.26). | — | **Yes** |
@@ -740,7 +747,14 @@ No other field is compared.
 
 **6.13** A damaged, defective or recalled record cannot be added to a shipment whose mode is air. The addition is blocked at the moment of assembly.
 
-**6.14** If a damage indicator is confirmed on a record already assigned to an air shipment, that record is removed from the shipment automatically, the shipping paper is voided per Rule 5.13, the shipment returns to a state requiring regeneration, and P1 and P2 are notified with the reason.
+**6.14** If a damage indicator or a recall association is confirmed on a record whose container is on an air shipment that has not departed:
+
+- the shipping paper is voided per Rule 5.13
+- the shipment returns to a state requiring regeneration
+- departure is refused
+- P1 and P2 are notified with the reason
+
+The record leaves the shipment when it is moved to quarantine (Rule 6.17). A departed shipment is never changed.
 
 **6.15** Packaging, outer-packaging class and marking requirements for damaged, defective and recalled batteries — including any minimum marking dimensions and required marking text — are carried by the applicable rule version as data, per Rule 1.23.
 
@@ -850,9 +864,11 @@ No other field is compared.
 
 ---
 
-### 10. Grading, damage triage and hazard ranking — B2 — STUB
+### 10. Grading, damage triage and hazard ranking — B2 — recall matching specified (D-73); the rest reserved
 
 *Reserved. Specified at **Gate 2** (11 December 2026), built in B2. The orchestration pattern is fixed in `_ANCHORS.md` §6: concurrent fan-out and fan-in over one record, then a sequential grading step, human gate at the end. Two rules below are not reserved — they are in force now and bind every section built before this one.*
+
+*Rules 10.10–10.18 (recall matching) are in force from `b2-09-recalls`. Everything else in this section stays reserved under 10.2.*
 
 **10.1** This section will govern: visual damage triage against the labeled damage set; automated recall matching on every intake record; relative hazard ranking of stored inventory; the published grading scheme; the reuse-versus-recycle recommendation; and the provenance record binding a pack's serial to the device or vehicle it came out of.
 
@@ -871,6 +887,79 @@ No other field is compared.
 **10.8** Chemistry is never determined from a photograph in B2 any more than in B1a. Improved label reading on degraded labels is still label reading. See Rule 2.9.
 
 **10.9** The provenance record binds a battery's serial to its source device or vehicle. B1a captures the source reference under Rule 2.30; this section specifies the binding, its verification and what breaks it.
+
+**10.10 — WHEN A CHECK RUNS.** A recall check runs:
+
+- when a record is committed with a confirmed catalog entry
+- when a record's catalog entry or source make, model or model year changes
+- when P1, P2 or P6 presses **Check now** on the record
+- on the nightly job, for every record in `confirmed`, `classified`, `reclassifying`, `stored`, `quarantined` or `staged` (T-22)
+
+**10.11 — WHAT IS MATCHED.** Two identities, each against its own source:
+
+- **The battery itself**, for every record with a confirmed catalog entry. Its manufacturer or brand name, and its model name or part number, are checked against the consumer product source.
+- **What it came out of**, when provenance is `vehicle_vin` or `device_serial` and the source make and model are on the record. A vehicle is checked against the vehicle safety source on make, model and model year. A device is checked against the consumer product source on make and model.
+
+A record with neither identity is not checked. Its standing reads "Nothing to match against." That is a recorded fact, not a failure. `unknown_provenance` and `bulk_consignment` stop only the second check.
+
+**10.12 — WHAT COUNTS AS A CANDIDATE.**
+
+- **Consumer source:** a hit is a candidate when the maker names agree and a model or part number listed in the recall agrees with the record's.
+- **Vehicle source:** a hit is a candidate when make, model and model year agree and the recall's component names the propulsion or traction battery.
+
+Names are normalized the way part numbers already are. A name agreeing on its own is never a candidate. The normalization and the component terms are configuration, not code (Rule 1.23).
+
+**10.13 — EVERY CANDIDATE IS A POSSIBLE MATCH.** The system never confirms a match, however exact (Rule 10.7, T-35).
+
+- No number, score, percentage or "match strength" is stored, shown or exported.
+- The record says which fields agreed, in words: "Brand and model match recall 24-123."
+- `match_confidence` is not written.
+
+**10.14 — DECIDING A POSSIBLE MATCH.**
+
+- **Confirm:** P1, P2 or P6. Confirming records an association (Rule 6.23).
+- **Dismiss:** P1 or P6, with a stated reason (T-35).
+- **P5:** neither.
+
+A confirmed match takes effect immediately:
+
+- the `recalled` DDR flag is set (T-30) and air is prohibited (Rule 6.7)
+- quarantine routing becomes a required action (Rule 6.17)
+- a re-classification check runs (Rule 6.20)
+- Rule 6.14 applies if the record is on an open air shipment
+- a possible match raises a `recall_match` alert for P1 and P2, and deciding it resolves the alert
+
+**10.15 — RECORDING A RECALL BY HAND.** P1, P2 or P6 may record a recall:
+
+- **Source:** `manufacturer_notice` or `manual_entry`.
+- **Reference:** the notice reference is required. The recall title is optional.
+- **Status:** it is stored as `confirmed_match` straight away, because a person entered it (Rule 6.23). The effects of 10.14 follow.
+
+**10.16 — WITHDRAWING A CONFIRMED RECALL.**
+
+- **Who:** P1 or P6, with a stated reason (Rule 6.24).
+- **The row:** it becomes `dismissed`. Nothing is deleted, and the confirmation and the withdrawal both stay visible on the record and in every export.
+- **The flag:** `recalled` clears only when no confirmed recall remains on the record. Air reopens only when the damage assessment is also clear.
+- **Quarantine:** withdrawing never moves the record. A person moves it back to sound stock with the existing move.
+
+**10.17 — A FAILED CHECK.** If a source can't be reached or returns an error:
+
+- the check run is recorded as failed, with a reason code
+- the record's standing reads "Not checked — source unavailable", with the time
+- intake is never blocked
+- the next run retries
+
+A failure is never shown as "no match".
+
+**10.18 — HISTORY.** Every check run is kept: when, which source, which identity and the outcome (no match, candidates found, nothing to match against, or failed with a reason).
+
+- A recall found again on a later run doesn't make a second match row.
+- Every confirm, dismiss, record and withdraw writes an `audit_event`.
+- A record's recall standing, in this order:
+  1. **Confirmed match** — any confirmed recall
+  2. **Possible match** — any open possible match
+  3. **No match** — the last run on every applicable source found none
+  4. **Not checked** — otherwise, with the reason
 
 ---
 

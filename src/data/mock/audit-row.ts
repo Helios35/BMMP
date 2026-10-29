@@ -81,6 +81,46 @@ export async function writeTriggerAudit(
 }
 
 /**
+ * An automated step's row — T-60 `system`, **no actor user**, the step named
+ * in `actorLabel` — for a step a person's act set running, such as the recall
+ * check on commit (Rule 12.5: automated steps are recorded as the step that
+ * ran, never attributed to a person). The request's attribution is kept, so
+ * the step stays tied to the act that ran it.
+ */
+export async function writeSystemAudit(
+  ctx: RequestContext,
+  at: IsoTimestamp,
+  stepLabel: string,
+  attribution: StorageWriteAttribution,
+  body: TriggerAuditBody,
+): Promise<void> {
+  const row: CreateAuditEvent = {
+    actorUserId: null,
+    actorType: "system",
+    actorLabel: stepLabel,
+    eventType: body.eventType,
+    entityTable: body.entityTable,
+    entityId: body.entityId,
+    occurredAt: at,
+    recordedAt: at,
+    beforeState: body.beforeState,
+    afterState: body.afterState,
+    changedFields: body.changedFields ?? null,
+    governingRuleVersionId: body.governingRuleVersionId ?? null,
+    ruleVersionsApplied: body.ruleVersionsApplied ?? null,
+    correlationId: ctx.correlationId,
+    requestId: attribution.requestId,
+    ipAddress: attribution.ipAddress,
+    userAgent: attribution.userAgent,
+    reason: body.reason ?? null,
+  };
+  await mockStore().auditEvents.insertAsDefiner(
+    ctx,
+    buildAuditEvent(ctx, row, nextId()),
+  );
+}
+
+/**
  * A scheduled job's row — T-60 `scheduled_job`, **no actor user**, the job
  * named in `actorLabel` (Rule 12.5: automated steps are recorded as the step
  * that ran, never attributed to a person). Same `security definer` door,

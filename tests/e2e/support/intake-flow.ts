@@ -412,10 +412,17 @@ export interface LoggedRecord {
  */
 export async function logCleanBattery(
   page: Page,
-  options: { readonly containerId?: string } & SendOptions = {},
+  options: {
+    readonly containerId?: string;
+    /**
+     * Another label that reads cleanly and matches its catalog entry — the
+     * scooter pack (`label-scooter.png`) is the one a fixture recall names.
+     */
+    readonly image?: IntakeFixtureImage;
+  } & SendOptions = {},
 ): Promise<LoggedRecord> {
   const containerId = options.containerId ?? CONTAINER.soundDrum;
-  const sessionId = await openReview(page, "label-clean.png", {
+  const sessionId = await openReview(page, options.image ?? "label-clean.png", {
     ...(options.exactBytes === undefined
       ? {}
       : { exactBytes: options.exactBytes }),

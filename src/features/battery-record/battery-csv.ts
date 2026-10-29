@@ -12,9 +12,14 @@ import {
 } from "@/domain/taxonomy/cell-form-factor";
 import { CHEMISTRIES, CHEMISTRY_LABELS } from "@/domain/taxonomy/chemistry";
 import { DDR_FLAG_LABELS } from "@/domain/taxonomy/ddr-flag";
+import {
+  RECALL_MATCH_STATUSES,
+  RECALL_MATCH_STATUS_LABELS,
+} from "@/domain/taxonomy/recall-match-status";
 import { readTaxonomyValue } from "@/domain/taxonomy/lookup";
 import { STORAGE_CLOCK_ALERT_BAND_LABELS } from "@/domain/taxonomy/storage-clock-alert-band";
 import type { BatteryRecord } from "@/types/battery-record";
+import type { RecallMatch } from "@/types/condition";
 import type { TimeZone } from "@/types/common";
 import type { Container, StorageClock } from "@/types/storage";
 
@@ -50,6 +55,7 @@ export const BATTERY_CSV_HEADERS = [
   "Time zone",
   "Status",
   "Catalog matched",
+  "Recall associations",
 ] as const;
 
 function label<T extends string>(
@@ -65,6 +71,30 @@ function label<T extends string>(
 export interface BatteryCsvContext {
   readonly containersById: ReadonlyMap<string, Container>;
   readonly clocksByContainerId: ReadonlyMap<string, StorageClock>;
+  /**
+   * Every recall association on each record, dismissed and withdrawn ones
+   * included — Rules 6.24, 10.16: the confirmation and the withdrawal both
+   * stay visible "in every export". Absent reads as none.
+   */
+  readonly recallsByRecordId?: ReadonlyMap<string, readonly RecallMatch[]>;
+}
+
+/** `26-041 (Possible match — needs review)`; a withdrawal says so. Never a number about the match. */
+function recallAssociations(matches: readonly RecallMatch[]): string {
+  return matches
+    .map((match) => {
+      const status = label(
+        RECALL_MATCH_STATUSES,
+        RECALL_MATCH_STATUS_LABELS,
+        match.status,
+      );
+      const withdrawn =
+        match.status === "dismissed" && match.confirmedBy !== null
+          ? ", withdrawn"
+          : "";
+      return `${match.recallNumber ?? match.providerRecordId} (${status}${withdrawn})`;
+    })
+    .join("; ");
 }
 
 export function batteryCsvRow(
@@ -102,5 +132,6 @@ export function batteryCsvRow(
     timeZone,
     label(BATTERY_RECORD_STATUSES, BATTERY_RECORD_STATUS_LABELS, record.status),
     record.catalogEntryId === null ? "No" : "Yes",
+    recallAssociations(context.recallsByRecordId?.get(record.id) ?? []),
   ];
 }

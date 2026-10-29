@@ -14,6 +14,8 @@ import { ValidationError } from "@/lib/errors";
 import type { BatteryRecord } from "@/types/battery-record";
 import type { IsoTimestamp, JsonObject, Uuid } from "@/types/common";
 import type { CatalogEntry } from "@/types/catalog";
+import { NO_ATTRIBUTION } from "@/features/intake/server/audit";
+import { runRecallCheckWithoutBlocking } from "@/features/recalls/server/check";
 import { systemEvent, userEvent, writeAuditEvent } from "./audit";
 import {
   assertRecordEditable,
@@ -312,6 +314,16 @@ export async function applyCatalogRematch(
     at,
     trigger: "catalog_rematch",
   });
+
+  // Rule 10.10 — a changed catalog entry is a changed identity, so the
+  // record is checked again; the check never blocks the re-match (10.17).
+  await runRecallCheckWithoutBlocking(
+    ctx,
+    record.id,
+    "identity_change",
+    at,
+    NO_ATTRIBUTION,
+  );
 
   return {
     record: reclassification.record,

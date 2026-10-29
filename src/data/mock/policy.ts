@@ -61,6 +61,8 @@ export type PolicyTable =
   | "container_label"
   | "document_render"
   | "damage_assessment"
+  | "recall_match"
+  | "recall_check"
   | "audit_event";
 
 export type PolicyAction = "select" | "insert" | "update";
@@ -165,6 +167,17 @@ export const POLICY_MATRIX: Readonly<Record<PolicyTable, PolicyRow>> = {
     insert: [...WRITER_SETS.W_INTAKE, ...WRITER_SETS.W_STORAGE],
     update: [],
   },
+  // `TECHNICAL_SPEC.md` §9.5 as D-73 #4 reads it: a check's rows are the
+  // system's (the definer door); a person records one by hand and confirms one
+  // as W_STORAGE; dismissing and withdrawing are P1's alone, which no writer
+  // set says — `mayTakeRecallAction` holds that finer line.
+  recall_match: {
+    select: R,
+    insert: WRITER_SETS.W_STORAGE,
+    update: WRITER_SETS.W_STORAGE,
+  },
+  // Check runs are append-only and written by the check, never typed.
+  recall_check: { select: R, insert: [], update: [] },
 
   // Read is P2, P5, P6 only — P1 cannot read the audit log (Rule 12.8).
   // Written by trigger under security definer, never by a user statement, which

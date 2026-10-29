@@ -10,6 +10,7 @@ import {
   ValidationError,
 } from "@/lib/errors";
 import type { IsoTimestamp, Uuid } from "@/types/common";
+import { runRecallCheckWithoutBlocking } from "@/features/recalls/server/check";
 
 import {
   CATALOG_ENTRY_NOT_AVAILABLE,
@@ -158,6 +159,18 @@ export async function commitIntake(
     ctx,
     built.confirmation,
   );
+  // Rule 10.10 — a record committed with a confirmed catalog entry is checked
+  // against the recall sources, and the check never blocks the commit
+  // (Rule 10.17): a source that does not answer is a recorded failed run.
+  if (committed.catalogEntryId !== null) {
+    await runRecallCheckWithoutBlocking(
+      ctx,
+      committed.id,
+      "intake_commit",
+      at,
+      attribution,
+    );
+  }
   revalidatePath("/batteries");
   revalidatePath(`/batteries/${committed.id}`);
   revalidatePath("/review");

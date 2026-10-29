@@ -192,6 +192,20 @@ describe("what the files hold", () => {
     expect(lines.length - 1).toBe(own.total);
   });
 
+  it("/batteries carries every recall association, the recall filter included (Rules 10.16, 10.18)", async () => {
+    const body = await (await batteries.GET(request("batteries"))).text();
+    expect(body.split("\r\n")[0]).toContain("Recall associations");
+    expect(body).toContain("HM-SN-2026-114 (Confirmed match)");
+    const recalled = await (
+      await batteries.GET(
+        request("batteries", "?recall=confirmed_match&format=csv"),
+      )
+    ).text();
+    const rows = recalled.split("\r\n").filter((line) => line !== "");
+    expect(rows).toHaveLength(2);
+    expect(rows[1]).toContain("BR-0011");
+  });
+
   it("/batteries honours the filters the screen was showing", async () => {
     const all = await (await batteries.GET(request("batteries"))).text();
     const narrowed = await (

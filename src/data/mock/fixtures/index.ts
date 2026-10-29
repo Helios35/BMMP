@@ -8,7 +8,11 @@ import type {
 import type { AuditEvent } from "@/types/audit";
 import type { BatteryRecord } from "@/types/battery-record";
 import type { CatalogEntry } from "@/types/catalog";
-import type { DamageAssessment } from "@/types/condition";
+import type {
+  DamageAssessment,
+  RecallCheckRun,
+  RecallMatch,
+} from "@/types/condition";
 import type {
   ClassificationDecision,
   ContainerLabel,
@@ -36,6 +40,7 @@ import type {
 } from "@/types/tenancy";
 import type { AppliedRuleVersion } from "@/domain/rules/outcome";
 import * as B1A_08 from "./b1a-08";
+import * as B2_09 from "./b2-09";
 import * as ID from "./ids";
 import { INVITE_TOKEN_HASHES } from "./invite-tokens";
 
@@ -1249,6 +1254,8 @@ export const ruleVersions: readonly RuleVersion[] = [
     createdAt: RULES_AUTHORED_B1A_08,
     createdBy: ID.USER.platformAdmin,
   },
+  // Added by b2-09 — never an edit to a row above (STATE §7.1).
+  ...B2_09.ruleVersions,
 ];
 
 /**
@@ -1862,6 +1869,8 @@ export const batteryRecords: readonly BatteryRecord[] = [
   },
   // Added by b1a-08 — never an edit to a row above (STATE §7.1).
   ...B1A_08.batteryRecords,
+  // Added by b2-09 — never an edit to a row above (STATE §7.1).
+  ...B2_09.batteryRecords,
 ];
 
 // ---------------------------------------------------------------------------
@@ -2446,6 +2455,8 @@ export const containers: readonly Container[] = [
   },
   // Added by b1a-08 — never an edit to a row above (STATE §7.1).
   ...B1A_08.containers,
+  // Added by b2-09 — never an edit to a row above (STATE §7.1).
+  ...B2_09.containers,
 ];
 
 export const lots: readonly Lot[] = [
@@ -2550,6 +2561,8 @@ export const storageClocks: readonly StorageClock[] = [
   },
   // Added by b1a-08 — never an edit to a row above (STATE §7.1).
   ...B1A_08.storageClocks,
+  // Added by b2-09 — never an edit to a row above (STATE §7.1).
+  ...B2_09.storageClocks,
 ];
 
 export const storageEvents: readonly StorageEvent[] = [
@@ -2681,6 +2694,8 @@ export const alerts: readonly Alert[] = [
     createdAt: T.spreadIntake,
     updatedAt: T.spreadIntake,
   },
+  // Added by b2-09 — never an edit to a row above (STATE §7.1).
+  ...B2_09.alerts,
 ];
 
 // ---------------------------------------------------------------------------
@@ -2828,6 +2843,8 @@ export const classificationDecisions: readonly ClassificationDecision[] = [
   },
   // Added by b1a-08 — never an edit to a row above (STATE §7.1).
   ...B1A_08.classificationDecisions,
+  // Added by b2-09 — never an edit to a row above (STATE §7.1).
+  ...B2_09.classificationDecisions,
 ];
 
 export const documentRenders: readonly DocumentRender[] = [
@@ -2894,6 +2911,8 @@ export const documentRenders: readonly DocumentRender[] = [
     supersededAt: null,
     createdAt: T.soundAccumulationStart,
   },
+  // Added by b2-09 — never an edit to a row above (STATE §7.1).
+  ...B2_09.documentRenders,
 ];
 
 export const shipments: readonly Shipment[] = [
@@ -2987,6 +3006,8 @@ export const shipments: readonly Shipment[] = [
   },
   // Added by b1a-08 — never an edit to a row above (STATE §7.1).
   ...B1A_08.shipments,
+  // Added by b2-09 — never an edit to a row above (STATE §7.1).
+  ...B2_09.shipments,
 ];
 
 export const shippingPapers: readonly ShippingPaper[] = [
@@ -3018,6 +3039,8 @@ export const shippingPapers: readonly ShippingPaper[] = [
     generatedBy: ID.USER.danaHandler,
     createdAt: T.julyShipped,
   },
+  // Added by b2-09 — never an edit to a row above (STATE §7.1).
+  ...B2_09.shippingPapers,
 ];
 
 export const containerLabels: readonly ContainerLabel[] = [
@@ -3147,6 +3170,8 @@ export const damageAssessments: readonly DamageAssessment[] = [
   },
   // Added by b1a-08 — never an edit to a row above (STATE §7.1).
   ...B1A_08.damageAssessments,
+  // Added by b2-09 — never an edit to a row above (STATE §7.1).
+  ...B2_09.damageAssessments,
 ];
 
 // ---------------------------------------------------------------------------
@@ -3254,4 +3279,12 @@ export const auditEvents: readonly AuditEvent[] = [
   },
   // Added by b1a-08 — never an edit to a row above (STATE §7.1).
   ...B1A_08.auditEvents,
+];
+
+// --- b2-09: recall matching — every row here is new (STATE §7.1) ------------
+
+export const recallMatches: readonly RecallMatch[] = [...B2_09.recallMatches];
+
+export const recallCheckRuns: readonly RecallCheckRun[] = [
+  ...B2_09.recallCheckRuns,
 ];

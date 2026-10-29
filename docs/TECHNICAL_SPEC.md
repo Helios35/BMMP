@@ -110,6 +110,7 @@ Every row is fixed by `PROJECT_SETUP_BMMP.md` §1 unless marked **added here**. 
 | Key | Server only | Purpose |
 |---|---|---|
 | `VISION_PROVIDER` | yes | Selects the `VisionProvider` implementation. `fixture` in CI and under `DATA_ADAPTER=mock`. |
+| `RECALL_PROVIDER` | yes | Selects the `RecallProvider` implementation. `fixture` is the default in CI and under `DATA_ADAPTER=mock`, keyed on part number or make/model. An unrecognized value fails at boot, the same as `VISION_PROVIDER` (§12.3). |
 | `CPSC_RECALL_BASE_URL` | yes | Consumer/mobility recall source. Complements the existing `NHTSA_RECALL_BASE_URL` (vehicle source). Both free, both unauthenticated (§11.2). |
 | `HEALTH_TESTER_WEBHOOK_SECRET` | yes | HMAC key for the B3 tester socket (§11.3). |
 | `SENTRY_DSN` | yes | Optional. Unset means no-op. |
@@ -729,7 +730,7 @@ The UI hiding a button is a fifth layer and is not counted among the four.
 | `damage_assessment` | `organization_id` | `R` | `W_INTAKE` ∨ `W_STORAGE` ∨ `PA` | **none** | **none** |
 | `grade` (B2) | `organization_id` | `R` | `W_INTAKE` ∨ `PA` | **none** | **none** |
 | `hazard_ranking` (B2) | `organization_id` | `R` | `W_INTAKE` ∨ `PA` | **none** | **none** |
-| `recall_match` (B2) | `organization_id` | `R` | system ∨ `PA` | `W_INTAKE` ∨ `PA` (confirm/dismiss) | none |
+| `recall_match` (B2) | `organization_id` | `R` | system ∨ `W_STORAGE` (record by hand, Rule 6.23) ∨ `PA` | `W_STORAGE` (confirm) · P1 (dismiss/withdraw) ∨ `PA` | none |
 | `jurisdiction` | — | any authenticated | `PA` | `PA` | none |
 | `jurisdiction_rule` | — | any authenticated | `PA` | `PA` | none |
 | `rule_version` | — | any authenticated | `PA` | `PA` **only while `published_at is null`** | none |
@@ -988,6 +989,8 @@ Interface and usage in §11.1. Integration properties:
 Free, public, **no authentication** — so there is no key to leak and no per-tenant credential to manage.
 
 Two sources behind one interface, because the product covers two worlds: `NHTSA_RECALL_BASE_URL` for vehicle-derived packs and `CPSC_RECALL_BASE_URL` for consumer and mobility-device products. `RecallProvider` in `src/lib/recalls/provider.ts` exposes `search(query): Promise<RecallHit[]>`; the caller does not know which source answered.
+
+`RECALL_PROVIDER` selects the `RecallProvider`. `fixture` is the default in CI and under `DATA_ADAPTER=mock`, keyed on part number or make/model. An unrecognized value fails at boot, the same as `VISION_PROVIDER`.
 
 Matching (B2) runs on intake and nightly via `POST /api/jobs/recall-sync`, writing `recall_match` with `source`, `provider_record_id`, `matched_on jsonb` (which fields produced the match), `match_confidence`, recall number, title, URL, publication date and remedy summary. **A match is a candidate, not a fact** — it is surfaced to a human to confirm or dismiss, and `confirmed_by` / `dismissed_reason` record which happened.
 

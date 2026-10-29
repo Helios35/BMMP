@@ -144,6 +144,11 @@ export function DdrPacketTemplate({
           <View style={styles.item} wrap={false}>
             <Text style={styles.itemName}>{CAPTIONS.ddrPackingLevel}</Text>
             <Text style={styles.value}>{payload.packingLevelText}</Text>
+            {payload.packingLevelCitation === null ? null : (
+              <Text style={styles.citation}>
+                {payload.packingLevelCitation}
+              </Text>
+            )}
           </View>
           <View style={styles.item} wrap={false}>
             <Text style={styles.itemName}>{CAPTIONS.ddrMarkingHeight}</Text>

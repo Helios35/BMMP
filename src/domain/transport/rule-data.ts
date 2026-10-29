@@ -47,7 +47,14 @@ export const SHIPPING_PAPER_RULE_KEYS = [
 const BASIC_DESCRIPTION_SCHEMA = "transport.basic_description.v1";
 const SHIPPER_CERTIFICATION_SCHEMA = "transport.shipper_certification.v1";
 const RETENTION_SCHEMA = "retention.shipment_record.v1";
-const DDR_PACKAGING_SCHEMA = "transport.ddr_packaging.v1";
+/**
+ * v1 (b1a-08) and v2 (D-72 #9, b2-09): the same rows, v2 carrying the packing
+ * level with its own citation. Both read; nothing else does.
+ */
+const DDR_PACKAGING_SCHEMAS: readonly string[] = [
+  "transport.ddr_packaging.v1",
+  "transport.ddr_packaging.v2",
+];
 
 /**
  * The fields `transport.basic_description.v1` may sequence. The schema's own
@@ -154,8 +161,15 @@ export type DdrPackagingItem = {
 export interface DdrPackagingRule {
   readonly families: readonly DdrPackagingFamily[];
   readonly packaging: readonly DdrPackagingItem[];
-  /** **Null means not on file** (D-58 #12) — the packet says so; nothing assumes one. */
-  readonly packingLevel: string | null;
+  /**
+   * **Null means not on file** (D-58 #12) — the packet says so; nothing
+   * assumes one. v1 carried the level as bare text; v2 (D-72 #9) carries it
+   * with its own citation, which the packet prints beside it (Rule 12.15).
+   */
+  readonly packingLevel: {
+    readonly text: string;
+    readonly citation: string | null;
+  } | null;
   readonly marking: {
     readonly citation: string;
     readonly minimumHeight: string;
@@ -195,7 +209,7 @@ function readItem(value: unknown): DdrPackagingItem | null {
 }
 
 /**
- * `transport.ddr_packaging.v1`, read whole or not at all. A family, an item
+ * `transport.ddr_packaging` v1 or v2, read whole or not at all. A family, an item
  * or a citation that is missing or malformed refuses the payload — a packet
  * that printed half its packaging would be a wrong document, and a wrong
  * document is worse than none.
@@ -204,7 +218,9 @@ export function readDdrPackagingRule(
   resolved: ResolvedRule,
 ): DdrPackagingRule | null {
   if (resolved.ruleKey !== DDR_PACKAGING_RULE_KEY) return null;
-  if (resolved.version.payloadSchemaKey !== DDR_PACKAGING_SCHEMA) return null;
+  if (!DDR_PACKAGING_SCHEMAS.includes(resolved.version.payloadSchemaKey)) {
+    return null;
+  }
   const payload: unknown = resolved.version.payload;
   if (!isRecord(payload)) return null;
   const { families, packaging, packingLevel, marking, air } = payload;
@@ -214,7 +230,8 @@ export function readDdrPackagingRule(
   const readItems = packaging.map(readItem);
   if (readFamilies.some((family) => family === null)) return null;
   if (readItems.some((item) => item === null)) return null;
-  if (packingLevel !== null && !isText(packingLevel)) return null;
+  const level = readPackingLevel(packingLevel);
+  if (level === undefined) return null;
   if (!isRecord(marking) || !isRecord(air)) return null;
   const { citation, minimumHeight, minimumHeightCitation } = marking;
   if (
@@ -232,10 +249,27 @@ export function readDdrPackagingRule(
     packaging: readItems.filter(
       (item): item is DdrPackagingItem => item !== null,
     ),
-    packingLevel,
+    packingLevel: level,
     marking: { citation, minimumHeight, minimumHeightCitation },
     air: { requirement: air.requirement, citation: air.citation },
   };
+}
+
+/**
+ * `null` (not on file), v1's bare text, or v2's `{ text, citation }`;
+ * `undefined` for anything else — a malformed row reads as no rule, never as
+ * a guess.
+ */
+function readPackingLevel(
+  value: unknown,
+): DdrPackagingRule["packingLevel"] | undefined {
+  if (value === null) return null;
+  if (isText(value)) return { text: value, citation: null };
+  if (!isRecord(value)) return undefined;
+  const { text, citation } = value;
+  if (!isText(text)) return undefined;
+  if (citation !== null && !isText(citation)) return undefined;
+  return { text, citation };
 }
 
 /** The family a chemistry falls under, or null — no rule on file for it (D-71). */

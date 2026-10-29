@@ -8,6 +8,8 @@ process.env.DATA_ADAPTER = "mock";
 // and fails closed on an unset value (D-25). The fixture provider is the only
 // one a test may ever spend on.
 process.env.VISION_PROVIDER = "fixture";
+// src/lib/recalls/index.ts selects the recall source the same way (§12.3).
+process.env.RECALL_PROVIDER = "fixture";
 delete process.env.VERCEL_ENV;
 // The permanent origin a printed label's QR points at (src/lib/app-url.ts).
 // Playwright pins it to the server it starts; this suite pins a host no

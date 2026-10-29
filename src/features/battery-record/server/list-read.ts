@@ -117,6 +117,7 @@ export async function readBatteryListRequest(
       containerId,
       containerIds,
       isCatalogMatched: selection.isCatalogMatched,
+      recallStatus: selection.recallStatus,
       loggedAfter: selection.loggedAfter,
       loggedBefore: selection.loggedBefore,
       sortBy: selection.sortBy,

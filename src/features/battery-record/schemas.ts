@@ -93,22 +93,5 @@ export const voidBatteryRecordSchema = z.object({
 
 export type VoidBatteryRecordInput = z.infer<typeof voidBatteryRecordSchema>;
 
-/**
- * The first issue a parse produced, as a field name and a message.
- *
- * One issue at a time, on the field it belongs to (§10.3). The same helper
- * lives in `src/features/auth/schemas.ts`; it is small enough that a copy
- * costs less than a cross-feature import, and lifting it to `src/lib` is a
- * one-line follow-up once a third feature needs it.
- */
-export function firstIssue(error: z.ZodError): {
-  readonly field: string | undefined;
-  readonly message: string;
-} {
-  const issue = error.issues[0];
-  const path = issue?.path[0];
-  return {
-    field: typeof path === "string" ? path : undefined,
-    message: issue?.message ?? "Check the details and try again.",
-  };
-}
+/** One issue at a time, on its field — `src/lib/first-issue.ts`. */
+export { firstIssue } from "@/lib/first-issue";
