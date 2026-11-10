@@ -175,6 +175,10 @@ import {
 } from "@/lib/errors";
 import { mockPlatformConfiguration } from "./platform-configuration";
 import {
+  mockCatalogReferencePhotos,
+  mockPhotoChecks,
+} from "./photo-check-writes";
+import {
   mockRecalls,
   recallSyncPlan,
   recordRecallCheckForJob,
@@ -1722,11 +1726,15 @@ const intakePhotos = tenantAppendOnlyRepository<
       parentIntakePhotoId?: Uuid;
       photoType?: string;
       contentHash?: Sha256;
+      hasLookFingerprint?: boolean;
       search?: string;
     },
   ) =>
     eq(query.intakeSessionId, row.intakeSessionId) &&
     eq(query.contentHash, row.contentHash) &&
+    (query.hasLookFingerprint === undefined ||
+      query.hasLookFingerprint ===
+        (row.lookFingerprint !== undefined && row.lookFingerprint !== null)) &&
     eq(query.parentIntakePhotoId, row.parentIntakePhotoId ?? undefined) &&
     eq(query.photoType, row.photoType) &&
     (query.isCrop === undefined ||
@@ -2652,6 +2660,8 @@ export const mockAdapter: DataAdapter = {
 
   damageAssessments,
   recalls: mockRecalls,
+  photoChecks: mockPhotoChecks,
+  catalogReferencePhotos: mockCatalogReferencePhotos,
   auditEvents,
 
   objects,

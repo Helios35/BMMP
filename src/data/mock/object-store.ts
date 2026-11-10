@@ -1,4 +1,10 @@
-import type { BucketKey, ObjectStore } from "@/data/contracts/object-store";
+import {
+  PLATFORM_BUCKET,
+  PLATFORM_PATH_PREFIX,
+  type BucketKey,
+  type ObjectStore,
+} from "@/data/contracts/object-store";
+import type { RequestContext } from "@/data/contracts/context";
 import { ConflictError, NotFoundError, ValidationError } from "@/lib/errors";
 import { sha256Hex } from "@/lib/hash/sha256";
 
@@ -38,9 +44,39 @@ export function snapshotObjects(): () => void {
   };
 }
 
+/**
+ * Whether the caller may read the path. An organization's objects are its own
+ * (`org/{id}/`); the platform bucket's reference label photos are every
+ * member's to read (Rule 2.36) and nothing else lives under its prefix.
+ */
+function readable(
+  ctx: RequestContext,
+  bucket: BucketKey,
+  path: string,
+): boolean {
+  if (bucket === PLATFORM_BUCKET) return path.startsWith(PLATFORM_PATH_PREFIX);
+  return path.startsWith(`org/${ctx.organizationId}/`);
+}
+
+/**
+ * Whether the caller may write the path. **Only P6 writes the platform
+ * bucket** (D-75 #1, #2) — a tenant's bytes can never land where every
+ * tenant reads them.
+ */
+function writable(
+  ctx: RequestContext,
+  bucket: BucketKey,
+  path: string,
+): boolean {
+  if (bucket === PLATFORM_BUCKET) {
+    return ctx.isPlatformAdmin && path.startsWith(PLATFORM_PATH_PREFIX);
+  }
+  return path.startsWith(`org/${ctx.organizationId}/`);
+}
+
 export const mockObjects: ObjectStore = {
   async put(ctx, req) {
-    if (!req.path.startsWith(`org/${ctx.organizationId}/`)) {
+    if (!writable(ctx, req.bucket, req.path)) {
       throw new ValidationError({
         userMessage: "That storage path is not available.",
         correlationId: ctx.correlationId,
@@ -68,10 +104,7 @@ export const mockObjects: ObjectStore = {
   },
   async get(ctx, req) {
     const stored = mockStore().objects.get(key(req.bucket, req.path));
-    if (
-      stored === undefined ||
-      !req.path.startsWith(`org/${ctx.organizationId}/`)
-    ) {
+    if (stored === undefined || !readable(ctx, req.bucket, req.path)) {
       throw new NotFoundError({
         userMessage: "That file could not be retrieved.",
         correlationId: ctx.correlationId,
@@ -81,7 +114,7 @@ export const mockObjects: ObjectStore = {
     return stored.bytes;
   },
   async signedUrl(ctx, req) {
-    if (!req.path.startsWith(`org/${ctx.organizationId}/`)) {
+    if (!readable(ctx, req.bucket, req.path)) {
       throw new NotFoundError({
         userMessage: "That file could not be retrieved.",
         correlationId: ctx.correlationId,

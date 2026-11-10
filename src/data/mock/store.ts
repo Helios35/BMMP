@@ -42,6 +42,7 @@ import type {
   User,
 } from "@/types/tenancy";
 import type { Uuid } from "@/types/common";
+import type { CatalogReferencePhoto, PhotoCheck } from "@/types/photo-check";
 
 /**
  * The in-memory database.
@@ -92,6 +93,8 @@ export interface MockStore {
   readonly damageAssessments: TenantTable<DamageAssessment>;
   readonly recallMatches: TenantTable<RecallMatch>;
   readonly recallCheckRuns: TenantTable<RecallCheckRun>;
+  readonly photoChecks: TenantTable<PhotoCheck>;
+  readonly catalogReferencePhotos: PlatformTable<CatalogReferencePhoto>;
   readonly auditEvents: TenantTable<TenantAuditEvent>;
 
   /** Object bytes, keyed `bucket:path`. */
@@ -251,13 +254,23 @@ function buildStore(): MockStore {
       "recallCheckRuns",
       FIXTURES.recallCheckRuns,
     ),
+    photoChecks: new TenantTable(
+      "photo_check",
+      "photoChecks",
+      FIXTURES.photoChecks,
+    ),
+    catalogReferencePhotos: new PlatformTable(
+      "catalog_reference_photo",
+      "catalogReferencePhotos",
+      FIXTURES.catalogReferencePhotos,
+    ),
     auditEvents: new TenantTable(
       "audit_event",
       "auditEvents",
       seededAuditEvents,
     ),
 
-    objects: new Map(),
+    objects: new Map(FIXTURES.seededObjects()),
   };
 }
 
@@ -308,9 +321,14 @@ export function resetMockStore(): MockStore {
   store.damageAssessments.replaceAll(FIXTURES.damageAssessments);
   store.recallMatches.replaceAll(FIXTURES.recallMatches);
   store.recallCheckRuns.replaceAll(FIXTURES.recallCheckRuns);
+  store.photoChecks.replaceAll(FIXTURES.photoChecks);
+  store.catalogReferencePhotos.replaceAll(FIXTURES.catalogReferencePhotos);
   store.auditEvents.replaceAll(seededAuditEvents);
 
   store.objects.clear();
+  for (const [stored, object] of FIXTURES.seededObjects()) {
+    store.objects.set(stored, object);
+  }
 
   resetIdSequence();
   resetSequenceNumbers();

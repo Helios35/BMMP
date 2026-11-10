@@ -39,8 +39,10 @@ import type {
   User,
 } from "@/types/tenancy";
 import type { AppliedRuleVersion } from "@/domain/rules/outcome";
+import type { CatalogReferencePhoto, PhotoCheck } from "@/types/photo-check";
 import * as B1A_08 from "./b1a-08";
 import * as B2_09 from "./b2-09";
+import * as B2_10 from "./b2-10";
 import * as ID from "./ids";
 import { INVITE_TOKEN_HASHES } from "./invite-tokens";
 
@@ -1871,6 +1873,7 @@ export const batteryRecords: readonly BatteryRecord[] = [
   ...B1A_08.batteryRecords,
   // Added by b2-09 — never an edit to a row above (STATE §7.1).
   ...B2_09.batteryRecords,
+  ...B2_10.batteryRecords,
 ];
 
 // ---------------------------------------------------------------------------
@@ -1958,6 +1961,7 @@ export const intakeSessions: readonly IntakeSession[] = [
   },
   // Added by b1a-08 — never an edit to a row above (STATE §7.1).
   ...B1A_08.intakeSessions,
+  ...B2_10.intakeSessions,
 ];
 
 export const intakePhotos: readonly IntakePhoto[] = [
@@ -2133,6 +2137,7 @@ export const intakePhotos: readonly IntakePhoto[] = [
   },
   // Added by b1a-08 — never an edit to a row above (STATE §7.1).
   ...B1A_08.intakePhotos,
+  ...B2_10.intakePhotos,
 ];
 
 const BAND_CUTOFFS = { high: 0.9, medium: 0.7, low: 0.4 } as const;
@@ -3172,6 +3177,7 @@ export const damageAssessments: readonly DamageAssessment[] = [
   ...B1A_08.damageAssessments,
   // Added by b2-09 — never an edit to a row above (STATE §7.1).
   ...B2_09.damageAssessments,
+  ...B2_10.damageAssessments,
 ];
 
 // ---------------------------------------------------------------------------
@@ -3288,3 +3294,14 @@ export const recallMatches: readonly RecallMatch[] = [...B2_09.recallMatches];
 export const recallCheckRuns: readonly RecallCheckRun[] = [
   ...B2_09.recallCheckRuns,
 ];
+
+/** b2-10 — photo check runs (Rules 2.36, 2.37, 6.25). */
+export const photoChecks: readonly PhotoCheck[] = [...B2_10.photoChecks];
+
+/** b2-10 — catalog reference label photos, platform rows (Rule 2.36). */
+export const catalogReferencePhotos: readonly CatalogReferencePhoto[] = [
+  ...B2_10.catalogReferencePhotos,
+];
+
+/** b2-10 — the bytes the seeded rows point at, so a check can read them. */
+export const seededObjects = B2_10.seededObjects;

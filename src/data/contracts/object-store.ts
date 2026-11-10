@@ -17,7 +17,20 @@ import type { Sha256 } from "@/types/common";
  * `document_render` row's bytes are immutable, and a reprint serves the stored
  * bytes rather than re-rendering (`TECHNICAL_SPEC.md` §8.4).
  */
-export const BUCKET_KEYS = ["intake-photos", "documents"] as const;
+export const BUCKET_KEYS = [
+  "intake-photos",
+  "documents",
+  "catalog-reference-photos",
+] as const;
+
+/**
+ * The one bucket whose objects are not an organization's: the catalog's
+ * reference label photos (Rule 2.36; D-75 #1). Its paths start
+ * `platform/`, never `org/{id}/`; every member reads them, and only P6 writes
+ * one — through `catalogReferencePhotos.set`, never a feature file.
+ */
+export const PLATFORM_BUCKET: BucketKey = "catalog-reference-photos";
+export const PLATFORM_PATH_PREFIX = "platform/";
 
 export type BucketKey = (typeof BUCKET_KEYS)[number];
 

@@ -149,6 +149,10 @@ export const BATTERY = {
   nothingToMatch: uid("0a000009", 14),
   /** b2-09 — sound, on air shipment SH-0004 with an issued paper, with a possible match (Rule 6.14). */
   airShipmentRecall: uid("0a000009", 15),
+  /** b2-10 — the copy target: its label photo carries a look-alike fingerprint; its label look check failed. */
+  photoCopyTarget: uid("0a000009", 16),
+  /** b2-10 — a `model_assisted_visual` assessment: one suggestion accepted, one rejected. */
+  modelAssisted: uid("0a000009", 17),
 } as const;
 
 export const INTAKE_SESSION = {
@@ -157,6 +161,10 @@ export const INTAKE_SESSION = {
   spreadInReview: uid("0a00000a", 3),
   /** b1a-08 — the label-vs-catalog disagreement in review. */
   labelMismatchInReview: uid("0a00000a", 4),
+  /** b2-10 — BR-0015's intake. */
+  copyTargetCompleted: uid("0a00000a", 5),
+  /** b2-10 — BR-0016's intake. */
+  modelAssistedCompleted: uid("0a00000a", 6),
 } as const;
 
 export const PHOTO = {
@@ -169,6 +177,13 @@ export const PHOTO = {
   swollenDamage: uid("0a00000b", 7),
   labelMismatchOriginal: uid("0a00000b", 8),
   labelMismatchCrop: uid("0a00000b", 9),
+  /** b2-10 — BR-0015's label photo, the copy target's fingerprint (Rule 2.37). */
+  copyTargetOriginal: uid("0a00000b", 10),
+  copyTargetCrop: uid("0a00000b", 11),
+  /** b2-10 — BR-0016's label photo, crop and damage photo (Rule 6.25). */
+  modelAssistedOriginal: uid("0a00000b", 12),
+  modelAssistedCrop: uid("0a00000b", 13),
+  modelAssistedDamage: uid("0a00000b", 14),
 } as const;
 
 export const EXTRACTION_RUN = {
@@ -281,6 +296,26 @@ export const DAMAGE = {
   recallCheckFails: uid("0a000016", 9),
   nothingToMatch: uid("0a000016", 10),
   airShipmentRecall: uid("0a000016", 11),
+  /** b2-10 — BR-0015, assessed sound by visual inspection. */
+  photoCopyTarget: uid("0a000016", 12),
+  /** b2-10 — BR-0016, `model_assisted_visual`. */
+  modelAssisted: uid("0a000016", 13),
+} as const;
+
+/** b2-10 — photo check runs (Rules 2.36, 2.37, 6.25). */
+export const PHOTO_CHECK = {
+  /** BR-0016's damage photo: dent and surface marking proposed. */
+  modelAssistedProposal: uid("0a00001e", 1),
+  /** BR-0015's label look check: the service did not answer (Rule 2.36). */
+  copyTargetLabelLookFailed: uid("0a00001e", 2),
+  /** BR-0015's copy check: no copy found. */
+  copyTargetCopyCheck: uid("0a00001e", 3),
+} as const;
+
+/** b2-10 — catalog reference label photos (Rule 2.36). */
+export const REFERENCE_PHOTO = {
+  /** The vehicle traction entry's current reference. The scooter and laptop entries have none. */
+  vehicleTractionNmc: uid("0a00001f", 1),
 } as const;
 
 /** b2-09 — recall associations (`recall_match`, Rules 10.13–10.16). */

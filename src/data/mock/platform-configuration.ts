@@ -3,11 +3,13 @@ import type { PlatformConfigurationRepository } from "@/data/contracts/platform-
 import { validateIntakeGateConfiguration } from "@/domain/intake/thresholds";
 import { validateEmergencyContactConfiguration } from "@/domain/transport/emergency-verification";
 import { validateRecallMatchConfiguration } from "@/domain/recalls/configuration";
+import { validateLookAlikeConfiguration } from "@/domain/photo-checks/look-alike";
 import { DataIntegrityError } from "@/lib/errors";
 
 import {
   PLATFORM_EMERGENCY_CONTACT_CONFIGURATION,
   PLATFORM_INTAKE_GATE_CONFIGURATION,
+  PLATFORM_LOOK_ALIKE_CONFIGURATION,
   PLATFORM_RECALL_MATCH_CONFIGURATION,
 } from "./fixtures/platform-configuration";
 
@@ -63,6 +65,21 @@ export const mockPlatformConfiguration: PlatformConfigurationRepository = {
       throw new DataIntegrityError({
         userMessage:
           "The recall-matching configuration could not be loaded. No check ran — ask an Admin.",
+        correlationId: ctx.correlationId,
+        context: { issues: validation.issues },
+      });
+    }
+    return validation.configuration;
+  },
+
+  async readLookAlikeConfiguration(ctx: RequestContext) {
+    const validation = validateLookAlikeConfiguration(
+      PLATFORM_LOOK_ALIKE_CONFIGURATION,
+    );
+    if (!validation.ok) {
+      throw new DataIntegrityError({
+        userMessage:
+          "The copy-check configuration could not be loaded. No check ran — ask an Admin.",
         correlationId: ctx.correlationId,
         context: { issues: validation.issues },
       });

@@ -2,6 +2,7 @@ import type { RequestContext } from "./context";
 import type { IntakeGateConfiguration } from "@/domain/intake/thresholds";
 import type { EmergencyContactConfiguration } from "@/domain/transport/emergency-verification";
 import type { RecallMatchConfiguration } from "@/domain/recalls/configuration";
+import type { LookAlikeConfiguration } from "@/domain/photo-checks/look-alike";
 
 /**
  * Platform configuration — the values P6 owns that are neither jurisdiction
@@ -63,4 +64,15 @@ export interface PlatformConfigurationRepository {
   readRecallMatchConfiguration(
     ctx: RequestContext,
   ): Promise<RecallMatchConfiguration>;
+
+  /**
+   * How close two look-alike fingerprints must be to count as a copy — Rule
+   * 2.37; D-40. **Read here and nowhere else**: a closeness in a TypeScript
+   * conditional is a rule in code. Its version is stamped on every copy check
+   * run (Rule 12.15). Validated with `validateLookAlikeConfiguration`; an
+   * invalid row throws `DataIntegrityError`, never a default.
+   */
+  readLookAlikeConfiguration(
+    ctx: RequestContext,
+  ): Promise<LookAlikeConfiguration>;
 }
