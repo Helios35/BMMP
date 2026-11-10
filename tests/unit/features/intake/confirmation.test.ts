@@ -223,6 +223,7 @@ function input(overrides: Partial<ConfirmationInput> = {}): ConfirmationInput {
     organization,
     dateCodeExtractionId: null,
     damagePhotoId: null,
+    damageSuggestions: { proposals: [], undecided: [], model: null },
     hasStoredPhoto: true,
     today: TODAY,
     at: AT,

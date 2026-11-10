@@ -456,9 +456,9 @@ describe("the awkward fixtures", () => {
     });
     expect(created.ddrFlags).toEqual([]);
     expect(created.isAirTransportProhibited).toBe(false);
-    // BR-0006 to BR-0008 are b1a-08 fixtures and BR-0009 to BR-0014 b2-09's;
-    // the counter starts above them.
-    expect(created.recordNumber).toBe("BR-0015");
+    // BR-0006 to BR-0008 are b1a-08 fixtures, BR-0009 to BR-0014 b2-09's and
+    // BR-0015, BR-0016 b2-10's; the counter starts above them.
+    expect(created.recordNumber).toBe("BR-0017");
   });
 
   it("carries a container past its accumulation period in the hard overdue state", async () => {

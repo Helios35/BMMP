@@ -2,7 +2,7 @@
 /**
  * The intake fixture images.
  *
- * Writes the ten synthetic PNGs the fixture label reader
+ * Writes the synthetic PNGs the fixture label reader
  * (`src/lib/vision/providers/fixture.ts`) keys on, to `public/fixtures/intake/`
  * and, as identical copies, to `tests/e2e/fixtures/intake/` for the specs to
  * upload. No real photograph is ever committed: a photo of a real label is a
@@ -111,6 +111,38 @@ const IMAGES = [
     label: rgb(0x22, 0x26, 0x2a),
     box: PACK_BOX,
     blotch: { box: DAMAGE_BLOTCH, colour: rgb(0x0c, 0x0d, 0x0e) },
+  },
+  // b2-10 — the photo checks' scenarios (src/lib/vision/providers/fixture.ts).
+  // Added after the ten above, so their bytes do not move.
+  {
+    // Two AI suggestions: swelling and surface marking (Rule 6.25).
+    name: "damage-swelling.png",
+    ground: rgb(0x70, 0x6a, 0x66),
+    label: rgb(0x2a, 0x24, 0x22),
+    box: PACK_BOX,
+    blotch: { box: DAMAGE_BLOTCH, colour: rgb(0x14, 0x10, 0x0e) },
+  },
+  {
+    // The damage check's service does not answer (Rule 6.26).
+    name: "damage-unavailable.png",
+    ground: rgb(0x66, 0x6c, 0x70),
+    label: rgb(0x20, 0x28, 0x2c),
+    box: PACK_BOX,
+    blotch: { box: DAMAGE_BLOTCH, colour: rgb(0x0e, 0x12, 0x14) },
+  },
+  {
+    // Reads as the clean label; looks different from its reference (Rule 2.36).
+    name: "label-different.png",
+    ground: rgb(0x2f, 0x4e, 0x3e),
+    label: rgb(0xe8, 0xf1, 0xf4),
+    box: LABEL_BOX,
+  },
+  {
+    // Reads as the clean label; a re-saved copy of BR-0015's photo (Rule 2.37).
+    name: "label-resaved.png",
+    ground: rgb(0x30, 0x3f, 0x4f),
+    label: rgb(0xf3, 0xf0, 0xe7),
+    box: LABEL_BOX,
   },
 ];
 

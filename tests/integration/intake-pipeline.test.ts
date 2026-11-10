@@ -226,15 +226,20 @@ describe("a clean read (label-clean.png)", () => {
     const before = auditRows().length;
     await run("label-clean.png");
     const written = auditRows().slice(before);
+    // The label look check runs after match on the exact entry (Rule 2.36)
+    // and records its run as the system's row; it looked consistent, so
+    // nothing routed.
     expect(written.map((row) => row.eventType)).toEqual([
       "label_extraction.completed",
       "catalog_entry.matched",
+      "photo_check.completed",
     ]);
     for (const row of written) {
       expect(row.actorType).toBe("system");
       expect(row.actorUserId).toBeNull();
+      // The look check is its own step, named by its kind (Rule 12.5).
       expect(row.actorLabel).toMatch(
-        /^intake_pipeline:(extract|match):fixture$/,
+        /^(intake_pipeline:(extract|match):fixture|photo_check:label_look)$/,
       );
       expect(row.correlationId).toBe(HANDLER.correlationId);
       expect(row.organizationId).toBe(ID.ORG.cascade);
