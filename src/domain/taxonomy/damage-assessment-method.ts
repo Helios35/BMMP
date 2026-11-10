@@ -16,8 +16,11 @@
  * silently replaces it (Rules 2.27, 11.5; Roadmap Principle 7). The vendor is
  * open until Gate 3.
  *
- * **B1a writes only `visual_inspection`.** Building the other two ahead of their
- * specification is a review rejection, not a head start.
+ * **`model_assisted_visual` is written when at least one model proposal was
+ * shown to the person who confirmed** (Rule 6.25, from `b2-10`); otherwise
+ * `visual_inspection`. `instrument_reading` stays unbuilt until unit 16. A
+ * stored value outside this set reads as stored and is **never** taken for
+ * model-assisted (STATE §7 #1 — the fixtures carry `human_visual_inspection`).
  *
  * Definitions for every value are in `docs/TAXONOMY.md` T-59, which is the
  * single source of truth. This module owns the stored value, the value order —
@@ -51,6 +54,6 @@ export const DAMAGE_ASSESSMENT_METHOD_LABELS: Readonly<
   Record<DamageAssessmentMethod, string>
 > = {
   visual_inspection: "Visual inspection",
-  model_assisted_visual: "Model-assisted inspection",
+  model_assisted_visual: "AI suggested, confirmed by a person",
   instrument_reading: "Instrument reading",
 };

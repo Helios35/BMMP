@@ -10,6 +10,7 @@ import type {
   Timestamped,
   Uuid,
 } from "@/types/common";
+import type { DamageProposalDecision } from "@/domain/photo-checks/damage-proposals";
 import type { CellFormFactor } from "@/domain/taxonomy/cell-form-factor";
 import type { Chemistry } from "@/domain/taxonomy/chemistry";
 import type { ChemistrySource } from "@/domain/taxonomy/chemistry-source";
@@ -154,6 +155,12 @@ export interface DraftCondition {
   readonly isDefective: boolean;
   readonly confirmedBy: Uuid | null;
   readonly confirmedAt: IsoTimestamp | null;
+  /**
+   * The person's decision on each AI-suggested finding (Rules 6.25, 7.25).
+   * Nothing is pre-ticked: a proposal reaches `findingTypes` only by being
+   * accepted here. Optional so a draft written before `b2-10` reads as none.
+   */
+  readonly proposalDecisions?: readonly DamageProposalDecision[];
 }
 
 export interface DraftStateOfCharge {
@@ -268,6 +275,16 @@ export interface IntakePhoto extends TenantScoped, Created {
   /** GPS and device identifiers are not retained (Rule 7.21). */
   readonly isExifStripped: boolean;
   readonly takenBy: Uuid;
+  /**
+   * The look-alike fingerprint, set when the photo is stored, beside the
+   * content hash (Rule 2.37). `<scheme>:<hex>`, from
+   * `VisionProvider.fingerprintPhoto`. **Null or absent is not compared** — a
+   * row stored before `b2-10`, or one whose fingerprinting failed. A crop
+   * carries none: it is a view of its parent, never compared (D-63 #5).
+   * Optional so no fixture row has to change; argued for unit 17 as
+   * `intake_photo.look_fingerprint`.
+   */
+  readonly lookFingerprint?: string | null;
 }
 
 export interface CropGeometry {

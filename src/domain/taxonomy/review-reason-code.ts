@@ -39,6 +39,13 @@
  * reason to look, never a verdict — no score or probability is shown with it,
  * and a person decides.
  *
+ * **`label_look_differs` and `photo_looks_reused` are D-75** (D-56 level 2,
+ * photo half), added at TAXONOMY.md v1.9: a label photo the vision model found
+ * looks different from the matched entry's reference photo (Rule 2.36), and a
+ * photo whose look-alike fingerprint is close to one on another record
+ * (Rule 2.37). Reasons to look, never verdicts — no score, similarity or
+ * distance is shown with either.
+ *
  * **Never invent a value.** If one is needed and is not here, it does not exist
  * yet — raise it to P6 (TAXONOMY.md §1.1).
  */
@@ -54,6 +61,8 @@ export const REVIEW_REASON_CODES = [
   "session_abandoned",
   "duplicate_photo",
   "label_catalog_mismatch",
+  "label_look_differs",
+  "photo_looks_reused",
 ] as const;
 
 export type ReviewReasonCode = (typeof REVIEW_REASON_CODES)[number];
@@ -81,4 +90,7 @@ export const REVIEW_REASON_CODE_LABELS: Readonly<
   session_abandoned: "Left unfinished",
   duplicate_photo: "Photo already on another record",
   label_catalog_mismatch: "Label disagrees with catalog",
+  label_look_differs:
+    "Label looks different from the catalog photo (AI suggested)",
+  photo_looks_reused: "Photo looks like a copy of one on another record",
 };
