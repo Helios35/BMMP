@@ -244,11 +244,17 @@ export function FieldRow({
         }
       />
     )
-  ) : field.source === "read_from_label" ? (
-    // Rule 1.29 — a value the label read is the model's until a person
-    // confirms it, and says who did after. Never on chemistry (Rule 2.10).
-    <span className="inline-flex flex-wrap items-center gap-2">
-      <FieldSourceBadge source={field.source} />
+  ) : (
+    <FieldSourceBadge
+      source={field.source}
+      enteredByName={field.source === "entered_by" ? ENTERED_BY_YOU : undefined}
+    />
+  );
+  // Rule 1.29 — a value the label read is the model's until a person confirms
+  // it, and says who did after. Never on chemistry (Rule 2.10). Beside the
+  // source rather than inside it, so §2.1.7's accessible name is unchanged.
+  const aiTag =
+    !isChemistry && field.source === "read_from_label" ? (
       <AiSuggestedTag
         decision={
           field.status === "confirmed" && field.confirmedByName !== null
@@ -256,13 +262,7 @@ export function FieldRow({
             : null
         }
       />
-    </span>
-  ) : (
-    <FieldSourceBadge
-      source={field.source}
-      enteredByName={field.source === "entered_by" ? ENTERED_BY_YOU : undefined}
-    />
-  );
+    ) : null;
 
   const rowIntent =
     field.status === "confirmed"
@@ -393,6 +393,7 @@ export function FieldRow({
           {sourceBadge ?? <span className="sr-only">{NO_SOURCE_YET}</span>}
           <span className="sr-only">,</span>
         </span>
+        {aiTag}
         <span className="inline-flex flex-col">
           <ConfidenceBandDisplay
             band={field.confidenceBand}
