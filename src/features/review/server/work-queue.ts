@@ -33,11 +33,13 @@ import {
   catalogQuery,
   commitGateInput,
   containerRows,
+  readConditionView,
   requiredTypeLabel,
   reviewCardView,
   reviewPlaceholders,
   WHO_CAN_CREATE_CONTAINER,
 } from "@/features/intake/server/step-views";
+import type { DamageSuggestionsView } from "@/components/condition/damage-suggestions";
 import { relativeTimeLabel } from "@/features/shell/chrome/relative-time";
 import type { BatteryRecord } from "@/types/battery-record";
 import type { CatalogEntry } from "@/types/catalog";
@@ -194,6 +196,8 @@ export interface ConditionPaneView {
   readonly findings: readonly DamageFindingType[];
   readonly isDefective: boolean;
   readonly confirmed: { readonly byName: string; readonly at: string } | null;
+  /** Rule 6.25 — the AI-suggested findings and the decisions on them. */
+  readonly suggestions: DamageSuggestionsView;
 }
 
 export interface PlacementPaneView {
@@ -254,9 +258,6 @@ export async function readIntakeItemView(
   const view = await readIntakeStepView(ctx, sessionId);
   if (view === null) return null;
 
-  const confirmedBy = view.draft.condition?.confirmedBy ?? null;
-  const confirmedAt = view.draft.condition?.confirmedAt ?? null;
-  const names = await resolveUserNames(ctx, [confirmedBy]);
   const card = reviewCardView(view);
 
   return {
@@ -272,21 +273,7 @@ export async function readIntakeItemView(
     catalogQuery: catalogQuery(view),
     fieldStates: commitFieldStates(view.draft),
     commitGate: commitGateInput(view),
-    condition: {
-      findings: view.draft.condition?.findingTypes ?? [],
-      isDefective: view.draft.condition?.isDefective ?? false,
-      confirmed:
-        confirmedBy === null || confirmedAt === null
-          ? null
-          : {
-              byName:
-                names.get(confirmedBy) ??
-                (confirmedBy === ctx.userId
-                  ? (view.viewer.fullName ?? "you")
-                  : "a colleague"),
-              at: formatInstant(confirmedAt, view.site.timeZone),
-            },
-    },
+    condition: await readConditionView(ctx, view),
     placement: {
       containers: containerRows(view),
       selectedId: view.draft.containerId,

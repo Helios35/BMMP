@@ -19,6 +19,12 @@ import {
   type OutstandingItem,
 } from "@/domain/intake/commit-gate";
 import { intakeLandingStatus } from "@/domain/intake/landing-status";
+import {
+  assessmentMethodFor,
+  decisionsOnShownProposals,
+  proposalDecisionJson,
+  type DamageProposal,
+} from "@/domain/photo-checks/damage-proposals";
 import { decodeDateCode } from "@/domain/intake/date-code";
 import {
   commitFieldStates,
@@ -119,6 +125,20 @@ export interface ConfirmationInput {
   readonly dateCodeExtractionId: Uuid | null;
   /** The session's damage photo, when one was captured (T-50 `damage`). */
   readonly damagePhotoId: Uuid | null;
+  /**
+   * The AI-suggested findings shown on the condition step, the ones no
+   * decision covers, and the model that proposed them (Rule 6.25). Every
+   * proposal must be decided before the record commits; the assessment's
+   * method follows from whether any was shown (T-59).
+   */
+  readonly damageSuggestions: {
+    readonly proposals: readonly DamageProposal[];
+    readonly undecided: readonly DamageProposal[];
+    readonly model: {
+      readonly provider: string | null;
+      readonly modelIdentifier: string | null;
+    } | null;
+  };
   /** At least one `intake_photo` is stored on the session (D-42). */
   readonly hasStoredPhoto: boolean;
   /** The request day in the site's zone, for the decode's future check (EC-11). */
@@ -142,9 +162,6 @@ export type ConfirmationBuild =
       readonly message: string;
       readonly outstanding: readonly OutstandingItem[];
     };
-
-/** T-59 — the only method a person's inspection on step 3 can be. */
-const VISUAL_INSPECTION = "visual_inspection";
 
 function fieldOf(
   draft: IntakeDraft,
@@ -351,8 +368,12 @@ export function buildIntakeConfirmation(
 ): ConfirmationBuild {
   const { ctx, draft, record, at } = input;
   const fields = commitFieldStates(draft);
+  // Rule 6.25 — an undecided suggestion leaves the condition unconfirmed, as
+  // the card says (read-intake.ts).
   const conditionConfirmed =
-    draft.condition !== null && draft.condition.confirmedBy !== null;
+    draft.condition !== null &&
+    draft.condition.confirmedBy !== null &&
+    input.damageSuggestions.undecided.length === 0;
 
   // One list, computed here and in read-intake.ts with the same inputs
   // (commit-gate.ts: a drifted checklist lets a card and a server disagree).
@@ -435,10 +456,19 @@ export function buildIntakeConfirmation(
   const batteryRecord = mapDraftToRecordUpdate(draft, input.catalogEntry, at);
 
   const assessedCondition: AssessedCondition = determination.assessedCondition;
+  // T-59 — `model_assisted_visual` when at least one proposal was shown to
+  // the person who confirmed, `visual_inspection` otherwise (Rule 6.25).
+  const shown = input.damageSuggestions.proposals;
+  const assessmentMethod = assessmentMethodFor(shown);
+  const modelAssisted = assessmentMethod === "model_assisted_visual";
+  const proposalDecisions = decisionsOnShownProposals(
+    shown,
+    condition.proposalDecisions ?? [],
+  );
   const damageAssessment: CreateDamageAssessment = {
     batteryRecordId: record.id,
     intakePhotoId: input.damagePhotoId,
-    assessmentMethod: VISUAL_INSPECTION,
+    assessmentMethod,
     status: determination.assessmentStatus,
     findingTypes: determination.findingTypes,
     findingDetail: null,
@@ -448,8 +478,14 @@ export function buildIntakeConfirmation(
     // damage split itself is taxonomy membership, not a jurisdiction rule.
     governingRuleVersionId: classificationRuleVersionId,
     evaluationTrace: null,
-    modelProvider: null,
-    modelIdentifier: null,
+    // How the proposal arrived, never who decided — a person did (Rule 6.6).
+    // No confidence: a proposal carries no number (D-75 #5).
+    modelProvider: modelAssisted
+      ? (input.damageSuggestions.model?.provider ?? null)
+      : null,
+    modelIdentifier: modelAssisted
+      ? (input.damageSuggestions.model?.modelIdentifier ?? null)
+      : null,
     modelConfidence: null,
     instrumentVendor: null,
     instrumentModel: null,
@@ -462,6 +498,8 @@ export function buildIntakeConfirmation(
     confirmedAt: condition.confirmedAt ?? at,
     clearingPhotoIntakePhotoId: null,
     supersedesDamageAssessmentId: null,
+    // Rules 6.12, 7.25 — every proposal shown and the decision on it.
+    proposalDecisions,
   };
 
   const conditionOutcome: IntakeConfirmation["conditionOutcome"] = {
@@ -683,6 +721,9 @@ export function buildIntakeConfirmation(
         findingTypes: [...determination.findingTypes],
         isDefective: condition.isDefective,
         status: determination.assessmentStatus,
+        // T-43 — the proposals shown and the decision on each (Rule 6.25).
+        assessmentMethod,
+        proposals: proposalDecisions.map(proposalDecisionJson),
       },
       governingRuleVersionId: classificationRuleVersionId,
       attribution: input.attribution,

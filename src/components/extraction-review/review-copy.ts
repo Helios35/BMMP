@@ -252,3 +252,25 @@ export function formatInstant(
     timeZoneName: "short",
   }).format(new Date(instant));
 }
+
+/**
+ * T-52 `label_look_differs` — `UX_SPEC.md` §3.8a; Rule 2.36. The two photos
+ * side by side, tagged AI suggested; the same three choices as Rule 2.35. No
+ * score, no similarity, no "match strength".
+ */
+export const LABEL_LOOK_INTRO =
+  "The label photo looks different from the catalog's reference photo for this entry. Check the battery in your hands before you confirm.";
+export const LABEL_LOOK_THIS_LABEL = "This label";
+export const LABEL_LOOK_REFERENCE = "Catalog reference";
+
+/**
+ * T-52 `photo_looks_reused` — §3.8a; Rule 2.37. Both photos, the other record
+ * linked. A fingerprint, not a model's judgment: no AI tag (D-75 #8).
+ */
+export const PHOTO_REUSE_BEFORE =
+  "This photo looks like a copy of one on battery ";
+export const PHOTO_REUSE_AFTER =
+  " — possibly re-saved, cropped or edited. Check this is a different battery before you confirm.";
+export const PHOTO_REUSE_THIS = "This photo";
+export const photoReuseOther = (recordNumber: string): string =>
+  `Photo on ${recordNumber}`;

@@ -29,6 +29,16 @@ import {
   type UploadTransport,
 } from "@/components/capture/upload-transport";
 
+import {
+  DamageSuggestions,
+  hasUndecidedSuggestion,
+  NO_SUGGESTION_VIEW,
+  SUGGESTIONS_UNDECIDED_REASON,
+  type DamageSuggestionView,
+  type DamageSuggestionsView,
+  type SuggestionDecision,
+} from "./damage-suggestions";
+
 /**
  * `ConditionForm` — step 3's assessed condition (`UX_SPEC.md` §3.9;
  * Rules 6.2–6.6; T-29, T-30, T-49).
@@ -52,6 +62,11 @@ import {
  *
  * `validateFindings` gates every call to `assessDamage` — an impossible set
  * throws there by design, and the reason is surfaced here instead.
+ *
+ * **AI suggestions** (Rule 6.25) render above the findings as the
+ * **Suggestions** list (`DamageSuggestions`). Nothing is pre-ticked, and the
+ * condition cannot be confirmed until every suggestion is accepted or
+ * rejected; a failed check says so and blocks nothing (Rule 6.26).
  */
 
 export interface ConditionFormProps {
@@ -76,6 +91,13 @@ export interface ConditionFormProps {
   } | null;
   /** The whole form is read-only, with this reason (§2.9). */
   readonly disabledReason?: string;
+  /** The AI-suggested findings on the session's photos (Rule 6.25). Absent reads as none. */
+  readonly suggestions?: DamageSuggestionsView;
+  /** `decideDamageSuggestion`. Absent renders the suggestions read-only. */
+  readonly onDecideSuggestion?: (
+    row: DamageSuggestionView,
+    decision: SuggestionDecision,
+  ) => Promise<ActionResult<unknown>>;
   /** Tests inject a transport; the default is the browser's. */
   readonly transport?: UploadTransport;
   readonly className?: string;
@@ -112,6 +134,8 @@ export function ConditionForm({
   onConfirm,
   damagePhoto,
   disabledReason,
+  suggestions = NO_SUGGESTION_VIEW,
+  onDecideSuggestion,
   transport = xhrUploadTransport,
   className,
 }: ConditionFormProps): ReactElement {
@@ -202,7 +226,11 @@ export function ConditionForm({
 
   const confirmReason =
     disabledReason ??
-    (validation.ok ? undefined : FINDINGS_REASON_COPY[validation.reason]);
+    (hasUndecidedSuggestion(suggestions)
+      ? SUGGESTIONS_UNDECIDED_REASON
+      : validation.ok
+        ? undefined
+        : FINDINGS_REASON_COPY[validation.reason]);
 
   /* ------------------------------------------------- confirmed, collapsed */
 
@@ -259,6 +287,12 @@ export function ConditionForm({
           <AlertTitle className="text-body-strong">{disabledReason}</AlertTitle>
         </Alert>
       ) : null}
+
+      <DamageSuggestions
+        view={suggestions}
+        onDecide={onDecideSuggestion ?? null}
+        {...(disabledReason === undefined ? {} : { disabledReason })}
+      />
 
       <fieldset
         aria-labelledby={`${groupId}-legend`}

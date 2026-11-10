@@ -63,6 +63,16 @@ import {
   readDuplicatePhotos,
   type DuplicatePhotoFinding,
 } from "./duplicate-photos";
+import {
+  readLookAlikePhotos,
+  type LookAlikeFinding,
+} from "@/features/photo-checks/server/look-alike";
+import {
+  readSessionSuggestions,
+  type SessionSuggestions,
+} from "@/features/photo-checks/server/suggestions";
+import type { CatalogReferencePhoto, PhotoCheck } from "@/types/photo-check";
+
 import { readGateConfiguration } from "./intake-pipeline";
 import { compareDraftWithEntry } from "./label-catalog";
 
@@ -385,6 +395,49 @@ export interface IntakeStepView {
     readonly open: readonly Lot[];
     readonly ofChosenContainer: Lot | null;
   };
+  /** Rule 6.25 — the AI-suggested findings on the session's photos, and the decisions on them. */
+  readonly suggestions: SessionSuggestions;
+  /** Rule 2.37 — the other records a photo here looks like a copy of. */
+  readonly lookAlikes: LookAlikeFinding;
+  /** Rule 2.36 — the session's latest label look check, with what it compared. */
+  readonly labelLook: SessionLabelLook | null;
+}
+
+export interface SessionLabelLook {
+  readonly check: PhotoCheck;
+  readonly entry: CatalogEntry | null;
+  readonly reference: CatalogReferencePhoto | null;
+  readonly comparedPhoto: IntakePhoto | null;
+}
+
+/** The latest label look run on a session, with its entry, reference and photo. */
+export async function readSessionLabelLook(
+  ctx: RequestContext,
+  sessionId: Uuid,
+  photos: readonly IntakePhoto[],
+): Promise<SessionLabelLook | null> {
+  const checks = await data.photoChecks.list(ctx, {
+    intakeSessionId: sessionId,
+    checkKind: "label_look",
+    limit: 1,
+  });
+  const check = checks.items[0];
+  if (check === undefined) return null;
+  const [entry, reference] = await Promise.all([
+    check.catalogEntryId === null
+      ? Promise.resolve(null)
+      : data.catalogEntries.get(ctx, check.catalogEntryId),
+    check.catalogReferencePhotoId === null
+      ? Promise.resolve(null)
+      : data.catalogReferencePhotos.get(ctx, check.catalogReferencePhotoId),
+  ]);
+  return {
+    check,
+    entry,
+    reference,
+    comparedPhoto:
+      photos.find((photo) => photo.id === check.intakePhotoId) ?? null,
+  };
 }
 
 /**
@@ -532,11 +585,25 @@ export async function readIntakeStepView(
       : null;
 
   const fields = commitFieldStates(draft);
+  // Rule 6.25 — a suggestion nobody has decided re-opens the condition: a
+  // photo stored after the confirmation brings proposals the person has not
+  // seen, and the confirmation did not cover them.
+  const suggestions = await readSessionSuggestions(ctx, {
+    intakeSessionId: session.id,
+    decisions: draft.condition?.proposalDecisions ?? [],
+    photos,
+  });
   const conditionConfirmed =
-    draft.condition !== null && draft.condition.confirmedBy !== null;
+    draft.condition !== null &&
+    draft.condition.confirmedBy !== null &&
+    suggestions.undecided.length === 0;
   const names = await resolveUserNames(ctx, [
     ...draft.fields.map((field) => field.confirmedBy),
     draft.condition?.confirmedBy ?? null,
+  ]);
+  const [lookAlikes, labelLook] = await Promise.all([
+    readLookAlikePhotos(ctx, session, photos),
+    readSessionLabelLook(ctx, session.id, photos),
   ]);
   const viewer = await data.users.get(ctx, ctx.userId);
   const [openLots, chosenLot] = await Promise.all([
@@ -611,6 +678,9 @@ export async function readIntakeStepView(
       fullName: viewer?.fullName ?? viewer?.email ?? null,
     },
     duplicatePhotos: await readDuplicatePhotos(ctx, session, photos),
+    suggestions,
+    lookAlikes,
+    labelLook,
     lots: {
       open: [...openLots.items].sort((a, b) =>
         a.lotCode.localeCompare(b.lotCode),

@@ -15,6 +15,7 @@ import {
   commitFieldStates,
   confirmDraftCondition,
   confirmDraftField,
+  decideDraftProposal,
   enterDraftChemistry,
   enterDraftFieldValue,
   markDraftExtractionRejected,
@@ -57,6 +58,8 @@ import {
   CHEMISTRY_NEEDS_SOURCE,
   CONDITION_CONFIRMED_AT_STEP_3,
   CONDITION_NOT_RECORDED,
+  SUGGESTION_NOT_FOUND,
+  SUGGESTIONS_UNDECIDED,
   CONTAINER_NEEDS_CLASSIFICATION,
   CONTAINER_NOT_FOUND,
   fieldValueRefused,
@@ -87,6 +90,7 @@ import {
   selectCatalogCandidateSchema,
   sessionIdSchema,
   setConditionSchema,
+  decideDamageSuggestionSchema,
   setLabelCropRegionSchema,
   setSourceDeviceSchema,
   setStateOfChargeSchema,
@@ -110,6 +114,9 @@ import {
   loadOpenIntake,
 } from "./server/read-intake";
 import { readDuplicatePhotos } from "./server/duplicate-photos";
+import { checkPickedEntryLook } from "./server/label-look";
+import { checkLookAlikes } from "@/features/photo-checks/server/look-alike";
+import { readSessionSuggestions } from "@/features/photo-checks/server/suggestions";
 import {
   compareDraftWithEntry,
   routeLabelDisagreement,
@@ -638,6 +645,16 @@ export async function selectCatalogCandidate(
           at: now(),
           attribution,
         });
+        // Rule 2.36 runs where 2.35 runs, through the same call site: the
+        // pick's label is looked at against the entry's reference.
+        await checkPickedEntryLook(ctx, {
+          session,
+          record,
+          draft: persisted,
+          entry: picked,
+          at: now(),
+          attribution,
+        });
       }
       return { sessionId: session.id, draft: persisted };
     },
@@ -728,7 +745,7 @@ export async function enterDetailsManually(
     "enterDetailsManually",
     sessionIdSchema,
     input,
-    async (ctx, parsed) => {
+    async (ctx, parsed, attribution) => {
       const { session, draft } = await openDraft(ctx, parsed.sessionId);
       const readInHand =
         session.status === "awaiting_confirmation" ||
@@ -758,16 +775,24 @@ export async function enterDetailsManually(
       });
 
       // D-56 level 1 — the manual path routes on a duplicate photo exactly
-      // as a read does. The check has no off switch on either path.
+      // as a read does, and on a look-alike copy beside it (Rule 2.37). The
+      // checks have no off switch on either path.
       const duplicates = await readDuplicatePhotos(ctx, session);
+      const lookAlikes = await checkLookAlikes(
+        ctx,
+        session,
+        now(),
+        attribution,
+      );
       // Stored codes are kept exactly as stored, unknown ones included; the
-      // one this path supplies is appended (T-52 is multi-select).
-      const duplicatePhoto: ReviewReasonCode = "duplicate_photo";
+      // ones this path supplies are appended (T-52 is multi-select).
+      const appended: ReviewReasonCode[] = [];
+      if (duplicates.matches.length > 0) appended.push("duplicate_photo");
+      if (lookAlikes.matches.length > 0) appended.push("photo_looks_reused");
       const stored = session.reviewReasonCodes;
+      const missing = appended.filter((code) => !stored?.includes(code));
       const reviewReasonCodes =
-        duplicates.matches.length === 0 || stored?.includes(duplicatePhoto)
-          ? stored
-          : [...(stored ?? []), duplicatePhoto];
+        missing.length === 0 ? stored : [...(stored ?? []), ...missing];
       const updated = await data.intakeSessions.update(ctx, session.id, {
         status: "awaiting_confirmation",
         currentStep: "extraction_review",
@@ -937,6 +962,52 @@ export async function setCondition(
   );
 }
 
+/**
+ * Accept or reject one AI-suggested finding (Rule 6.25). The proposal is read
+ * from the session's own check runs, never taken from the client; accepting
+ * adds the finding exactly as ticking it would, and any decision re-opens a
+ * confirmed condition. Every decision is kept, rejected ones included
+ * (Rule 7.25).
+ */
+export async function decideDamageSuggestion(
+  input: unknown,
+): Promise<ActionResult<DraftActionData>> {
+  return intakeAction(
+    "decideDamageSuggestion",
+    decideDamageSuggestionSchema,
+    input,
+    async (ctx, parsed) => {
+      const { session, draft } = await openDraft(ctx, parsed.sessionId);
+      const suggestions = await readSessionSuggestions(ctx, {
+        intakeSessionId: session.id,
+        decisions: draft.condition?.proposalDecisions ?? [],
+      });
+      const proposal = suggestions.proposals.find(
+        (row) =>
+          row.photoCheckId === parsed.photoCheckId &&
+          row.findingType === parsed.findingType,
+      );
+      if (proposal === undefined) {
+        throw new ValidationError({
+          userMessage: SUGGESTION_NOT_FOUND,
+          correlationId: ctx.correlationId,
+          field: "photoCheckId",
+        });
+      }
+      const next = decideDraftProposal(
+        draft,
+        proposal,
+        parsed.decision,
+        actor(ctx, now()),
+      );
+      return {
+        sessionId: session.id,
+        draft: await persistDraft(ctx, session, next),
+      };
+    },
+  );
+}
+
 /** Confirm the recorded findings (Rule 6.2) — the third attributable confirmation. */
 export async function confirmCondition(
   input: unknown,
@@ -952,6 +1023,18 @@ export async function confirmCondition(
           userMessage: CONDITION_NOT_RECORDED,
           correlationId: ctx.correlationId,
           field: "findingTypes",
+        });
+      }
+      // Rule 6.25 — Confirm waits until every suggestion is decided.
+      const suggestions = await readSessionSuggestions(ctx, {
+        intakeSessionId: session.id,
+        decisions: draft.condition.proposalDecisions ?? [],
+      });
+      if (suggestions.undecided.length > 0) {
+        throw new ValidationError({
+          userMessage: SUGGESTIONS_UNDECIDED,
+          correlationId: ctx.correlationId,
+          field: "proposalDecisions",
         });
       }
       const validation = validateFindings(draft.condition.findingTypes);

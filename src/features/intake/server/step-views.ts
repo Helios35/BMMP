@@ -1,7 +1,14 @@
-import type {
-  CatalogCandidateView,
-  LabelCatalogDisagreementView,
-  ReviewCardState,
+import {
+  formatInstant,
+  LABEL_LOOK_REFERENCE,
+  LABEL_LOOK_THIS_LABEL,
+  PHOTO_REUSE_THIS,
+  photoReuseOther,
+  type CatalogCandidateView,
+  type LabelCatalogDisagreementView,
+  type LabelLookDifferenceView,
+  type PhotoReuseRecordView,
+  type ReviewCardState,
 } from "@/components/extraction-review";
 import type { FieldSource } from "@/components/provenance/field-source-badge";
 import type { CommitGateInput } from "@/domain/intake/commit-gate";
@@ -25,6 +32,7 @@ import { ROLE_LABELS } from "@/domain/taxonomy/role";
 import { STORAGE_CLOCK_ALERT_BAND_LABELS } from "@/domain/taxonomy/storage-clock-alert-band";
 import type {
   ClockPreview,
+  ConditionView,
   SummaryField,
 } from "@/features/intake/components/confirm-and-place-step";
 import type { ContainerPickerRow } from "@/components/storage/container-picker";
@@ -49,6 +57,14 @@ import {
   NO_CLASSIFICATION_RULE_IN_FORCE,
   NO_JURISDICTION_PROFILE,
 } from "../copy";
+import type { RequestContext } from "@/data/contracts";
+import type { DamageSuggestionsView } from "@/components/condition/damage-suggestions";
+import { resolveUserNames } from "@/features/battery-record/user-names";
+import {
+  suggestionDeciders,
+  suggestionsView,
+} from "@/features/photo-checks/suggestion-view";
+
 import { latestRunRows, type IntakeStepView } from "./read-intake";
 
 /**
@@ -163,6 +179,68 @@ function labelCatalogView(
   };
 }
 
+/**
+ * Rule 2.36 — **This label** beside **Catalog reference**, shown only while
+ * the session carries `label_look_differs` and its latest look check says
+ * so. No number: two frames and the entry.
+ */
+function labelLookView(view: IntakeStepView): LabelLookDifferenceView | null {
+  const look = view.labelLook;
+  if (look === null || look.check.outcome !== "looks_different") return null;
+  if (!(view.session.reviewReasonCodes ?? []).includes("label_look_differs")) {
+    return null;
+  }
+  return {
+    entryTitle:
+      look.entry === null
+        ? LABEL_LOOK_REFERENCE
+        : catalogEntryTitle(look.entry),
+    entryHref:
+      look.check.catalogEntryId === null
+        ? "/catalog"
+        : `/catalog/${look.check.catalogEntryId}`,
+    thisLabel: photoImage(look.comparedPhoto, LABEL_LOOK_THIS_LABEL),
+    reference:
+      look.reference === null
+        ? null
+        : {
+            src: null,
+            alt: LABEL_LOOK_REFERENCE,
+            width: look.reference.widthPx,
+            height: look.reference.heightPx,
+          },
+  };
+}
+
+/**
+ * Rule 2.37 — each other record a photo here looks like a copy of, with
+ * both photos. Shown while the copy check finds them; the record is linked
+ * because only P1 and P6 render the card, and both open `/batteries/[id]`.
+ */
+function photoReuseViews(
+  view: IntakeStepView,
+): readonly PhotoReuseRecordView[] {
+  const { lookAlikes } = view;
+  return lookAlikes.records.map((record) => {
+    const match = lookAlikes.matches.find((row) =>
+      row.batteryRecordIds.includes(record.id),
+    );
+    const thisPhoto =
+      view.photos.find((photo) => photo.id === match?.photoId) ?? null;
+    const otherPhoto =
+      lookAlikes.matchedPhotos.find(
+        (photo) => match?.matchedPhotoIds.includes(photo.id) ?? false,
+      ) ?? null;
+    return {
+      id: record.id,
+      recordNumber: record.recordNumber,
+      href: `/batteries/${record.id}`,
+      thisPhoto: photoImage(thisPhoto, PHOTO_REUSE_THIS),
+      otherPhoto: photoImage(otherPhoto, photoReuseOther(record.recordNumber)),
+    };
+  });
+}
+
 function isHardGated(fieldCode: LabelFieldCode): boolean {
   return (HARD_GATED_LABEL_FIELD_CODES as readonly LabelFieldCode[]).includes(
     fieldCode,
@@ -241,6 +319,8 @@ export function reviewCardView(view: IntakeStepView): ReviewCardView {
         href: `/batteries/${record.id}`,
       })),
       labelCatalog: labelCatalogView(view),
+      labelLook: labelLookView(view),
+      photoReuse: photoReuseViews(view),
     },
     fields: view.fields,
     candidates,
@@ -486,9 +566,11 @@ export function commitGateInput(
 ): Omit<CommitGateInput, "isOffline"> {
   return {
     fields: commitFieldStates(view.draft),
+    // Rule 6.25 — an undecided suggestion re-opens a confirmed condition.
     conditionConfirmed:
       view.draft.condition !== null &&
-      view.draft.condition.confirmedBy !== null,
+      view.draft.condition.confirmedBy !== null &&
+      view.suggestions.undecided.length === 0,
     ownsCondition: true,
     containerChosen: view.draft.containerId !== null,
     // D-41 — the same predicate confirmation.ts and read-intake.ts apply: a
@@ -505,5 +587,41 @@ export function commitGateInput(
     // blocks; the server gate in confirmation.ts passes the same, and the
     // two must never drift (commit-gate.ts). E-13 states the missing input.
     classificationBlocked: false,
+  };
+}
+
+/**
+ * The condition section as step 3 and `/review` render it — the findings,
+ * who confirmed them, and the **Suggestions** list with each decision and who
+ * made it (Rules 1.29, 6.25). **A suggestion nobody has decided leaves the
+ * condition unconfirmed**, whatever the draft's stamp says: a photo stored
+ * after the confirmation brought proposals the confirmation did not cover.
+ */
+export async function readConditionView(
+  ctx: RequestContext,
+  view: IntakeStepView,
+): Promise<ConditionView & { readonly suggestions: DamageSuggestionsView }> {
+  const confirmedBy = view.draft.condition?.confirmedBy ?? null;
+  const confirmedAt = view.draft.condition?.confirmedAt ?? null;
+  const names = await resolveUserNames(ctx, [
+    confirmedBy,
+    ...suggestionDeciders(view.suggestions),
+  ]);
+  const undecided = view.suggestions.undecided.length > 0;
+  return {
+    findings: view.draft.condition?.findingTypes ?? [],
+    isDefective: view.draft.condition?.isDefective ?? false,
+    confirmed:
+      undecided || confirmedBy === null || confirmedAt === null
+        ? null
+        : {
+            byName:
+              names.get(confirmedBy) ??
+              (confirmedBy === ctx.userId
+                ? (view.viewer.fullName ?? "you")
+                : "a colleague"),
+            at: formatInstant(confirmedAt, view.site.timeZone),
+          },
+    suggestions: suggestionsView(view.suggestions, names),
   };
 }

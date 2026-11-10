@@ -31,6 +31,7 @@ import type { StorageClock } from "@/types/storage";
 import { NEW_CLOCK_ON_PLACEMENT } from "../copy";
 import { bindPlacementActions } from "./bind-actions";
 import { ConditionForm } from "@/components/condition/condition-form";
+import type { DamageSuggestionsView } from "@/components/condition/damage-suggestions";
 import {
   ContainerPicker,
   type ContainerPickerRow,
@@ -81,6 +82,8 @@ export interface ConditionView {
   readonly isDefective: boolean;
   /** Server state — who confirmed, and when, in the site's zone. */
   readonly confirmed: { readonly byName: string; readonly at: string } | null;
+  /** Rule 6.25 — the AI-suggested findings and the decisions on them. Absent reads as none. */
+  readonly suggestions?: DamageSuggestionsView;
 }
 
 export interface PlacementView {
@@ -233,6 +236,16 @@ export function ConfirmAndPlaceStep({
           confirmed={condition.confirmed}
           onChange={actions.setCondition}
           onConfirm={actions.confirmCondition}
+          {...(condition.suggestions === undefined
+            ? {}
+            : { suggestions: condition.suggestions })}
+          onDecideSuggestion={(row, decision) =>
+            actions.decideSuggestion(
+              row.photoCheckId,
+              row.findingType,
+              decision,
+            )
+          }
           damagePhoto={{ sessionId, uploadUrl }}
           {...(transport === undefined ? {} : { transport })}
         />

@@ -167,3 +167,14 @@ export const REASON_SAVED_TO_QUEUE = "session_saved_to_queue";
 
 /** Rule 2.35 — a person picked an entry the label disagrees with (T-52 `label_catalog_mismatch`). */
 export const REASON_LABEL_CATALOG_MISMATCH = "label_catalog_mismatch";
+
+/** Rule 2.36 — a person picked an entry whose reference the label looks different from (T-52 `label_look_differs`). */
+export const REASON_LABEL_LOOK_DIFFERS = "label_look_differs";
+
+// --- AI suggestions (Rules 6.25, 6.26) ------------------------------------------------
+
+export const SUGGESTIONS_UNDECIDED =
+  "Accept or reject each AI suggestion before confirming the assessed condition.";
+
+export const SUGGESTION_NOT_FOUND =
+  "That suggestion is no longer on this intake. Refresh to see the current list.";
