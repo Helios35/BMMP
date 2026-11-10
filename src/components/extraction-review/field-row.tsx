@@ -14,6 +14,7 @@ import {
   ConfidenceBandDisplaySkeleton,
 } from "@/components/confidence/confidence-band-display";
 import { ACTION_BUTTON_CLASS } from "@/components/page";
+import { AiSuggestedTag } from "@/components/ai/ai-suggested-tag";
 import {
   FieldSourceBadge,
   FieldSourceBadgeSkeleton,
@@ -243,6 +244,19 @@ export function FieldRow({
         }
       />
     )
+  ) : field.source === "read_from_label" ? (
+    // Rule 1.29 — a value the label read is the model's until a person
+    // confirms it, and says who did after. Never on chemistry (Rule 2.10).
+    <span className="inline-flex flex-wrap items-center gap-2">
+      <FieldSourceBadge source={field.source} />
+      <AiSuggestedTag
+        decision={
+          field.status === "confirmed" && field.confirmedByName !== null
+            ? { verb: "confirmed", byName: field.confirmedByName }
+            : null
+        }
+      />
+    </span>
   ) : (
     <FieldSourceBadge
       source={field.source}

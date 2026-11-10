@@ -3,6 +3,7 @@
 import { useState, type ReactElement } from "react";
 
 import { GatedControl } from "@/components/access/gated-control";
+import type { DamageSuggestionsView } from "@/components/condition/damage-suggestions";
 import { ACTION_BUTTON_CLASS } from "@/components/page";
 import { Button } from "@/components/ui/button";
 import type { DamageAssessmentStatus } from "@/domain/taxonomy/damage-assessment-status";
@@ -54,6 +55,8 @@ export interface RecordActionFacts {
   readonly currentAssessmentStatus: DamageAssessmentStatus | null;
   readonly currentFindings: readonly DamageFindingType[];
   readonly currentIsDefective: boolean;
+  /** Rule 6.25 — AI suggestions on photos attached since the last assessment. */
+  readonly suggestions: DamageSuggestionsView;
 }
 
 export interface RecordActionHandlers {
@@ -158,6 +161,7 @@ export function RecordActionsMenu({
             currentStatus: facts.currentAssessmentStatus,
             currentFindings: facts.currentFindings,
             currentIsDefective: facts.currentIsDefective,
+            suggestions: facts.suggestions,
           }}
           action={actions.recordDamageAssessment}
         />

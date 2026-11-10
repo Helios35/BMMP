@@ -1,6 +1,15 @@
 import { data } from "@/data";
 import type { CreateDamageAssessment, RequestContext } from "@/data/contracts";
 import { assessDamage, validateFindings } from "@/domain/condition/damage";
+import {
+  assessmentMethodFor,
+  decisionsOnShownProposals,
+  isProposableFindingType,
+  proposalDecisionJson,
+  type DamageProposalDecision,
+  type ProposalDecisionValue,
+} from "@/domain/photo-checks/damage-proposals";
+import { readReassessmentSuggestions } from "@/features/photo-checks/server/suggestions";
 import { prohibitsAir, withDamageFlags } from "@/domain/recalls/recalled-flag";
 import type { DamageFindingType } from "@/domain/taxonomy/damage-finding-type";
 import type { DdrFlag } from "@/domain/taxonomy/ddr-flag";
@@ -43,9 +52,6 @@ import {
  * the same rule so the dialog is a courtesy rather than the enforcement.
  */
 
-/** T-59 — the method a person's visual assessment records. */
-const VISUAL_INSPECTION = "visual_inspection";
-
 /** Bounded read — one record carries a handful of assessments over its life. */
 const ASSESSMENTS_PER_RECORD_LIMIT = 50;
 
@@ -55,6 +61,17 @@ export interface RecordDamageAssessmentRequest {
   readonly isDefective: boolean;
   readonly reason: string | null;
   readonly clearingPhotoIntakePhotoId: Uuid | null;
+  /**
+   * Rule 6.25 — the person's decision on each AI suggestion the dialog
+   * showed. Checked here against the suggestions read from `src/data`, never
+   * trusted from the client: every one shown must be decided, and an
+   * accepted finding must be among the findings.
+   */
+  readonly proposalDecisions?: readonly {
+    readonly photoCheckId: Uuid;
+    readonly findingType: string;
+    readonly decision: ProposalDecisionValue;
+  }[];
 }
 
 export interface RecordDamageAssessmentOutcome {
@@ -176,6 +193,64 @@ export async function recordDamageAssessmentFor(
     clearingPhotoId = photo.id;
   }
 
+  // Rule 6.25 — the suggestions on photos attached since the last assessment,
+  // read from the record's own check runs. Every one shown is decided before
+  // the assessment is written, and the decisions go onto it (Rule 7.25).
+  const prior = await data.damageAssessments.list(ctx, {
+    batteryRecordId: record.id,
+    limit: ASSESSMENTS_PER_RECORD_LIMIT,
+  });
+  const claimed: DamageProposalDecision[] = [];
+  for (const row of input.proposalDecisions ?? []) {
+    if (!isProposableFindingType(row.findingType)) continue;
+    claimed.push({
+      photoCheckId: row.photoCheckId,
+      intakePhotoId: "",
+      findingType: row.findingType,
+      decision: row.decision,
+      decidedBy: ctx.userId,
+      decidedAt: at,
+    });
+  }
+  const suggestions = await readReassessmentSuggestions(ctx, {
+    intakeSessionId: record.intakeSessionId,
+    assessments: prior.items,
+    decisions: claimed,
+  });
+  if (suggestions.undecided.length > 0) {
+    throw new ValidationError({
+      userMessage:
+        "Accept or reject each AI suggestion before recording the assessed condition.",
+      field: "proposalDecisions",
+      correlationId: ctx.correlationId,
+    });
+  }
+  const proposalDecisions = decisionsOnShownProposals(
+    suggestions.proposals,
+    claimed,
+  ).map((decision) => ({
+    ...decision,
+    intakePhotoId:
+      suggestions.proposals.find(
+        (proposal) => proposal.photoCheckId === decision.photoCheckId,
+      )?.intakePhotoId ?? decision.intakePhotoId,
+  }));
+  const notObserved = proposalDecisions.find(
+    (decision) =>
+      decision.decision === "accepted" &&
+      !determination.findingTypes.includes(decision.findingType),
+  );
+  if (notObserved !== undefined) {
+    throw new ValidationError({
+      userMessage:
+        "An accepted suggestion is a finding: tick it, or reject the suggestion.",
+      field: "findingTypes",
+      correlationId: ctx.correlationId,
+    });
+  }
+  const assessmentMethod = assessmentMethodFor(suggestions.proposals);
+  const modelAssisted = assessmentMethod === "model_assisted_visual";
+
   // The rule version that will govern the re-classification is the one the
   // record's condition is recorded under (`condition_rule_version_id`), so it
   // is resolved before the assessment is appended and reused after.
@@ -186,7 +261,7 @@ export async function recordDamageAssessmentFor(
     // The photo this assessment rests on. For a clearing it is the clearing
     // evidence itself, so the History tab's evidence line shows it.
     intakePhotoId: clearingPhotoId,
-    assessmentMethod: VISUAL_INSPECTION,
+    assessmentMethod,
     status: determination.assessmentStatus,
     findingTypes: determination.findingTypes,
     findingDetail: input.reason === null ? null : { reason: input.reason },
@@ -196,8 +271,11 @@ export async function recordDamageAssessmentFor(
     // Rules 6.2–6.6 are mechanical set membership, not a jurisdiction rule
     // evaluation, so there is no applied-version trace to record here.
     evaluationTrace: null,
-    modelProvider: null,
-    modelIdentifier: null,
+    // How the proposal arrived, never who decided (Rule 6.6); no number.
+    modelProvider: modelAssisted ? (suggestions.model?.provider ?? null) : null,
+    modelIdentifier: modelAssisted
+      ? (suggestions.model?.modelIdentifier ?? null)
+      : null,
     modelConfidence: null,
     instrumentVendor: null,
     instrumentModel: null,
@@ -210,6 +288,7 @@ export async function recordDamageAssessmentFor(
     confirmedAt: at,
     clearingPhotoIntakePhotoId: clearingPhotoId,
     supersedesDamageAssessmentId: current?.id ?? null,
+    proposalDecisions,
   };
 
   const assessment = await data.damageAssessments.append(ctx, row);
@@ -248,7 +327,12 @@ export async function recordDamageAssessmentFor(
       entityId: assessment.id,
       occurredAt: at,
       beforeState: current === null ? null : assessmentSnapshot(current),
-      afterState: assessmentSnapshot(assessment),
+      afterState: {
+        ...assessmentSnapshot(assessment),
+        // T-43 — the proposals shown and the decision on each (Rule 6.25).
+        assessmentMethod,
+        proposals: proposalDecisions.map(proposalDecisionJson),
+      },
       changedFields: ["assessedCondition", "findingTypes", "status"],
       governingRuleVersionId: rule.ruleVersionId,
       reason: input.reason,

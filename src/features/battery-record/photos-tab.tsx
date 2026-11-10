@@ -25,6 +25,20 @@ import {
   type LabelFieldCode,
 } from "@/domain/taxonomy/label-field-code";
 import { labelFor, readTaxonomyValue } from "@/domain/taxonomy/lookup";
+import {
+  PHOTO_CHECK_KIND_LABELS,
+  PHOTO_CHECK_KINDS,
+  type PhotoCheckKind,
+} from "@/domain/taxonomy/photo-check-kind";
+import {
+  PHOTO_CHECK_OUTCOME_LABELS,
+  PHOTO_CHECK_OUTCOMES,
+} from "@/domain/taxonomy/photo-check-outcome";
+import { canReadRoute } from "@/domain/access/route-capability";
+import { AiSuggestedTag } from "@/components/ai/ai-suggested-tag";
+import type { PhotoCheck } from "@/types/photo-check";
+import type { Uuid } from "@/types/common";
+import Link from "next/link";
 import type { BatteryRecord } from "@/types/battery-record";
 import type { TimeZone } from "@/types/common";
 import type { IntakePhoto, LabelExtraction } from "@/types/intake";
@@ -106,6 +120,11 @@ export async function PhotosTab({
     ctx,
     photos.items.map((photo) => photo.takenBy),
   );
+  const checks = await readPhotoCheckSummaries(
+    ctx,
+    record.intakeSessionId,
+    canReadRoute(ctx.role, "/batteries/[id]"),
+  );
 
   return (
     <div className="flex flex-col gap-6">
@@ -121,6 +140,7 @@ export async function PhotosTab({
               takenByName={names.get(photo.takenBy)}
               acceptance={acceptanceInForceAt(acceptances.items, photo)}
               timeZone={timeZone}
+              checks={checks.get(photo.id) ?? []}
             />
           ))}
         </ul>
@@ -159,16 +179,149 @@ function acceptanceInForceAt(
     .at(-1);
 }
 
+/** One photo check, as the Photos tab words it: the latest run of each kind. */
+interface PhotoCheckSummary {
+  readonly kind: PhotoCheckKind;
+  readonly outcome: string;
+  /** A model's answer (Rule 1.29) — never the copy check's, never a failure's. */
+  readonly modelSuggested: boolean;
+  /** Copy check: the other records, linked where the role can open them (Rule 2.37). */
+  readonly records: readonly {
+    readonly id: Uuid;
+    readonly recordNumber: string;
+    readonly href: string | null;
+  }[];
+}
+
+const MODEL_OUTCOMES: readonly string[] = [
+  "proposed",
+  "nothing_proposed",
+  "looks_consistent",
+  "looks_different",
+  "cannot_compare",
+];
+
+/**
+ * The latest run of each photo check on each of the session's photos — Rules
+ * 2.36, 2.37, 6.25; `UX_SPEC.md` §3.7. Outcomes are T-66 labels, never a
+ * number; a copy names the other record and links it.
+ */
+async function readPhotoCheckSummaries(
+  ctx: RequestContext,
+  intakeSessionId: Uuid | null,
+  canOpenRecords: boolean,
+): Promise<ReadonlyMap<Uuid, readonly PhotoCheckSummary[]>> {
+  if (intakeSessionId === null) return new Map();
+  const runs = (
+    await data.photoChecks.list(ctx, { intakeSessionId, limit: 200 })
+  ).items;
+  const latest = new Map<string, PhotoCheck>();
+  for (const run of runs) {
+    const key = `${run.intakePhotoId}:${run.checkKind}`;
+    const seen = latest.get(key);
+    if (seen === undefined || run.ranAt > seen.ranAt) latest.set(key, run);
+  }
+  const recordNumbers = new Map<Uuid, string>();
+  for (const run of latest.values()) {
+    for (const id of run.matchedBatteryRecordIds) {
+      if (recordNumbers.has(id)) continue;
+      const other = await data.batteryRecords.get(ctx, id);
+      if (other !== null) recordNumbers.set(id, other.recordNumber);
+    }
+  }
+  const byPhoto = new Map<Uuid, PhotoCheckSummary[]>();
+  for (const run of latest.values()) {
+    const summaries = byPhoto.get(run.intakePhotoId) ?? [];
+    summaries.push({
+      kind: run.checkKind,
+      outcome: run.outcome,
+      modelSuggested:
+        run.checkKind !== "look_alike" && MODEL_OUTCOMES.includes(run.outcome),
+      records: run.matchedBatteryRecordIds.flatMap((id) => {
+        const recordNumber = recordNumbers.get(id);
+        return recordNumber === undefined
+          ? []
+          : [
+              {
+                id,
+                recordNumber,
+                href: canOpenRecords ? `/batteries/${id}` : null,
+              },
+            ];
+      }),
+    });
+    byPhoto.set(
+      run.intakePhotoId,
+      summaries.sort(
+        (a, b) =>
+          PHOTO_CHECK_KINDS.indexOf(a.kind) - PHOTO_CHECK_KINDS.indexOf(b.kind),
+      ),
+    );
+  }
+  return byPhoto;
+}
+
+function PhotoChecks({
+  checks,
+}: {
+  readonly checks: readonly PhotoCheckSummary[];
+}) {
+  if (checks.length === 0) return null;
+  return (
+    <ul data-photo-checks="true" className="grid gap-1">
+      {checks.map((check) => (
+        <li
+          key={check.kind}
+          data-photo-check={check.kind}
+          data-photo-check-outcome={check.outcome}
+          className="flex flex-wrap items-center gap-2 text-body"
+        >
+          <span className="text-label">
+            {labelFor(PHOTO_CHECK_KIND_LABELS, check.kind)}
+          </span>
+          <TaxonomyText
+            system="T-66 photo check outcome"
+            read={readTaxonomyValue(
+              PHOTO_CHECK_OUTCOMES,
+              PHOTO_CHECK_OUTCOME_LABELS,
+              check.outcome,
+            )}
+          />
+          {check.modelSuggested ? <AiSuggestedTag /> : null}
+          {check.records.map((other) =>
+            other.href === null ? (
+              <span key={other.id} className="font-mono">
+                {other.recordNumber}
+              </span>
+            ) : (
+              <Link
+                key={other.id}
+                href={other.href}
+                data-photo-copy-of={other.id}
+                className="font-mono underline underline-offset-4"
+              >
+                {other.recordNumber}
+              </Link>
+            ),
+          )}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 function PhotoCard({
   photo,
   takenByName,
   acceptance,
   timeZone,
+  checks,
 }: {
   readonly photo: IntakePhoto;
   readonly takenByName: string | undefined;
   readonly acceptance: TosAcceptance | undefined;
   readonly timeZone: TimeZone;
+  readonly checks: readonly PhotoCheckSummary[];
 }) {
   return (
     <li
@@ -226,6 +379,11 @@ function PhotoCard({
         <PhotoFact label="EXIF">
           {photo.isExifStripped ? "Stripped" : "Retained"}
         </PhotoFact>
+        {checks.length === 0 ? null : (
+          <PhotoFact label="Photo checks">
+            <PhotoChecks checks={checks} />
+          </PhotoFact>
+        )}
         {photo.cropGeometry === null ? null : (
           <PhotoFact label="Crop">
             <span className="text-mono">

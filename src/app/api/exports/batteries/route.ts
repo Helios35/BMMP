@@ -63,12 +63,50 @@ export async function GET(request: Request): Promise<Response> {
         list.push(match);
         recallsByRecordId.set(match.batteryRecordId, list);
       }
+      // Rule 1.29 — Identified by: a session whose label read supplied a value.
+      const extractions = await readEveryPage((page) =>
+        data.labelExtractions.list(ctx, page),
+      );
+      if (extractions.kind === "too_large") return extractions;
+      const readSessions = new Set(
+        extractions.rows
+          .filter((row) => row.fieldValue !== null)
+          .map((row) => row.intakeSessionId),
+      );
+      const identifiedByModelRecordIds = new Set(
+        read.rows
+          .filter(
+            (record) =>
+              record.intakeSessionId !== null &&
+              readSessions.has(record.intakeSessionId),
+          )
+          .map((record) => record.id),
+      );
+      // Damage assessed by — the current assessment's T-59 method, as stored.
+      const assessments = await readEveryPage((page) =>
+        data.damageAssessments.list(ctx, { isCurrent: true, ...page }),
+      );
+      if (assessments.kind === "too_large") return assessments;
+      const assessmentMethodByRecordId = new Map<string, string>();
+      for (const assessment of [...assessments.rows].sort((a, b) =>
+        a.assessedAt.localeCompare(b.assessedAt),
+      )) {
+        assessmentMethodByRecordId.set(
+          assessment.batteryRecordId,
+          assessment.assessmentMethod,
+        );
+      }
       return {
         kind: "file",
         file: {
           headers: BATTERY_CSV_HEADERS,
           rows: read.rows.map((record) =>
-            batteryCsvRow(record, { ...request, recallsByRecordId }),
+            batteryCsvRow(record, {
+              ...request,
+              recallsByRecordId,
+              identifiedByModelRecordIds,
+              assessmentMethodByRecordId,
+            }),
           ),
           scope: exportScope(
             request.listQuery.filters,

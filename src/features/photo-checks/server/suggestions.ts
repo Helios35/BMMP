@@ -177,3 +177,28 @@ export async function readSessionSuggestions(
           },
   };
 }
+
+/**
+ * The suggestions a re-assessment shows (Rule 6.25): the proposals on the
+ * record's photos that no assessment on the record has decided — the photos
+ * attached for it, never the ones the intake already settled.
+ */
+export async function readReassessmentSuggestions(
+  ctx: RequestContext,
+  input: {
+    readonly intakeSessionId: Uuid | null;
+    readonly assessments: readonly {
+      readonly proposalDecisions?: readonly DamageProposalDecision[] | null;
+    }[];
+    readonly decisions: readonly DamageProposalDecision[];
+  },
+): Promise<SessionSuggestions> {
+  if (input.intakeSessionId === null) return NO_SUGGESTIONS;
+  return readSessionSuggestions(ctx, {
+    intakeSessionId: input.intakeSessionId,
+    decisions: input.decisions,
+    excludeDecided: input.assessments.flatMap(
+      (assessment) => assessment.proposalDecisions ?? [],
+    ),
+  });
+}
