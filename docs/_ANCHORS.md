@@ -50,7 +50,7 @@ Database naming is `snake_case`. Types in TypeScript are `PascalCase` singular.
 
 **Battery and identification**
 
-`battery_record` (the canonical record — sized wide, see §0) · `catalog_entry` (known battery products) · `intake_session` · `intake_photo` · `label_extraction` (per-field values + per-field confidence) · `date_code_decode`
+`battery_record` (the canonical record — sized wide, see §0) · `catalog_entry` (known battery products) · `intake_session` · `intake_photo` · `label_extraction` (per-field values + per-field confidence) · `date_code_decode` · `catalog_reference_photo` (a catalog entry's platform reference label photo, Rule 2.36)
 
 **Storage and containers**
 
@@ -62,7 +62,7 @@ Database naming is `snake_case`. Types in TypeScript are `PascalCase` singular.
 
 **Condition**
 
-`damage_assessment` · `grade` (B2) · `hazard_ranking` (B2) · `recall_match` (B2)
+`damage_assessment` · `grade` (B2) · `hazard_ranking` (B2) · `recall_match` (B2) · `recall_check` (B2, D-74 #2) · `photo_check` (B2, Rules 2.36, 2.37, 6.25)
 
 **Rules as data**
 

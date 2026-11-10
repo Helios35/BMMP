@@ -1,5 +1,5 @@
 # Taxonomy — BMMP
-**Version:** 1.8 · **Date:** 2026-10-28 · **Owner:** Nathan Ivy / Next Sketch LLC
+**Version:** 1.9 · **Date:** 2026-11-10 · **Owner:** Nathan Ivy / Next Sketch LLC
 **Answers:** How is everything in this product classified?
 **Reads from:** `_ANCHORS.md` · `PRD.md` · `BUSINESS_RULES.md` · `PROJECT_SETUP_BMMP.md`  ·  **Feeds:** `TECHNICAL_SPEC.md` · `ERD.md` · `UX_SPEC.md` · `SITE_ARCHITECTURE.md` · every builder brief
 
@@ -9,6 +9,15 @@
 ---
 
 ## Changelog
+
+**v1.9 · 2026-11-10 — photo checks (`Decision Log.md` D-74, D-75)**
+
+- T-35, T-36, T-18, T-43, T-46, T-52 and T-59 changes and T-65, T-66 authored by planning (D-74, D-75), transcribed by `b2-10-photo-checks`.
+- **T-52 gains `label_look_differs` and `photo_looks_reused`** (Rules 2.36, 2.37).
+- **T-59:** `model_assisted_visual` reads "AI suggested, confirmed by a person" and is written from `b2-10` (Rule 6.25).
+- **Two systems added: T-65 `photo_check.check_kind` and T-66 `photo_check.outcome`.**
+- **T-43 gains `photo_check.completed`, `photo_check.failed` and `catalog_entry.reference_photo_set`.**
+- **T-35, T-36 (D-74 #3), T-18 and T-46** are brought into line with Rules 10.14, 10.18 and the amended Rule 6.14.
 
 **v1.8 · 2026-10-28 — recall matching (`Decision Log.md` D-72, D-73)**
 
@@ -78,7 +87,7 @@ BMMP follows a battery through the end of its life: identify it → assess its c
 - **Never invent a value.** If a value you need is not here, it does not exist yet. Stop and raise it — additions go through P6 and get appended to the relevant system, not improvised in a branch.
 - **Never invent a mapping.** §5 (Label-to-Database Mapping) is binding. A display label is never derived from a stored value at runtime by string manipulation, and a stored value is never derived from a label.
 - **Never rename a stored value.** Renaming is a deprecation plus an addition, logged in §6. See §5.4.
-- Each system carries a stable ID (`T-01` … `T-64`). Cite systems by ID. **IDs never move and are never reused.**
+- Each system carries a stable ID (`T-01` … `T-66`). Cite systems by ID. **IDs never move and are never reused.**
 
 ### 1.2 What is taxonomy and what is data — the load-bearing distinction
 
@@ -227,6 +236,9 @@ Two citations in this document are deliberately **not** numbered, because what t
 | T-62 | Accumulation start source | `container.accumulation_start_source` | single, nullable | B1a |
 | T-63 | Storage clock subject type | `storage_clock.subject_type` | single | B1a |
 | T-64 | Clock start basis | `storage_clock.clock_start_basis` | single | B1a |
+| **K. Photo checks — added at v1.9** ||||
+| T-65 | Photo check kind | `photo_check.check_kind` | single | B2 (from `b2-10`) |
+| T-66 | Photo check outcome | `photo_check.outcome` | single | B2 (from `b2-10`) |
 
 ---
 
@@ -694,7 +706,7 @@ Two citations in this document are deliberately **not** numbered, because what t
 - **Single-select per shipment.** A shipment has exactly one origin, one destination, one mode and one shipping paper (**Rule 5.2**).
 - **Assigned by P1 or P6** while building a shipment, and recorded on both the shipment and the shipping paper (**Rule 5.10**).
 - **`air` is hard-blocked, not warned, when any record on the shipment carries a DDR flag.** Governed by **Rules 6.7, 6.8 and 5.11**. There is no acknowledge-and-proceed, no confirmation dialog that permits it, no "I understand the risk" checkbox and no supervisor approval path, and **no role can override it — not P1, not P2, not P6** (**Rule 6.8; EC-38**). **Rule 6.9** fixes what the user sees: the mode visibly present but not selectable, a plain-language statement, the citation from the governing rule version, the specific records causing the block, and the specific indicator behind each. **Rule 6.10** fixes the three available paths and no others — ship by a non-air mode, remove the blocking records and fly the remainder, or re-assess under Rule 6.11.
-- **Triggers behaviour:** packaging exception eligibility (T-20, **Rule 5.19** — the recycling and disposal exception is a ground-transport concept), shipping paper preconditions (**Rule 5.3**), and the DDR block above (**Rules 6.7, 6.13**). Confirming a damage indicator on a record already loaded onto an air shipment removes it automatically, voids the paper and notifies P1 and P2 (**Rule 6.14; EC-39**).
+- **Triggers behaviour:** packaging exception eligibility (T-20, **Rule 5.19** — the recycling and disposal exception is a ground-transport concept), shipping paper preconditions (**Rule 5.3**), and the DDR block above (**Rules 6.7, 6.13**). Confirming a damage indicator on a record already loaded onto an air shipment voids the paper, returns the shipment to regenerate and refuses departure, and notifies P1 and P2; the record leaves when it is moved to quarantine (**Rule 6.14; EC-39**).
 - **Not terminal** while the shipment is `draft`; frozen once documents are issued.
 - **The mobility air-travel document set at B3 is a different artefact** (T-38 `air_travel_packet`) covering a person travelling with their own device. It does not relax this prohibition and must not be confused with it.
 
@@ -1151,7 +1163,7 @@ Two citations in this document are deliberately **not** numbered, because what t
 **Rules**
 
 - **Single-select.**
-- **`possible_match` requires human adjudication by P1 or P6.** It never resolves itself, never auto-promotes to `confirmed_match`, and never auto-dismisses on a timer. It sits in the review path until a human decides. Governed by **Rule 10.7**: recall matching produces an *advisory* association confirmed by a human — with one exception, that a confirmed association triggers the section 6 handling class immediately, because that direction is the safe one.
+- **`possible_match` requires a person: confirm by P1, P2 or P6; dismiss by P1 or P6 (Rule 10.14).** It never resolves itself, never auto-promotes to `confirmed_match`, and never auto-dismisses on a timer. It sits in the review path until a human decides. Governed by **Rule 10.7**: recall matching produces an *advisory* association confirmed by a human — with one exception, that a confirmed association triggers the section 6 handling class immediately, because that direction is the safe one.
 - **`confirmed_match` sets the `recalled` DDR flag (T-30).** This is the only automatic write into T-30. A recalled record is handled in the same class as a damaged or defective one for transport and segregation (**Rule 6.5**), moves to quarantine, triggers a re-classification check, and makes air unavailable on any shipment containing it (**EC-41**).
 - **`dismissed` requires a stated reason** recorded on the match row, is attributable to the human who dismissed it, and never deletes the original — both the match and its dismissal stay permanently visible on the record and in every export (**Rule 6.24**). P5 may never dismiss one.
 - **Match rows hold `possible_match`, `confirmed_match` or `dismissed`.** `not_checked` and `no_match` describe a record's standing, derived from its check runs (Rule 10.18), never a match row.
@@ -1180,7 +1192,7 @@ Two citations in this document are deliberately **not** numbered, because what t
 - **`manufacturer_notice` and `manual_entry` require the originating notice or database entry recorded on the row**, together with the actor and the timestamp (**Rule 6.23**). In B1a a recall association is entered by a human (**Rule 6.5**); automated matching is B2 (**Rule 10.7**).
 - **Entry is not restricted to P6.** v1.1 tightened these two sources to P6 with no rule behind them; **Rule 6.23 relaxed that deliberately** rather than ratifying it — **P1, P2 or P6 may record a recall association**, because the handler at the facility is who receives a manufacturer's notice and the effect of recording one is to *increase* handling restrictions, which is the safe direction to let people move in quickly. **P5 may never record one.** *(RN-10, resolved.)*
 - **Removing an association is held to a stricter bar than adding one.** Dismissal requires a stated reason, is attributable, never deletes the original, and leaves both the association and its dismissal permanently visible (**Rule 6.24**). Air transport does not reopen until the damage assessment *and* every recall association are clear — **clearing a recall flag is not a route around Rule 6.7**.
-- **Not terminal.** Sources are re-queried on a cadence and each query writes its own row.
+- **Not terminal.** One match row per record, source and recall; each check writes a check run (Rule 10.18).
 
 ---
 
@@ -1370,11 +1382,14 @@ Two citations in this document are deliberately **not** numbered, because what t
 | `catalog_entry.proposed` | Catalog entry proposed | A person proposed a new catalog entry from a catalog miss; it waits as `proposed` (T-07) for P6 at `/settings/catalog` and is not available for matching (**Rule 2.20**; Flow F). **Not `catalog_entry.matched`**, which is the match step proposing an existing entry for a record. |
 | `catalog_entry.status_changed` | Catalog entry status changed | The entry moved between values of T-07 — P6 approving a proposal to `published` or rejecting it — with the stated reason (Flow F). An approval lists the records it raised on `/review` for a person to confirm; it changes none of them. |
 | `catalog_entry.updated` | Catalog entry edited | P6 edited an entry's shipping identity — identification number, proper shipping name, hazard class, packing group — with the stated reason (D-50). The before and after values are on the event. **Only P6 edits the catalog; a handler never types a shipping identifier** (**Rule 5.9**). |
+| `catalog_entry.reference_photo_set` | Reference photo set | P6 set or replaced an entry's reference label photo, with before and after (Rule 2.36). |
 | `battery_record.routed_to_review` | Routed to review | A gated field below band placed the record in the review queue. |
 | `battery_record.confirmed` | Identification confirmed | A human confirmed identification, including chemistry. |
 | `battery_record.status_changed` | Record status changed | The record moved between values of T-22. |
 | `classification_decision.recorded` | Waste classification recorded | A classification decision and its basis codes were written. |
-| `damage_assessment.recorded` | Damage assessment recorded | An inspection wrote findings. |
+| `damage_assessment.recorded` | Damage assessment recorded | An inspection wrote findings. The event also carries the proposals shown and the decision on each (Rule 6.25). |
+| `photo_check.completed` | Photo check completed | A photo check ran: kind, photo and outcome. |
+| `photo_check.failed` | Photo check failed | A photo check failed, with the reason code (Rule 6.26). |
 | `battery_record.ddr_flag_set` | DDR flag set | A DDR flag was set on a record. |
 | `recall_check.completed` | Recall check completed | A check ran: source, identity checked, outcome (no match, candidates found, or nothing to match against). |
 | `recall_check.failed` | Recall check failed | A source could not be reached or returned an error. Carries the reason code (Rule 10.17). |
@@ -1487,7 +1502,7 @@ Two citations in this document are deliberately **not** numbered, because what t
 - **`assessed_damaged` hard-blocks air transport** (**Rule 6.7**), and **no role can override that, including P6** (**Rule 6.8**). The user sees the blocking records, the specific indicator on each, and exactly three paths — ship non-air, remove the blocking records, or re-assess (**Rules 6.9, 6.10; EC-38**).
 - **Neither assessed state is terminal, deliberately.** **Rule 6.11** provides exactly one clearing path: a superseding human assessment finding no indicator present, carrying a stated reason and at least one supporting photograph. The block clears because the assessed condition changed — never because someone chose to proceed. *This is why v1.1's declaration that damage findings were terminal was wrong and was corrected: it contradicted Rule 6.11.*
 - **Both assessments stay visible.** A superseded assessment is displayed beside the current one with its author, timestamp, indicators and evidence, permanently and in every export (**Rule 6.12**). A record whose damage finding was reversed is one an auditor will want to look at, and the system makes that easy rather than hard.
-- **Triggers behaviour:** quarantine routing and segregation (**Rules 6.17, 6.18, 4.28**; T-23), re-classification because damage is a classification input (**Rules 3.4, 3.15, 6.20**), automatic removal from an air shipment with the paper voided (**Rule 6.14; EC-39**), and the DDR packet (**Rules 6.15, 6.16**). Damage never stops a storage clock (**Rule 6.19**). Every change writes an `audit_event` carrying before, after, reason, actor and evidence (**Rule 6.21**).
+- **Triggers behaviour:** quarantine routing and segregation (**Rules 6.17, 6.18, 4.28**; T-23), re-classification because damage is a classification input (**Rules 3.4, 3.15, 6.20**), on an air shipment that has not departed — Rule 6.14 voids the paper, returns the shipment to regenerate and refuses departure; the record leaves when it is moved to quarantine (**Rule 6.14; EC-39**) — and the DDR packet (**Rules 6.15, 6.16**). Damage never stops a storage clock (**Rule 6.19**). Every change writes an `audit_event` carrying before, after, reason, actor and evidence (**Rule 6.21**).
 
 ---
 
@@ -1653,6 +1668,8 @@ Severity is set by the code that raises the alert, from the condition that raise
 | `session_abandoned` | Left unfinished | The handler explicitly abandoned the session (T-08 `abandoned`). The session, its photos and its extraction are retained, and no battery record is created. **It is not on the queue**: a closed session has no exit a person can take (Rule 2.23; D-53). A session merely left mid-flow — tab closed, phone locked — stays open and stays on the queue under its gate reasons (Flow A-a(3)). **Work is never lost and never silently committed.** |
 | `duplicate_photo` | Photo already on another record | An intake photo's content hash matches a photo on another battery record in this organization. The whole record routes to review (Rule 2.14). A reason to look, never a verdict: no score or probability is shown (Rule 1.25; D-56). |
 | `label_catalog_mismatch` | Label disagrees with catalog | At least one field the label read disagrees with the catalog entry the record is matched to, beyond the configured tolerance (Rule 2.35). The whole record routes to review (Rule 2.14). A reason to look, never a verdict: no score or probability is shown, and a person decides. |
+| `label_look_differs` | Label looks different from the catalog photo (AI suggested) | The vision model compared the label photo with the matched entry's reference photo and found it looks different (Rule 2.36). The whole record routes to review (Rule 2.14). A reason to look, never a verdict. |
+| `photo_looks_reused` | Photo looks like a copy of one on another record | A photo's look-alike fingerprint is close to a photo on another battery record in this organization: possibly re-saved, cropped or edited (Rule 2.37). The whole record routes to review. A reason to look, never a verdict. |
 
 **Rules**
 
@@ -1801,7 +1818,7 @@ Severity is set by the code that raises the alert, from the condition that raise
 | Stored value | Display label | Definition | Phase |
 |---|---|---|---|
 | `visual_inspection` | Visual inspection | A person inspected the battery and confirmed the findings. **B1a's only method.** | B1a |
-| `model_assisted_visual` | Model-assisted inspection | A model proposed indicators from a photograph and a person confirmed them. | B2 |
+| `model_assisted_visual` | AI suggested, confirmed by a person | A model proposed indicators from a photograph and a person confirmed them. | from `b2-10` |
 | `instrument_reading` | Instrument reading | A third-party health tester supplied a reading, recorded alongside a human-confirmed assessment. Carries the `instrument_*` columns. | B3 |
 
 **Rules**
@@ -1809,7 +1826,7 @@ Severity is set by the code that raises the alert, from the condition that raise
 - **Single-select.**
 - **No method produces an assessment without human confirmation, at any confidence** (**Rule 6.6**). **A model proposes indicators; a model never sets them** (**Rule 6.2**). `model_assisted_visual` describes how the proposal arrived, not who decided.
 - **An instrument reading is measured data.** It is stored, labelled and exported **separately** from assessed condition, and never merges into it or silently replaces it (**Rules 2.27, 11.5**; Roadmap Principle 7). The vendor is open until Gate 3.
-- **B1a writes only `visual_inspection`.** Building the other two ahead of their specification is a review rejection, not a head start.
+- **`model_assisted_visual` is written when at least one model proposal was shown to the person who confirmed (Rule 6.25). Otherwise `visual_inspection`. `instrument_reading` stays unbuilt until unit 16.**
 
 ---
 
@@ -1916,6 +1933,48 @@ Severity is set by the code that raises the alert, from the condition that raise
 - **A battery's start date travels with it** (Rule 4.9). A `battery_record` clock is only ever `first_placement`; moving the battery never starts a new one.
 - **The clock never pauses** (Rule 4.6). No value exists for pause, hold, extension or restart.
 - A start moved earlier re-computes `due_at` and may make the subject overdue immediately (Rule 4.10).
+
+---
+
+### T-65 · Photo check kind
+
+**Stored on:** `photo_check.check_kind` · **Cardinality:** single-select · **Phase:** B2 (from `b2-10`)
+
+| Stored value | Display label | Definition |
+|---|---|---|
+| `damage_proposal` | Damage suggestions | The model looked for T-29 findings on a whole-pack or damage photo (Rule 6.25). |
+| `label_look` | Label look check | The model compared a label photo with the catalog reference (Rule 2.36). |
+| `look_alike` | Copy check | The photo's fingerprint was compared with the organization's other photos (Rule 2.37). |
+
+**Rules**
+
+- **Single-select.**
+- **Check runs are append-only.**
+- **No number is stored on a run.**
+
+---
+
+### T-66 · Photo check outcome
+
+**Stored on:** `photo_check.outcome` · **Cardinality:** single-select · **Phase:** B2 (from `b2-10`)
+
+| Stored value | Display label | Definition |
+|---|---|---|
+| `proposed` | Suggestions made | Damage: at least one finding was proposed. |
+| `nothing_proposed` | No suggestions | Damage: none proposed. Never a finding, never "none observed". |
+| `looks_consistent` | Looks like the reference | Label look. |
+| `looks_different` | Looks different from the reference | Label look. Routes to review. |
+| `cannot_compare` | Could not compare | Label look: the model could not compare the two. No flag. |
+| `no_reference` | No reference photo on file | Label look: the entry has none. Nothing was compared. |
+| `copy_found` | Looks like a copy | Look-alike: routes to review, naming the other record. |
+| `no_copy_found` | No copy found | Look-alike. |
+| `failed` | Check failed | The service could not be reached or returned an error. Carries the reason code. Never shown as any other outcome. |
+
+**Rules**
+
+- **Single-select.**
+- **Check runs are append-only.**
+- **No number is stored on a run.**
 
 ---
 

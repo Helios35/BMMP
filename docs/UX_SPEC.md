@@ -222,6 +222,8 @@ Each row shows four things, always, in this order: **field name · value · wher
 | Confidence | A `Badge` with the band as text — **High / Medium / Low / None** — intent `ok` / `attention` / `critical` / `neutral`. The numeric value appears as `caption` beneath on desktop and in the badge tooltip on mobile. Bands and threshold per D-22. |
 | Confirm control | See 2.1.4 |
 
+**"AI suggested"** (Rule 1.29; `AiSuggestedTag`, §2.16). Every value pre-filled from the label read shows the tag until confirmed. Chemistry from the catalog never does.
+
 #### 2.1.3 The fields, their sources, and what is gated
 
 | Field | Source | Gated | Notes |
@@ -573,6 +575,10 @@ Shows up to five `catalog_entry` candidates, each with: manufacturer and model, 
 
 Sticky bottom bar during `/batteries/new` and `/shipments/new` on `<md`. Contains the step's primary action at 56px full-width, an optional secondary above it, and — when the primary is disabled — the reason checklist from §2.1.4 rendered directly above it. Respects `env(safe-area-inset-bottom)`. Sits above the tab bar and hides the tab bar during a flow, so nothing competes with the step's action.
 
+### 2.16 `AiSuggestedTag`
+
+**One shared component** (Rule 1.29). Text "AI suggested", neutral colour, never a scale. After a decision: "AI suggested · confirmed by Dana R." (or "· rejected by").
+
 ---
 
 ## 3. Screen Specs
@@ -667,6 +673,8 @@ One per route in `_ANCHORS.md` §5. Access per `SITE_ARCHITECTURE.md` §5.2.
 
 **A small mobility-device pack and a vehicle traction pack render in the same table with no special case** (`PROJECT_SETUP_BMMP.md` §8.2). The mock fixtures must contain both from day one, sitting next to each other.
 
+**Exports** (Rule 1.29). The `/batteries` CSV gains **Identified by** ("AI suggested, confirmed by a person" or "Entered by a person") and **Damage assessed by** (the T-59 label). On the DDR packet, a model-assisted finding carries the T-59 label.
+
 **shadcn:** Table, Input, Select, Badge, Button, Pagination, Sheet (mobile filters), Skeleton.
 
 ---
@@ -687,6 +695,7 @@ One per route in `_ANCHORS.md` §5. Access per `SITE_ARCHITECTURE.md` §5.2.
 
 **What's on it — step 3, Confirm and place.**
 - **Assessed condition** (hard-gated, confirmed here if not already) and state of charge at intake.
+  - **Suggestions** (Rules 6.25, 6.26): a list above the findings. Each row has the finding, its photo thumbnail, and **Accept** / **Reject**. Confirm stays disabled, with a stated reason, until each row is decided. If the check failed: "AI suggestions unavailable — inspect as usual."
 - **Container or lot assignment** — `Command` picker showing each container's current fill and clock tier so the handler does not put a battery into a container that expires next week.
 - **Classification outcome** — light waste category vs full hazardous, rendered as a `Card` with **the recorded reasoning shown, not hidden behind a disclosure**: every input used, every rule identity and version applied, the citation each carried, the outcome, and any obligations it triggers (Rule 3.7). The reasoning trail is what survives an audit; it is not a detail view. Classification runs only after identification is confirmed (Rule 3.3), and **blocks rather than defaults** where an input is missing (Rules 3.4, 3.10) — see E-13.
 - **A full-hazardous outcome** states the manifest obligation prominently here and carries it onto the container, the shipment and the shipping paper's checklist. **B1a does not generate a manifest, and the shipment is never presented as fully documented** (Rules 3.11, 3.12) — see E-14.
@@ -722,9 +731,11 @@ Tabs:
     - **Actions, by role:** **Confirm** (P1/P2/P6) · **Dismiss** (P1/P6, needs a reason) · **Record a recall** (P1/P2/P6: source, reference, optional title) · **Check now** (P1/P2/P6).
     - **Colors:** a possible match is `warning`. A confirmed recall is the existing `HardBlockNotice`, named as a recall (§2.6).
     - **No match-strength wording anywhere.**
-- **Photos & extraction** — every `intake_photo`, the label crop, and the full `label_extraction` with per-field confidence and the extracted-vs-confirmed pair. Also shows the record's **training-eligible state** and the Terms of Service version in force at capture, so eligibility can be verified from outside the system rather than trusted (Rules 7.16, 7.22). Read-only after commit.
+- **Photos & extraction** — every `intake_photo`, the label crop, and the full `label_extraction` with per-field confidence and the extracted-vs-confirmed pair. Also shows the record's **training-eligible state** and the Terms of Service version in force at capture, so eligibility can be verified from outside the system rather than trusted (Rules 7.16, 7.22). Read-only after commit. The Photos tab links a look-alike to the other record (Rule 2.37).
 - **Documents** — every `document_render` touching this record, each linking to `/documents/[id]`. Voided renders appear here, marked void, with their reason and actor (Rules 5.14, 5.15).
-- **History** — the `audit_event` trail, newest first, each with actor, time and what changed. Any superseded `damage_assessment` is displayed **alongside** the current one with its author, timestamp, indicators and evidence (Rule 6.12).
+- **History** — the `audit_event` trail, newest first, each with actor, time and what changed. Any superseded `damage_assessment` is displayed **alongside** the current one with its author, timestamp, indicators and evidence (Rule 6.12). The assessment history shows proposals and decisions (Rules 6.25, 7.25).
+
+**Edit assessed condition** shows the same **Suggestions** list as the condition step (§3.6 step 3) for whole-pack and damage photos attached for the re-assessment (Rule 6.25).
 
 **Editing a confirmed field creates a superseding version — it never overwrites.** Prior values, their confirmer and their timestamps stay readable. **A correction to chemistry, model or condition re-opens the confidence gate for that field** and requires confirmation again (Rule 2.32); a condition change also triggers a re-classification check (Rules 3.15, 6.20). The edit `Dialog` says so *before* the change is saved, not after.
 
@@ -757,6 +768,10 @@ Tabs:
 **This is the same `ExtractionReviewCard` as `/batteries/new` step 2. Not a second implementation.** Selected item in the URL (`?item=`) so a dashboard alert deep-links to it.
 
 **Label disagrees with catalog** (Rule 2.35). When the reason includes `label_catalog_mismatch`, each disagreeing field shows two values side by side, **Label says** and **Catalog says**, with the catalog entry linked. No colour-coded score, no percentage, no "match strength" wording. The three choices are the ones the card already offers: keep this entry, pick another, or enter manually.
+
+**Label looks different** (Rule 2.36): **This label** and **Catalog reference** photos side by side, tagged AI suggested, same three choices. **Photo looks like a copy** (Rule 2.37): both photos, with the other record linked.
+
+The review pane's condition step carries the same **Suggestions** list as §3.6 step 3 (Rules 6.25, 6.26).
 
 Also holds: sessions abandoned mid-intake, sessions whose photo upload never completed (E-3), and re-match confirmations raised by an approved catalog entry (Flow F).
 
@@ -890,7 +905,7 @@ Tabs:
 
 **What's on it — step 1, Contents.** Multi-select over containers and lots, each row showing fill, clock tier and condition flags. A live summary: record count, chemistries present, aggregate mass and energy where known, and **any damaged/defective record named explicitly**.
 
-**What's on it — step 2, Transport.** `RadioGroup` for transport mode. **This is where the air block lives.** With a damaged, defective or recalled record in scope, the Air option renders **visible and not selectable** with `HardBlockNotice` (§2.6) above it carrying all five required parts — statement, citation from the rule version, blocking records, the triggering indicator per record, and the three permitted paths (Rules 6.9, 6.10). Adding such a record after air was selected is blocked at assembly (Rule 6.13); confirming damage on a record already on an open air shipment removes it automatically, voids the paper, returns the shipment to a regenerate state and notifies P1 and P2 (Rule 6.14). **No override exists for any role, including P6** (Rules 6.8, 1.20). The server re-checks at commit.
+**What's on it — step 2, Transport.** `RadioGroup` for transport mode. **This is where the air block lives.** With a damaged, defective or recalled record in scope, the Air option renders **visible and not selectable** with `HardBlockNotice` (§2.6) above it carrying all five required parts — statement, citation from the rule version, blocking records, the triggering indicator per record, and the three permitted paths (Rules 6.9, 6.10). Adding such a record after air was selected is blocked at assembly (Rule 6.13); confirming damage or a recall on a record already on an open air shipment voids the paper, returns the shipment to regenerate, refuses departure and notifies P1 and P2; the record leaves when it is moved to quarantine (Rule 6.14). **No override exists for any role, including P6** (Rules 6.8, 1.20). The server re-checks at commit.
 
 **What's on it — step 3, Review and generate.** A **precondition checklist that names every unmet item** rather than a single "can't generate" message (Rule 5.3): unconfirmed identifications, records with no active classification, mode conflicts, an unverified 24-hour emergency number, missing destination or transporter details, and **missing shipping identifiers** — which are derived from the matched catalog entry plus the active classification, never free-typed and never guessed, so an unmatched record blocks here (Rule 5.9).
 
@@ -964,7 +979,7 @@ Then: the generated basic description per line; emergency response information f
 | **On success** | Navigates to the edit surface. |
 | **On failure** | Detail load failure → `critical` `Alert` + **Retry**. |
 
-**What's on it.** Manufacturer and model, chemistry, form factor, specification, certification marks, source and last-updated. A list of `battery_record`s matched to this entry, linked. No edit affordance renders for non-P6 roles.
+**What's on it.** Manufacturer and model, chemistry, form factor, specification, certification marks, source and last-updated. A list of `battery_record`s matched to this entry, linked. No edit affordance renders for non-P6 roles. A **Reference label photo** section, read-only, or "None on file" (Rule 2.36).
 
 **`[B1b]` reserves space for the format band — and reserves it as a *list*, not a field.** A format band is a `format_classification`, keyed on `(battery_record, jurisdiction, rule_version)`, because **the same battery classifies differently in different states** (`_ANCHORS.md` §3; Rule 3.5). B1a renders none. But B1a must not render a single organization-wide size or format value anywhere either — doing so bakes in exactly the assumption that entity exists to prevent, and B1b then has to unpick the screen instead of filling it in.
 
@@ -1027,6 +1042,8 @@ Then: the generated basic description per line; emergency response information f
 | **On failure** | Validation inline; the proposal stays queued. |
 
 **What's on it.** Two lists: **Proposals** (from intake catalog misses, with the proposing user, the linked `intake_photo` and label crop side by side with the proposed fields) and **All entries** (editable). Approve / Reject with a required reason. A rejected proposal changes no record: the battery it was proposed from is already logged on the manual path (E-5) and keeps its identification (D-49).
+
+For P6, `?entry=` gets a **Reference label photo** panel to upload or replace one (Rule 2.36). The rest of entry editing stays deferred (D-50).
 
 **shadcn:** Table, Card, Form, Input, Select, Dialog, AlertDialog, Badge, Button, Tabs.
 
