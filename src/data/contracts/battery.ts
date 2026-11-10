@@ -429,6 +429,13 @@ export interface IntakePhotoQuery extends BaseQuery {
    * Wants `index(organization_id, content_hash)` on `intake_photo`.
    */
   readonly contentHash?: Sha256;
+  /**
+   * Only photos that carry a look-alike fingerprint (Rule 2.37) — the copy
+   * check's candidates. Tenant-scoped, like `contentHash`. The mock compares
+   * every candidate; unit 17 wants a nearest-neighbour index on
+   * `look_fingerprint`, not a scan.
+   */
+  readonly hasLookFingerprint?: boolean;
 }
 
 export type IntakePhotoRepository = AppendOnlyRepository<

@@ -90,3 +90,16 @@ export const PLATFORM_RECALL_MATCH_CONFIGURATION = {
     "high-voltage battery",
   ],
 } as const;
+
+/**
+ * How close two look-alike fingerprints must be to count as a copy (Rule
+ * 2.37; D-40) — **the only place in `src/` this closeness exists.** Stated for
+ * the fixture vision provider's 64-bit scheme; unit 19's real fingerprint
+ * function gets its own row and version. Stamped on every copy check run by
+ * its version. Validated on every read by `validateLookAlikeConfiguration`.
+ */
+export const PLATFORM_LOOK_ALIKE_CONFIGURATION = {
+  configurationVersion: "look-alike-2026-11",
+  fingerprintScheme: "fixture64",
+  maxDifferingBits: 6,
+} as const;

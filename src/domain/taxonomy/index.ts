@@ -142,3 +142,7 @@ export * from "./accumulation-start-source";
 export * from "./storage-clock-subject-type";
 // T-64 · Clock start basis
 export * from "./clock-start-basis";
+// T-65 · Photo check kind
+export * from "./photo-check-kind";
+// T-66 · Photo check outcome
+export * from "./photo-check-outcome";

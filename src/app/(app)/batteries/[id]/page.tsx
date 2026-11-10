@@ -21,6 +21,8 @@ import { UNPLACED_RECORD_TIME_ZONE } from "@/features/battery-record/format-inst
 import { HistoryTab } from "@/features/battery-record/history-tab";
 import { OverviewTab } from "@/features/battery-record/overview-tab";
 import { PhotosTab } from "@/features/battery-record/photos-tab";
+import { readReassessmentSuggestions } from "@/features/photo-checks/server/suggestions";
+import { suggestionsView } from "@/features/photo-checks/suggestion-view";
 import { RecordActions } from "@/features/battery-record/record-actions";
 import { RecordHeader } from "@/features/battery-record/record-header";
 import {
@@ -154,6 +156,18 @@ export default async function BatteryRecordPage({
       : null;
 
   const canReassess = canWriteRoute(ctx.role, "/batteries/[id]");
+  // Rule 6.25 — what a re-assessment would show: proposals on photos attached
+  // since, which no assessment on the record has decided.
+  const reassessmentSuggestions = canReassess
+    ? suggestionsView(
+        await readReassessmentSuggestions(ctx, {
+          intakeSessionId: record.intakeSessionId,
+          assessments: assessments.items,
+          decisions: [],
+        }),
+        new Map(),
+      )
+    : undefined;
   // §2.6 — a recall is named as a recall, by its number.
   const confirmedRecalls = record.ddrFlags.includes("recalled")
     ? (
@@ -171,6 +185,9 @@ export default async function BatteryRecordPage({
       recordId={record.id}
       record={record}
       {...(currentAssessment === undefined ? {} : { currentAssessment })}
+      {...(reassessmentSuggestions === undefined
+        ? {}
+        : { suggestions: reassessmentSuggestions })}
     />
   );
 

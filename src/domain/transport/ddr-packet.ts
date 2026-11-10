@@ -11,6 +11,7 @@ import {
   DAMAGE_FINDING_TYPE_LABELS,
   DAMAGE_FINDING_TYPES,
 } from "@/domain/taxonomy/damage-finding-type";
+import { DAMAGE_ASSESSMENT_METHOD_LABELS } from "@/domain/taxonomy/damage-assessment-method";
 import { DDR_FLAG_LABELS, type DdrFlag } from "@/domain/taxonomy/ddr-flag";
 import { readTaxonomyValue } from "@/domain/taxonomy/lookup";
 
@@ -64,6 +65,13 @@ export interface DdrPacketRecordInput {
   readonly findings: readonly string[];
   /** Who confirmed that assessment, and when (Rule 6.6). */
   readonly assessedByName: string | null;
+  /**
+   * T-59 as stored, of that assessment. Only a recognised
+   * `model_assisted_visual` prints its label beside the findings (Rule 1.29);
+   * anything else — an unknown stored value included — prints nothing extra.
+   * Optional so a caller from before `b2-10` reads as none.
+   */
+  readonly assessmentMethod?: string | null;
   readonly assessedAt: IsoTimestamp | null;
   readonly containerCode: string;
   /** T-23 as stored. */
@@ -86,6 +94,8 @@ export type DdrPacketRecordEntry = {
   readonly chemistryLabel: string;
   readonly flagLabels: readonly string[];
   readonly findingLabels: readonly string[];
+  /** Rule 1.29 — the T-59 label, on a model-assisted finding only; null otherwise. */
+  readonly methodLabel: string | null;
   readonly assessedBy: string;
   readonly assessedAtText: string;
   readonly containerCode: string;
@@ -178,6 +188,10 @@ export function buildDdrPacketContent(input: DdrPacketInput): DdrPacketBuild {
       findingLabels: record.findings.map((finding) =>
         label(DAMAGE_FINDING_TYPES, DAMAGE_FINDING_TYPE_LABELS, finding),
       ),
+      methodLabel:
+        record.assessmentMethod === "model_assisted_visual"
+          ? DAMAGE_ASSESSMENT_METHOD_LABELS.model_assisted_visual
+          : null,
       assessedBy: record.assessedByName ?? NOT_RECORDED,
       assessedAtText:
         record.assessedAt === null

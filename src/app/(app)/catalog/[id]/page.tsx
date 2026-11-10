@@ -16,6 +16,8 @@ import { catalogEntryTitle } from "@/features/catalog/catalog-entry-display";
 import { CatalogEntrySections } from "@/features/catalog/components/catalog-entry-sections";
 import { EditEntryControl } from "@/features/catalog/components/edit-entry-control";
 import { MatchedRecords } from "@/features/catalog/components/matched-records";
+import { ReferencePhotoSection } from "@/features/catalog/components/reference-photo";
+import { readReferencePhotoView } from "@/features/catalog/server/reference-photo";
 
 /**
  * `/catalog/[id]` — `UX_SPEC.md` §3.16, `SITE_ARCHITECTURE.md` §2.5.
@@ -93,6 +95,10 @@ export default async function CatalogEntryPage({
       <CatalogEntrySections
         entry={entry}
         verifiedByName={await verifiedByName(ctx, entry)}
+      />
+
+      <ReferencePhotoSection
+        photo={await readReferencePhotoView(ctx, entry.id)}
       />
 
       <MatchedRecords

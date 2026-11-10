@@ -139,9 +139,14 @@ describe("the taxonomy", () => {
         // shape §4.5 forbids is the machine value shown in brackets; an English
         // word the label shares is not that shape. Exempt by name, so no other
         // system inherits the latitude.
+        // T-66 `failed` reads "Check failed", as planning authored it (D-75)
+        // — the same English-word case as T-48's, raised in b2-10's
+        // build-notes rather than reworded. Exempt by name, likewise.
         const ownerKeptLabel =
-          system.labels === taxonomy.ALERT_SEVERITY_LABELS &&
-          value === "attention";
+          (system.labels === taxonomy.ALERT_SEVERITY_LABELS &&
+            value === "attention") ||
+          (system.labels === taxonomy.PHOTO_CHECK_OUTCOME_LABELS &&
+            value === "failed");
         if (value.length >= 3 && !ownerKeptLabel) {
           expect(
             label.includes(value),
@@ -348,8 +353,9 @@ describe("the 24-hour number and the duplicate-photo check (D-63, TAXONOMY.md v1
 
 describe("the label-vs-catalog check and the lot's audit trail (D-68, TAXONOMY.md v1.7)", () => {
   it("appends T-52 label_catalog_mismatch after duplicate_photo, so no stored order moves", () => {
-    expect(taxonomy.REVIEW_REASON_CODES.at(-1)).toBe("label_catalog_mismatch");
-    expect(taxonomy.REVIEW_REASON_CODES.at(-2)).toBe("duplicate_photo");
+    // b2-10 appended its two after it (TAXONOMY.md v1.9).
+    expect(taxonomy.REVIEW_REASON_CODES.at(-3)).toBe("label_catalog_mismatch");
+    expect(taxonomy.REVIEW_REASON_CODES.at(-4)).toBe("duplicate_photo");
     expect(taxonomy.REVIEW_REASON_CODE_LABELS.label_catalog_mismatch).toBe(
       "Label disagrees with catalog",
     );

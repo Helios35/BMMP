@@ -1,3 +1,5 @@
+import type { ProposableFindingType } from "@/domain/photo-checks/damage-proposals";
+import type { LabelLookModelOutcome } from "@/domain/photo-checks/label-look";
 import {
   HARD_GATED_LABEL_FIELD_CODES,
   LABEL_FIELD_CODES,
@@ -123,10 +125,86 @@ export interface ExtractionRequest {
   readonly requestedFields: readonly LabelFieldKey[];
 }
 
+// --- the photo checks (b2-10; Rules 2.36, 2.37, 6.25) ------------------------------
+
+/** The versions of the shapes the photo checks' answers are validated against. */
+export const DAMAGE_PROPOSAL_SCHEMA_VERSION = "damage-proposal.v1";
+export const LABEL_LOOK_SCHEMA_VERSION = "label-look.v1";
+
+/**
+ * One stored image, as a photo check sends it. **EXIF has already been
+ * stripped** by the upload route (Rule 7.21). `fileName` is a hint the fixture
+ * keys on; a real provider reads the bytes.
+ */
+export interface PhotoImage {
+  readonly bytes: Uint8Array;
+  readonly mimeType: string;
+  readonly width: number;
+  readonly height: number;
+  readonly fileName: string | null;
+}
+
+/**
+ * The call's metering, when the provider reports it — tokens and cost, so cost
+ * and latency are recorded per call on `photo_check` (`TECHNICAL_SPEC.md`
+ * §12.2). **Never a judgment about the photo**: no score, similarity or
+ * distance has anywhere to go in these shapes.
+ */
+export type PhotoCheckUsage = ExtractionUsage;
+
+/**
+ * What the model proposed on one whole-pack or damage photo (Rule 6.25): T-29
+ * findings minus `none_observed`, and nothing else — **no number and no
+ * words**. The photo each was seen on is the request's own photo; the caller
+ * attaches it. An empty list is "nothing proposed", which is never "none
+ * observed".
+ */
+export interface DamageProposalResult {
+  readonly schemaVersion: string;
+  readonly findings: readonly ProposableFindingType[];
+  readonly providerCode: string;
+  readonly modelIdentifier: string;
+  readonly promptVersion: string;
+  readonly usage?: PhotoCheckUsage | null;
+}
+
+export interface LabelLookRequest {
+  /** The record's label crop, or its label photo when there is no crop. */
+  readonly photo: PhotoImage;
+  /** The matched catalog entry's current reference label photo. */
+  readonly reference: PhotoImage;
+}
+
+/** One closed outcome and no words (Rule 2.36). */
+export interface LabelLookResult {
+  readonly schemaVersion: string;
+  readonly outcome: LabelLookModelOutcome;
+  readonly providerCode: string;
+  readonly modelIdentifier: string;
+  readonly promptVersion: string;
+  readonly usage?: PhotoCheckUsage | null;
+}
+
 export interface VisionProvider {
   readonly code: string;
   detectLabelRegion(req: RegionRequest): Promise<RegionDetection | null>;
   extractLabelFields(req: ExtractionRequest): Promise<LabelExtractionResult>;
+  /**
+   * Rule 6.25 — T-29 findings (minus `none_observed`) seen on one whole-pack
+   * or damage photo. Anything outside that closed set is `malformed`.
+   */
+  proposeDamageFindings(image: PhotoImage): Promise<DamageProposalResult>;
+  /**
+   * Rule 2.36 — `looks_consistent` · `looks_different` · `cannot_compare`.
+   * A vendor's similarity number is turned into one of these inside the
+   * provider and never leaves it.
+   */
+  compareLabelToReference(req: LabelLookRequest): Promise<LabelLookResult>;
+  /**
+   * Rule 2.37 — a look-alike fingerprint, `<scheme>:<hex>`. **Deterministic**:
+   * the same image always gives the same fingerprint.
+   */
+  fingerprintPhoto(image: PhotoImage): Promise<string>;
 }
 
 export const VISION_PROVIDER_ERROR_CODES = [

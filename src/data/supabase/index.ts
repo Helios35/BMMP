@@ -103,6 +103,7 @@ export const supabaseAdapter: DataAdapter = {
     "readIntakeGateConfiguration",
     "readEmergencyContactConfiguration",
     "readRecallMatchConfiguration",
+    "readLookAlikeConfiguration",
   ]),
 
   jurisdictions: unimplemented("jurisdictions", [...CRUD, "chainFrom"]),
@@ -185,6 +186,13 @@ export const supabaseAdapter: DataAdapter = {
     "confirm",
     "dismiss",
     "record",
+  ]),
+  photoChecks: unimplemented("photoChecks", ["list", "record"]),
+  catalogReferencePhotos: unimplemented("catalogReferencePhotos", [
+    "current",
+    "get",
+    "list",
+    "set",
   ]),
   // `write` is the `security definer` door (§10.5, `app.write_audit_event()`).
   // It refuses here like everything else — an adapter that answered it silently

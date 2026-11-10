@@ -81,7 +81,7 @@ const FEDERAL_TRANSPORT_APPLIED: AppliedRuleVersion = {
   outcome: "shipping_paper_required",
 };
 
-const EMPTY_PASSPORT = {
+export const EMPTY_PASSPORT = {
   materialComposition: null,
   hazardousSubstances: null,
   criticalRawMaterials: null,
@@ -97,7 +97,7 @@ const EMPTY_PASSPORT = {
   passportExtension: null,
 } as const;
 
-const NO_PERFORMANCE = {
+export const NO_PERFORMANCE = {
   minVoltageV: null,
   maxVoltageV: null,
   originalPowerW: null,
@@ -109,7 +109,7 @@ const NO_PERFORMANCE = {
   certificationMarks: null,
 } as const;
 
-const NO_SOURCE_DEVICE = {
+export const NO_SOURCE_DEVICE = {
   sourceDeviceType: null,
   sourceDeviceIdentifier: null,
   sourceDeviceMake: null,
@@ -129,7 +129,7 @@ const NO_OVERRIDE = {
   ruleGapClosedByRuleVersionId: null,
 } as const;
 
-const NO_ASSESSMENT_INSTRUMENT = {
+export const NO_ASSESSMENT_INSTRUMENT = {
   evaluationTrace: null,
   modelProvider: null,
   modelIdentifier: null,

@@ -3,7 +3,11 @@ import type { ReactElement } from "react";
 
 import { ClassificationOutcome } from "@/components/classification/classification-outcome";
 import { FieldList } from "@/components/page";
-import { FieldSourceBadge } from "@/components/provenance/field-source-badge";
+import { AiSuggestedTag } from "@/components/ai/ai-suggested-tag";
+import {
+  FieldSourceBadge,
+  type FieldSource,
+} from "@/components/provenance/field-source-badge";
 import { StatusBadge } from "@/components/status/status-badge";
 import { StorageClockMeter } from "@/components/storage/storage-clock-meter";
 import { data } from "@/data";
@@ -118,7 +122,19 @@ export async function OverviewTab({
           })
         ).items[0];
 
-  const names = await resolveUserNames(ctx, [record.conditionConfirmedBy]);
+  // Rule 1.29 — a value the label read is the model's, confirmed by the
+  // person who committed the record; that person is named beside it.
+  const session =
+    record.intakeSessionId === null
+      ? null
+      : await data.intakeSessions.get(ctx, record.intakeSessionId);
+  const identifiedBy = session?.reviewedBy ?? record.createdBy ?? null;
+  const names = await resolveUserNames(ctx, [
+    record.conditionConfirmedBy,
+    identifiedBy,
+  ]);
+  const identifiedByName =
+    identifiedBy === null ? null : (names.get(identifiedBy) ?? null);
   // Rules 10.13–10.18 — the Recalls section, in the record's own zone.
   const recalls = await readRecallSection(
     ctx,
@@ -144,7 +160,8 @@ export async function OverviewTab({
           <FieldRow
             label="Manufacturer"
             source={
-              <FieldSourceBadge
+              <IdentitySource
+                confirmedByName={identifiedByName}
                 source={fieldSourceFor("manufacturerName", sourceInput)}
               />
             }
@@ -155,7 +172,8 @@ export async function OverviewTab({
           <FieldRow
             label="Model"
             source={
-              <FieldSourceBadge
+              <IdentitySource
+                confirmedByName={identifiedByName}
                 source={fieldSourceFor("modelName", sourceInput)}
               />
             }
@@ -166,7 +184,8 @@ export async function OverviewTab({
           <FieldRow
             label="Part number"
             source={
-              <FieldSourceBadge
+              <IdentitySource
+                confirmedByName={identifiedByName}
                 source={fieldSourceFor("partNumber", sourceInput)}
               />
             }
@@ -181,7 +200,8 @@ export async function OverviewTab({
           <FieldRow
             label="Serial number"
             source={
-              <FieldSourceBadge
+              <IdentitySource
+                confirmedByName={identifiedByName}
                 source={fieldSourceFor("serialNumber", sourceInput)}
               />
             }
@@ -248,7 +268,8 @@ export async function OverviewTab({
           <FieldRow
             label="Nominal voltage"
             source={
-              <FieldSourceBadge
+              <IdentitySource
+                confirmedByName={identifiedByName}
                 source={fieldSourceFor("nominalVoltageV", sourceInput)}
               />
             }
@@ -258,7 +279,8 @@ export async function OverviewTab({
           <FieldRow
             label="Rated capacity"
             source={
-              <FieldSourceBadge
+              <IdentitySource
+                confirmedByName={identifiedByName}
                 source={fieldSourceFor("ratedCapacityAh", sourceInput)}
               />
             }
@@ -268,7 +290,8 @@ export async function OverviewTab({
           <FieldRow
             label="Rated energy"
             source={
-              <FieldSourceBadge
+              <IdentitySource
+                confirmedByName={identifiedByName}
                 source={fieldSourceFor("ratedEnergyWh", sourceInput)}
               />
             }
@@ -466,4 +489,32 @@ function Un383({ record }: { readonly record: BatteryRecord }) {
   }
   if (record.hasUn383Summary === null) return <NotRecorded />;
   return <span>{record.hasUn383Summary ? "On file" : "Not on file"}</span>;
+}
+
+/**
+ * An identity value's source, and — where the label read supplied it — the
+ * **AI suggested** tag with who confirmed it (Rule 1.29). Never on chemistry,
+ * which no read supplies (Rules 2.9, 2.10): `ChemistryRow` does not use this.
+ */
+function IdentitySource({
+  source,
+  confirmedByName,
+}: {
+  readonly source: FieldSource;
+  readonly confirmedByName: string | null;
+}) {
+  return (
+    <span className="flex flex-wrap items-center gap-2">
+      <FieldSourceBadge source={source} />
+      {source === "read_from_label" ? (
+        <AiSuggestedTag
+          decision={
+            confirmedByName === null
+              ? null
+              : { verb: "confirmed", byName: confirmedByName }
+          }
+        />
+      ) : null}
+    </span>
+  );
 }

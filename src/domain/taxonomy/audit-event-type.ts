@@ -48,6 +48,11 @@
  * `recall_match.dismissed`** were authored by planning (D-73) and added at
  * TAXONOMY.md v1.8: every check run, a candidate written as a possible match,
  * and the three human decisions on one (Rules 10.14–10.18).
+ * **`photo_check.completed`, `photo_check.failed` and
+ * `catalog_entry.reference_photo_set`** were authored by planning (D-75) and
+ * added at TAXONOMY.md v1.9: every photo check run, a failed one with its
+ * reason (Rule 6.26), and P6 setting or replacing an entry's reference label
+ * photo (Rule 2.36).
  *
  * **Never invent a value.** If one is needed and is not here, it does not exist
  * yet — raise it to P6 (TAXONOMY.md §1.1).
@@ -61,11 +66,14 @@ export const AUDIT_EVENT_TYPES = [
   "catalog_entry.proposed",
   "catalog_entry.status_changed",
   "catalog_entry.updated",
+  "catalog_entry.reference_photo_set",
   "battery_record.routed_to_review",
   "battery_record.confirmed",
   "battery_record.status_changed",
   "classification_decision.recorded",
   "damage_assessment.recorded",
+  "photo_check.completed",
+  "photo_check.failed",
   "battery_record.ddr_flag_set",
   "recall_check.completed",
   "recall_check.failed",
@@ -118,11 +126,14 @@ export const AUDIT_EVENT_TYPE_LABELS: Readonly<Record<AuditEventType, string>> =
     "catalog_entry.proposed": "Catalog entry proposed",
     "catalog_entry.status_changed": "Catalog entry status changed",
     "catalog_entry.updated": "Catalog entry edited",
+    "catalog_entry.reference_photo_set": "Reference photo set",
     "battery_record.routed_to_review": "Routed to review",
     "battery_record.confirmed": "Identification confirmed",
     "battery_record.status_changed": "Record status changed",
     "classification_decision.recorded": "Waste classification recorded",
     "damage_assessment.recorded": "Damage assessment recorded",
+    "photo_check.completed": "Photo check completed",
+    "photo_check.failed": "Photo check failed",
     "battery_record.ddr_flag_set": "DDR flag set",
     "recall_check.completed": "Recall check completed",
     "recall_check.failed": "Recall check failed",

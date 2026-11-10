@@ -35,6 +35,10 @@ import type {
 } from "./documents";
 import type { DamageAssessmentRepository } from "./condition";
 import type { RecallRepository } from "./recalls";
+import type {
+  CatalogReferencePhotoRepository,
+  PhotoCheckRepository,
+} from "./photo-checks";
 import type { AuditEventRepository } from "./audit";
 import type { IdentityRepository } from "./identity";
 import type { PlatformConfigurationRepository } from "./platform-configuration";
@@ -149,6 +153,12 @@ export interface DataAdapter {
   // recall_match and its check runs are b2-09's (D-73).
   readonly damageAssessments: DamageAssessmentRepository;
   readonly recalls: RecallRepository;
+  /**
+   * The photo checks — `photo_check` runs and the catalog's reference label
+   * photos, both argued for unit 17 (Rules 2.36, 2.37, 6.25; D-75).
+   */
+  readonly photoChecks: PhotoCheckRepository;
+  readonly catalogReferencePhotos: CatalogReferencePhotoRepository;
 
   // Evidence and audit — ERD.md §10.2. evidence_pack is B1b (D-24).
   readonly auditEvents: AuditEventRepository;
@@ -191,3 +201,4 @@ export * from "./audit";
 export * from "./platform-configuration";
 export * from "./jobs";
 export * from "./recalls";
+export * from "./photo-checks";

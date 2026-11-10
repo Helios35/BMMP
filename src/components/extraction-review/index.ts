@@ -16,6 +16,11 @@ export {
 } from "./extraction-review-card";
 export { FieldRow, FieldRowSkeleton, chemistryRowSource } from "./field-row";
 export { GateBanner } from "./gate-banner";
+export {
+  PhotoPair,
+  IMAGE_NOT_AVAILABLE,
+  type PhotoPairItem,
+} from "./photo-pair";
 export { ReviewActionBar, OutstandingChecklist } from "./action-bar";
 export { CatalogMatchPanel } from "./catalog-match-panel";
 export { NoReadState } from "./no-read-state";

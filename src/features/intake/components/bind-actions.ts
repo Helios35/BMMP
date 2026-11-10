@@ -10,6 +10,7 @@ import {
   chooseIntakeLot,
   choosePlacement,
   confirmCondition,
+  decideDamageSuggestion,
   confirmField,
   confirmIntake,
   createContainerForIntake,
@@ -285,6 +286,12 @@ export interface PlacementActions {
     isDefective: boolean,
   ) => Promise<ActionResult<unknown>>;
   readonly confirmCondition: () => Promise<ActionResult<unknown>>;
+  /** Rule 6.25 — accept or reject one AI-suggested finding. */
+  readonly decideSuggestion: (
+    photoCheckId: string,
+    findingType: string,
+    decision: "accepted" | "rejected",
+  ) => Promise<ActionResult<unknown>>;
   readonly setStateOfCharge: (
     value: DraftStateOfCharge,
   ) => Promise<ActionResult<unknown>>;
@@ -328,6 +335,15 @@ export function bindPlacementActions(
         }),
       ),
     confirmCondition: () => write(() => confirmCondition({ sessionId })),
+    decideSuggestion: (photoCheckId, findingType, decision) =>
+      write(() =>
+        decideDamageSuggestion({
+          sessionId,
+          photoCheckId,
+          findingType,
+          decision,
+        }),
+      ),
     setStateOfCharge: (value) =>
       write(() =>
         setStateOfCharge({

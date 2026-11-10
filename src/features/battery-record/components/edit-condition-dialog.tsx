@@ -6,6 +6,14 @@ import { CircleAlert } from "lucide-react";
 import { toast } from "sonner";
 
 import { PhotoCaptureInput } from "@/components/capture/photo-capture-input";
+import {
+  DamageSuggestions,
+  hasUndecidedSuggestion,
+  SUGGESTIONS_UNDECIDED_REASON,
+  type DamageSuggestionView,
+  type DamageSuggestionsView,
+  type SuggestionDecision,
+} from "@/components/condition/damage-suggestions";
 import { ACTION_BUTTON_CLASS } from "@/components/page";
 import { INTENT_SURFACE_CLASSES } from "@/components/status/intent-classes";
 import { StatusBadge } from "@/components/status/status-badge";
@@ -71,6 +79,9 @@ export const CONDITION_GATE_NOTICE =
 export const CLEARING_PHOTO_REQUIRED =
   "A damaged finding clears only with a stated reason and at least one supporting photo. The photo is kept as clearing evidence beside both assessments.";
 
+/** Who a decision in the open dialog is by, before the save names them on the record. */
+const DECIDED_BY_YOU = "you";
+
 export const NO_SESSION_FOR_PHOTO =
   "This record has no intake session to attach a photo to.";
 
@@ -81,6 +92,11 @@ export interface ConditionDialogFacts {
   readonly currentStatus: DamageAssessmentStatus | null;
   readonly currentFindings: readonly DamageFindingType[];
   readonly currentIsDefective: boolean;
+  /**
+   * Rule 6.25 — the AI-suggested findings on photos attached since the last
+   * assessment, none decided yet. Absent reads as none.
+   */
+  readonly suggestions?: DamageSuggestionsView;
 }
 
 export type RecordDamageAssessmentAction = (
@@ -127,6 +143,23 @@ export function EditConditionDialog({
   const [isUploading, setIsUploading] = useState(false);
   const [isPending, setIsPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Rule 6.25 — the person's decision on each suggestion, kept until the save
+  // writes them all onto the new assessment (Rule 7.25).
+  const [decisions, setDecisions] = useState<
+    ReadonlyMap<string, SuggestionDecision>
+  >(new Map());
+  const suggestionRows = facts.suggestions?.rows ?? [];
+  const suggestions: DamageSuggestionsView = {
+    unavailable: facts.suggestions?.unavailable ?? false,
+    rows: suggestionRows.map((row) => {
+      const decision = decisions.get(row.key) ?? null;
+      return {
+        ...row,
+        decision,
+        decidedByName: decision === null ? null : DECIDED_BY_YOU,
+      };
+    }),
+  };
 
   const determination = derive(findings, isDefective);
   const hasPrior = facts.currentStatus !== null;
@@ -139,6 +172,9 @@ export function EditConditionDialog({
   // The reason checklist beneath the primary — one line per thing still
   // outstanding, so a disabled save is never silent (§2.1.4, Rule 1.26).
   const outstanding: string[] = [];
+  if (hasUndecidedSuggestion(suggestions)) {
+    outstanding.push(SUGGESTIONS_UNDECIDED_REASON);
+  }
   if (determination === null) outstanding.push("Choose at least one finding.");
   if (hasPrior && reason.trim() === "") {
     outstanding.push("State why the assessed condition is changing.");
@@ -161,6 +197,40 @@ export function EditConditionDialog({
       if (finding === "none_observed") return ["none_observed"];
       return [...current.filter((item) => item !== "none_observed"), finding];
     });
+  }
+
+  /**
+   * Accept puts the finding in the set, as ticking it would; reject leaves the
+   * set alone unless it takes back what this suggestion's acceptance added
+   * (`decideProposal`'s rule, kept locally until the save).
+   */
+  async function decideSuggestion(
+    row: DamageSuggestionView,
+    decision: SuggestionDecision,
+  ): Promise<{ readonly ok: true; readonly data: null }> {
+    const previous = decisions.get(row.key) ?? null;
+    const next = new Map(decisions);
+    next.set(row.key, decision);
+    setDecisions(next);
+    const finding = row.findingType as DamageFindingType;
+    if (decision === "accepted") {
+      setFindings((current) =>
+        current.includes(finding)
+          ? current.filter((item) => item !== "none_observed")
+          : [...current.filter((item) => item !== "none_observed"), finding],
+      );
+    } else if (previous === "accepted") {
+      const stillAccepted = suggestionRows.some(
+        (other) =>
+          other.key !== row.key &&
+          other.findingType === row.findingType &&
+          next.get(other.key) === "accepted",
+      );
+      if (!stillAccepted) {
+        setFindings((current) => current.filter((item) => item !== finding));
+      }
+    }
+    return { ok: true, data: null };
   }
 
   async function attachClearingPhoto(file: File): Promise<void> {
@@ -190,6 +260,18 @@ export function EditConditionDialog({
       isDefective,
       reason: reason.trim() === "" ? null : reason.trim(),
       clearingPhotoIntakePhotoId: photo?.intakePhotoId ?? null,
+      proposalDecisions: suggestionRows.flatMap((row) => {
+        const decision = decisions.get(row.key);
+        return decision === undefined
+          ? []
+          : [
+              {
+                photoCheckId: row.photoCheckId,
+                findingType: row.findingType,
+                decision,
+              },
+            ];
+      }),
     });
     setIsPending(false);
     if (!result.ok) {
@@ -222,6 +304,8 @@ export function EditConditionDialog({
             set, never chosen.
           </DialogDescription>
         </DialogHeader>
+
+        <DamageSuggestions view={suggestions} onDecide={decideSuggestion} />
 
         <fieldset className="grid gap-2">
           <legend className="text-label">Findings</legend>

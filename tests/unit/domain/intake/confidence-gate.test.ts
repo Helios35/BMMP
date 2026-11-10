@@ -62,6 +62,8 @@ function input(patch: Partial<GateInput> = {}): GateInput {
     extractionFailed: false,
     duplicatePhoto: false,
     labelCatalogMismatch: false,
+    labelLookDiffers: false,
+    photoLooksReused: false,
     ...patch,
   };
 }
@@ -309,6 +311,43 @@ describe("evaluateConfidenceGate", () => {
     expect(strict.reasonCodes).toEqual([
       "catalog_match_score_below_threshold",
       "catalog_match_ambiguous",
+    ]);
+  });
+});
+
+describe("the photo checks at the gate (Rules 2.36, 2.37; D-75 #7)", () => {
+  it("routes the whole record on a label that looks different from its reference", () => {
+    const verdict = evaluateConfidenceGate(
+      input({ labelLookDiffers: true }),
+      THRESHOLDS,
+    );
+    expect(verdict.isReviewRequired).toBe(true);
+    expect(verdict.reasonCodes).toEqual(["label_look_differs"]);
+  });
+
+  it("routes the whole record on a photo that looks like a copy of one on another record", () => {
+    const verdict = evaluateConfidenceGate(
+      input({ photoLooksReused: true }),
+      THRESHOLDS,
+    );
+    expect(verdict.reasonCodes).toEqual(["photo_looks_reused"]);
+  });
+
+  it("stores both after every earlier reason, in T-52 order", () => {
+    const verdict = evaluateConfidenceGate(
+      input({
+        photoLooksReused: true,
+        labelLookDiffers: true,
+        duplicatePhoto: true,
+        labelCatalogMismatch: true,
+      }),
+      THRESHOLDS,
+    );
+    expect(verdict.reasonCodes).toEqual([
+      "duplicate_photo",
+      "label_catalog_mismatch",
+      "label_look_differs",
+      "photo_looks_reused",
     ]);
   });
 });

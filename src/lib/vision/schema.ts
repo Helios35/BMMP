@@ -1,11 +1,21 @@
 import { z } from "zod";
 
 import {
+  isProposableFindingType,
+  PROPOSABLE_FINDING_TYPES,
+} from "@/domain/photo-checks/damage-proposals";
+import { LABEL_LOOK_MODEL_OUTCOMES } from "@/domain/photo-checks/label-look";
+
+import {
+  DAMAGE_PROPOSAL_SCHEMA_VERSION,
   LABEL_EXTRACTION_SCHEMA_VERSION,
   LABEL_FIELD_KEYS,
+  LABEL_LOOK_SCHEMA_VERSION,
   VisionProviderError,
+  type DamageProposalResult,
   type LabelExtractionResult,
   type LabelFieldKey,
+  type LabelLookResult,
 } from "./provider";
 
 /**
@@ -115,3 +125,63 @@ export function parseLabelExtractionResult(
 export const validatedResultIsContract = (
   validated: ValidatedLabelExtractionResult,
 ): LabelExtractionResult => validated;
+
+// --- the photo checks (b2-10; Rules 2.36, 2.37, 6.25; D-75 #5) --------------------
+//
+// **No number and no model-written words survive this boundary.** Every answer
+// is a strict object of closed values: a finding outside T-29-minus-
+// `none_observed`, an outcome outside the three the model may give, an extra key
+// carrying a note, or a number where a value belongs is `malformed` — refused
+// whole, never trimmed to what fits. The raw response is not kept anywhere.
+
+const damageProposalResultSchema = z.strictObject({
+  schemaVersion: z.literal(DAMAGE_PROPOSAL_SCHEMA_VERSION),
+  findings: z.array(z.enum(PROPOSABLE_FINDING_TYPES as [string, ...string[]])),
+  providerCode: z.string().min(1),
+  modelIdentifier: z.string().min(1),
+  promptVersion: z.string().min(1),
+  usage: usageSchema.nullable().optional(),
+});
+
+const labelLookResultSchema = z.strictObject({
+  schemaVersion: z.literal(LABEL_LOOK_SCHEMA_VERSION),
+  outcome: z.enum(LABEL_LOOK_MODEL_OUTCOMES),
+  providerCode: z.string().min(1),
+  modelIdentifier: z.string().min(1),
+  promptVersion: z.string().min(1),
+  usage: usageSchema.nullable().optional(),
+});
+
+/** `<scheme>:<hex>` — a fixed-length hex digest under a named scheme. */
+const fingerprintSchema = z
+  .string()
+  .regex(/^[a-z0-9-]+:[0-9a-f]{8,128}$/, "not a <scheme>:<hex> fingerprint");
+
+function refuse(what: string, error: z.ZodError): never {
+  throw new VisionProviderError(
+    "malformed",
+    `The ${what} response did not match its schema: ${describeIssues(error)}`,
+  );
+}
+
+/** Validate a damage-proposal answer, or throw `VisionProviderError("malformed")`. */
+export function parseDamageProposalResult(raw: unknown): DamageProposalResult {
+  const parsed = damageProposalResultSchema.safeParse(raw);
+  if (!parsed.success) refuse("damage-proposal", parsed.error);
+  const findings = parsed.data.findings.filter(isProposableFindingType);
+  return { ...parsed.data, findings: [...new Set(findings)] };
+}
+
+/** Validate a label-look answer, or throw `VisionProviderError("malformed")`. */
+export function parseLabelLookResult(raw: unknown): LabelLookResult {
+  const parsed = labelLookResultSchema.safeParse(raw);
+  if (!parsed.success) refuse("label-look", parsed.error);
+  return parsed.data;
+}
+
+/** Validate a fingerprint, or throw `VisionProviderError("malformed")`. */
+export function parseLookFingerprint(raw: unknown): string {
+  const parsed = fingerprintSchema.safeParse(raw);
+  if (!parsed.success) refuse("fingerprint", parsed.error);
+  return parsed.data;
+}

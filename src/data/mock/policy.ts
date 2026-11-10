@@ -63,6 +63,8 @@ export type PolicyTable =
   | "damage_assessment"
   | "recall_match"
   | "recall_check"
+  | "photo_check"
+  | "catalog_reference_photo"
   | "audit_event";
 
 export type PolicyAction = "select" | "insert" | "update";
@@ -178,6 +180,11 @@ export const POLICY_MATRIX: Readonly<Record<PolicyTable, PolicyRow>> = {
   },
   // Check runs are append-only and written by the check, never typed.
   recall_check: { select: R, insert: [], update: [] },
+  // Photo check runs are the check's, through the definer door, never typed
+  // (Rule 12.5); the door itself refuses a role that cannot set one running.
+  photo_check: { select: R, insert: [], update: [] },
+  // A platform table: every member reads, only P6 writes (Rule 2.36; D-75).
+  catalog_reference_photo: { select: R, insert: [], update: [] },
 
   // Read is P2, P5, P6 only — P1 cannot read the audit log (Rule 12.8).
   // Written by trigger under security definer, never by a user statement, which

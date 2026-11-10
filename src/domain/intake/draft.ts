@@ -18,6 +18,12 @@ import type {
   DraftSourceDevice,
   IntakeDraft,
 } from "@/types/intake";
+import {
+  decideProposal,
+  type DamageProposal,
+  type ProposalDecisionValue,
+} from "@/domain/photo-checks/damage-proposals";
+
 import type { CommitFieldState } from "./commit-gate";
 import type { DateCodeDecodeResult } from "./date-code";
 
@@ -438,6 +444,48 @@ export function setDraftCondition(
       isDefective,
       confirmedBy: by?.userId ?? null,
       confirmedAt: by?.at ?? null,
+      // The decisions on AI suggestions stand whatever else the person ticks
+      // (Rule 7.25); only `decideDraftProposal` changes them.
+      ...(draft.condition?.proposalDecisions === undefined
+        ? {}
+        : { proposalDecisions: draft.condition.proposalDecisions }),
+    },
+  };
+}
+
+/**
+ * A person accepts or rejects one AI-suggested finding (Rule 6.25). Accepting
+ * puts the finding in the set as ticking it would; nothing was in the set
+ * before (nothing is pre-ticked). Any decision re-opens a confirmed condition,
+ * as any change to the findings does — the person confirms what they now see.
+ * The set may be left empty by a rejection; confirming it is then refused
+ * until the person records what they observed.
+ */
+export function decideDraftProposal(
+  draft: IntakeDraft,
+  proposal: DamageProposal,
+  decision: ProposalDecisionValue,
+  by: DraftActor,
+): IntakeDraft {
+  assertActor(by);
+  const condition = draft.condition;
+  const decided = decideProposal(
+    {
+      findings: condition?.findingTypes ?? [],
+      decisions: condition?.proposalDecisions ?? [],
+    },
+    proposal,
+    decision,
+    by,
+  );
+  return {
+    ...draft,
+    condition: {
+      findingTypes: [...decided.findings],
+      isDefective: condition?.isDefective ?? false,
+      confirmedBy: null,
+      confirmedAt: null,
+      proposalDecisions: [...decided.decisions],
     },
   };
 }

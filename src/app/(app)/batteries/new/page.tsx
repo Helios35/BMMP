@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 
-import { formatInstant } from "@/components/extraction-review";
 import { PageHeader, PageShell } from "@/components/page";
 import { data } from "@/data";
 import { canReadRoute } from "@/domain/access/route-capability";
@@ -18,7 +17,6 @@ import {
   IntakeGraceNotice,
 } from "@/features/consent/components/intake-blocked-notice";
 import { readIntakeGate } from "@/features/consent/read-intake-gate";
-import { resolveUserNames } from "@/features/battery-record/user-names";
 import { ConfirmAndPlaceStep } from "@/features/intake/components/confirm-and-place-step";
 import { ExtractionReviewStep } from "@/features/intake/components/extraction-review-step";
 import {
@@ -49,6 +47,7 @@ import {
   requiredTypeLabel,
   reviewCardView,
   reviewPlaceholders,
+  readConditionView,
   summaryFields,
   WHO_CAN_CREATE_CONTAINER,
 } from "@/features/intake/server/step-views";
@@ -261,30 +260,14 @@ export default async function LogBatteryPage({
   }
 
   const asOf = nowIso();
-  const confirmedBy = view.draft.condition?.confirmedBy ?? null;
-  const names = await resolveUserNames(ctx, [confirmedBy]);
-  const confirmedAt = view.draft.condition?.confirmedAt ?? null;
+  const condition = await readConditionView(ctx, view);
 
   return (
     <ConfirmAndPlaceStep
       frame={frame}
       sessionId={view.session.id}
       uploadUrl={UPLOAD_URL}
-      condition={{
-        findings: view.draft.condition?.findingTypes ?? [],
-        isDefective: view.draft.condition?.isDefective ?? false,
-        confirmed:
-          confirmedBy === null || confirmedAt === null
-            ? null
-            : {
-                byName:
-                  names.get(confirmedBy) ??
-                  (confirmedBy === ctx.userId
-                    ? (view.viewer.fullName ?? "you")
-                    : "a colleague"),
-                at: formatInstant(confirmedAt, view.site.timeZone),
-              },
-      }}
+      condition={condition}
       stateOfCharge={view.draft.stateOfCharge}
       sourceDevice={view.draft.sourceDevice}
       placement={{

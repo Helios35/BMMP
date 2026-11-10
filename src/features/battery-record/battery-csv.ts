@@ -11,6 +11,10 @@ import {
   CELL_FORM_FACTOR_LABELS,
 } from "@/domain/taxonomy/cell-form-factor";
 import { CHEMISTRIES, CHEMISTRY_LABELS } from "@/domain/taxonomy/chemistry";
+import {
+  DAMAGE_ASSESSMENT_METHOD_LABELS,
+  DAMAGE_ASSESSMENT_METHODS,
+} from "@/domain/taxonomy/damage-assessment-method";
 import { DDR_FLAG_LABELS } from "@/domain/taxonomy/ddr-flag";
 import {
   RECALL_MATCH_STATUSES,
@@ -56,7 +60,17 @@ export const BATTERY_CSV_HEADERS = [
   "Status",
   "Catalog matched",
   "Recall associations",
+  "Identified by",
+  "Damage assessed by",
 ] as const;
+
+/**
+ * Rule 1.29 — **Identified by**: a record whose identity the label read
+ * supplied (a model, confirmed by a person at the gate) or one a person typed.
+ * `UX_SPEC.md` §3.5 words both.
+ */
+export const IDENTIFIED_BY_MODEL = "AI suggested, confirmed by a person";
+export const IDENTIFIED_BY_PERSON = "Entered by a person";
 
 function label<T extends string>(
   values: readonly T[],
@@ -77,6 +91,16 @@ export interface BatteryCsvContext {
    * stay visible "in every export". Absent reads as none.
    */
   readonly recallsByRecordId?: ReadonlyMap<string, readonly RecallMatch[]>;
+  /**
+   * Rule 1.29 — the records whose session's label read supplied at least one
+   * value. Absent reads as none: every record exports "Entered by a person".
+   */
+  readonly identifiedByModelRecordIds?: ReadonlySet<string>;
+  /**
+   * T-59 as stored, of each record's current assessment. A value outside
+   * T-59 exports as stored and is never read as model-assisted (STATE §7 #1).
+   */
+  readonly assessmentMethodByRecordId?: ReadonlyMap<string, string>;
 }
 
 /** `26-041 (Possible match — needs review)`; a withdrawal says so. Never a number about the match. */
@@ -133,5 +157,13 @@ export function batteryCsvRow(
     label(BATTERY_RECORD_STATUSES, BATTERY_RECORD_STATUS_LABELS, record.status),
     record.catalogEntryId === null ? "No" : "Yes",
     recallAssociations(context.recallsByRecordId?.get(record.id) ?? []),
+    context.identifiedByModelRecordIds?.has(record.id) === true
+      ? IDENTIFIED_BY_MODEL
+      : IDENTIFIED_BY_PERSON,
+    label(
+      DAMAGE_ASSESSMENT_METHODS,
+      DAMAGE_ASSESSMENT_METHOD_LABELS,
+      context.assessmentMethodByRecordId?.get(record.id) ?? null,
+    ),
   ];
 }

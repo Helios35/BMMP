@@ -4,6 +4,7 @@ import Link from "next/link";
 import type { ReactElement } from "react";
 import { Clock } from "lucide-react";
 
+import { AiSuggestedTag } from "@/components/ai/ai-suggested-tag";
 import { INTENT_SURFACE_CLASSES } from "@/components/status/intent-classes";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { readTaxonomyValue } from "@/domain/taxonomy/lookup";
@@ -19,7 +20,14 @@ import {
   LABEL_CATALOG_ENTRY,
   LABEL_CATALOG_FIELD,
   LABEL_CATALOG_INTRO,
+  LABEL_LOOK_INTRO,
+  LABEL_LOOK_REFERENCE,
+  LABEL_LOOK_THIS_LABEL,
   LABEL_SAYS,
+  PHOTO_REUSE_AFTER,
+  PHOTO_REUSE_BEFORE,
+  PHOTO_REUSE_THIS,
+  photoReuseOther,
   needsReviewTitle,
   NEEDS_REVIEW_TITLE_NO_FIELDS,
   RESOLVE_NOW,
@@ -31,10 +39,13 @@ import {
   ReviewButton,
   useActionCall,
 } from "./review-controls";
+import { PhotoPair } from "./photo-pair";
 import type {
   ExtractionReviewActions,
   ExtractionReviewGate,
   LabelCatalogDisagreementView,
+  LabelLookDifferenceView,
+  PhotoReuseRecordView,
 } from "./types";
 
 /**
@@ -121,6 +132,12 @@ export function GateBanner({
         gate.labelCatalog.rows.length === 0 ? null : (
           <LabelCatalogDisagreement view={gate.labelCatalog} />
         )}
+        {gate.labelLook === undefined || gate.labelLook === null ? null : (
+          <LabelLookDifference view={gate.labelLook} />
+        )}
+        {(gate.photoReuse ?? []).length === 0 ? null : (
+          <PhotoReuse records={gate.photoReuse ?? []} />
+        )}
         {reasons.length === 0 ? null : (
           <ul data-gate-reasons="true" className="flex flex-wrap gap-2">
             {reasons.map((reason) => (
@@ -165,6 +182,84 @@ export function GateBanner({
         )}
       </AlertDescription>
     </Alert>
+  );
+}
+
+/**
+ * Rule 2.36 — **This label** beside **Catalog reference**, tagged AI
+ * suggested, the entry linked. The person decides with the card's three
+ * choices: keep this entry, pick another, or enter manually. No number.
+ */
+function LabelLookDifference({
+  view,
+}: {
+  readonly view: LabelLookDifferenceView;
+}): ReactElement {
+  return (
+    <div data-label-look="true" className="grid gap-2">
+      <div className="flex flex-wrap items-center gap-2">
+        <p className="max-w-[72ch] text-body">{LABEL_LOOK_INTRO}</p>
+        <AiSuggestedTag />
+      </div>
+      <p className="text-body">
+        {`${LABEL_CATALOG_ENTRY}: `}
+        <Link
+          href={view.entryHref}
+          data-label-look-entry="true"
+          className="underline underline-offset-4"
+        >
+          {view.entryTitle}
+        </Link>
+      </p>
+      <PhotoPair
+        first={{ caption: LABEL_LOOK_THIS_LABEL, image: view.thisLabel }}
+        second={{ caption: LABEL_LOOK_REFERENCE, image: view.reference }}
+      />
+    </div>
+  );
+}
+
+/**
+ * Rule 2.37 — the photo beside the one on the other record, the record
+ * linked. A fingerprint is not a model's judgment, so no AI tag (D-75 #8).
+ */
+function PhotoReuse({
+  records,
+}: {
+  readonly records: readonly PhotoReuseRecordView[];
+}): ReactElement {
+  return (
+    <ul data-photo-reuse="true" className="grid gap-4">
+      {records.map((record) => (
+        <li
+          key={record.id}
+          data-photo-reuse-record={record.id}
+          className="grid gap-2"
+        >
+          <p className="max-w-[72ch] text-body">
+            {PHOTO_REUSE_BEFORE}
+            {record.href === null ? (
+              <span className="font-mono">{record.recordNumber}</span>
+            ) : (
+              <Link
+                href={record.href}
+                className="font-mono underline underline-offset-4"
+              >
+                {record.recordNumber}
+              </Link>
+            )}
+            {PHOTO_REUSE_AFTER}
+          </p>
+          <PhotoPair
+            first={{ caption: PHOTO_REUSE_THIS, image: record.thisPhoto }}
+            second={{
+              caption: photoReuseOther(record.recordNumber),
+              image: record.otherPhoto,
+            }}
+          />
+        </li>
+      ))}
+    </ul>
   );
 }
 

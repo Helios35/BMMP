@@ -52,6 +52,13 @@ import {
   readCatalogProposals,
 } from "@/features/catalog-admin/server/proposals";
 import { SettingsSection } from "@/features/settings/components/settings-primitives";
+import { ReferencePhotoPanel } from "@/features/catalog-admin/components/reference-photo-panel";
+import {
+  REFERENCE_PHOTO_DESCRIPTION,
+  REFERENCE_PHOTO_TITLE,
+} from "@/features/catalog/components/reference-photo";
+import { readReferencePhotoView } from "@/features/catalog/server/reference-photo";
+import { catalogEntryTitle } from "@/features/catalog/catalog-entry-display";
 import { SettingsSectionNav } from "@/features/settings/components/settings-section-nav";
 import { requireRoute } from "@/lib/auth/guard";
 
@@ -85,8 +92,29 @@ const SECTIONS = [
   { id: ENTRIES_ID, label: ENTRIES_SECTION },
 ] as const;
 
-export default async function CatalogAdministrationPage() {
+type SearchParams = Readonly<Record<string, string | string[] | undefined>>;
+
+function firstParam(value: string | string[] | undefined): string | null {
+  const single = Array.isArray(value) ? value[0] : value;
+  return single === undefined || single.trim() === "" ? null : single.trim();
+}
+
+const REFERENCE_ID = "reference-photo";
+
+export default async function CatalogAdministrationPage({
+  searchParams,
+}: PageProps<"/settings/catalog">) {
   const { ctx } = await requireRoute("/settings/catalog");
+  const params: SearchParams = await searchParams;
+  // §3.19 — `?entry=` opens the entry's Reference label photo panel (Rule
+  // 2.36). An id that names no entry opens nothing rather than an empty panel.
+  const entryId = firstParam(params.entry);
+  const focusEntry =
+    entryId === null ? null : await data.catalogEntries.get(ctx, entryId);
+  const focusReference =
+    focusEntry === null
+      ? null
+      : await readReferencePhotoView(ctx, focusEntry.id);
 
   const organization = await data.organizations.get(ctx, ctx.organizationId);
   if (organization === null) {
@@ -113,11 +141,33 @@ export default async function CatalogAdministrationPage() {
       <PageColumns
         aside={
           <SettingsSectionNav
-            sections={SECTIONS}
+            sections={
+              focusEntry === null
+                ? SECTIONS
+                : [
+                    { id: REFERENCE_ID, label: REFERENCE_PHOTO_TITLE },
+                    ...SECTIONS,
+                  ]
+            }
             label="Catalog administration sections"
           />
         }
       >
+        {focusEntry === null ? null : (
+          <SettingsSection
+            id={REFERENCE_ID}
+            title={`${REFERENCE_PHOTO_TITLE} — ${catalogEntryTitle(focusEntry)}`}
+            description={REFERENCE_PHOTO_DESCRIPTION}
+            dataAttributes={{ "data-reference-entry": focusEntry.id }}
+          >
+            <SectionCard>
+              <ReferencePhotoPanel
+                catalogEntryId={focusEntry.id}
+                current={focusReference}
+              />
+            </SectionCard>
+          </SettingsSection>
+        )}
         <SettingsSection
           id={PROPOSALS_ID}
           title={PROPOSALS_SECTION}
@@ -189,6 +239,15 @@ export default async function CatalogAdministrationPage() {
                         >
                           {`${IDENTITY_COLUMN}: ${identityText(entry.identity)}`}
                         </span>
+                        {/* Rule 2.36 — the entry's reference label photo, on
+                            this page's own `?entry=` (D-75 #2). */}
+                        <Link
+                          href={`/settings/catalog?entry=${encodeURIComponent(entry.id)}#${REFERENCE_ID}`}
+                          data-reference-photo-link={entry.id}
+                          className="inline-flex min-h-11 items-center text-body underline underline-offset-4"
+                        >
+                          {REFERENCE_PHOTO_TITLE}
+                        </Link>
                         <TransportIdentityDialog
                           catalogEntryId={entry.id}
                           entryTitle={entry.title}

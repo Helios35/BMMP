@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { PROPOSABLE_FINDING_TYPES } from "@/domain/photo-checks/damage-proposals";
 import { DAMAGE_FINDING_TYPES } from "@/domain/taxonomy/damage-finding-type";
 
 /**
@@ -57,6 +58,16 @@ export const recordDamageAssessmentSchema = z.object({
   isDefective: z.boolean(),
   reason: optionalReason,
   clearingPhotoIntakePhotoId: optionalId,
+  /** Rule 6.25 — the decision on each AI suggestion the dialog showed. */
+  proposalDecisions: z
+    .array(
+      z.object({
+        photoCheckId: uuidField,
+        findingType: z.enum(PROPOSABLE_FINDING_TYPES as [string, ...string[]]),
+        decision: z.enum(["accepted", "rejected"]),
+      }),
+    )
+    .default([]),
 });
 
 export type RecordDamageAssessmentInput = z.infer<

@@ -108,7 +108,9 @@ export function DdrPacketTemplate({
               <Row term={CAPTIONS.ddrFindings}>
                 {record.findingLabels.length === 0
                   ? CAPTIONS.ddrNone
-                  : record.findingLabels.join(", ")}
+                  : record.methodLabel === null
+                    ? record.findingLabels.join(", ")
+                    : `${record.findingLabels.join(", ")} (${record.methodLabel})`}
               </Row>
               <Row term={CAPTIONS.ddrAssessedBy}>
                 {`${record.assessedBy} — ${record.assessedAtText}`}

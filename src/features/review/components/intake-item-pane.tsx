@@ -170,6 +170,14 @@ export function IntakeItemPane({
               confirmed={item.condition.confirmed}
               onChange={placement.setCondition}
               onConfirm={placement.confirmCondition}
+              suggestions={item.condition.suggestions}
+              onDecideSuggestion={(row, decision) =>
+                placement.decideSuggestion(
+                  row.photoCheckId,
+                  row.findingType,
+                  decision,
+                )
+              }
               damagePhoto={{ sessionId: item.sessionId, uploadUrl }}
               {...(state === "disabled"
                 ? { disabledReason: OFFLINE_REASON }

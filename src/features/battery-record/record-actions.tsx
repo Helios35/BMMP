@@ -1,6 +1,10 @@
 import type { ReactElement } from "react";
 
 import { GatedControl } from "@/components/access/gated-control";
+import {
+  NO_SUGGESTION_VIEW,
+  type DamageSuggestionsView,
+} from "@/components/condition/damage-suggestions";
 import { Button } from "@/components/ui/button";
 import type { Capability } from "@/domain/access/capability";
 import {
@@ -105,6 +109,8 @@ export interface RecordActionsProps {
   readonly record?: BatteryRecord;
   /** The assessment currently governing the record, where one is recorded. */
   readonly currentAssessment?: DamageAssessment;
+  /** Rule 6.25 — AI suggestions on photos attached since, for the re-assessment. */
+  readonly suggestions?: DamageSuggestionsView;
 }
 
 export function RecordActions({
@@ -113,6 +119,7 @@ export function RecordActions({
   recordId,
   record,
   currentAssessment,
+  suggestions,
 }: RecordActionsProps): ReactElement | null {
   const treatments = RECORD_CONTROLS.map((control) => ({
     control,
@@ -146,6 +153,7 @@ export function RecordActions({
           // T-30 — `defective` is the functional flag, set beside the findings
           // rather than among them.
           currentIsDefective: record.ddrFlags.includes("defective"),
+          suggestions: suggestions ?? NO_SUGGESTION_VIEW,
         }}
         actions={{
           recordDamageAssessment,

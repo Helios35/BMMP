@@ -5,19 +5,26 @@ import type { VisionProvider } from "./provider";
 
 export type {
   BoundingBox,
+  DamageProposalResult,
   ExtractionRequest,
   ExtractionUsage,
   LabelExtractionResult,
   LabelFieldKey,
   LabelFieldResult,
+  LabelLookRequest,
+  LabelLookResult,
+  PhotoCheckUsage,
+  PhotoImage,
   RegionDetection,
   RegionRequest,
   VisionProvider,
   VisionProviderErrorCode,
 } from "./provider";
 export {
+  DAMAGE_PROPOSAL_SCHEMA_VERSION,
   HARD_GATED_FIELDS,
   LABEL_EXTRACTION_SCHEMA_VERSION,
+  LABEL_LOOK_SCHEMA_VERSION,
   LABEL_FIELD_KEYS,
   VISION_PROVIDER_ERROR_CODES,
   VisionProviderError,
@@ -25,7 +32,10 @@ export {
 } from "./provider";
 export {
   labelExtractionResultSchema,
+  parseDamageProposalResult,
   parseLabelExtractionResult,
+  parseLabelLookResult,
+  parseLookFingerprint,
   type ValidatedLabelExtractionResult,
 } from "./schema";
 

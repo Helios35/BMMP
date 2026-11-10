@@ -1,5 +1,5 @@
 # Business Rules — BMMP
-**Version:** 1.3 · **Date:** 2026-10-28 · **Owner:** Nathan Ivy / Next Sketch LLC
+**Version:** 1.4 · **Date:** 2026-11-10 · **Owner:** Nathan Ivy / Next Sketch LLC
 **Answers:** What decisions does the system make, and on what basis?
 **Reads from:** `docs/_ANCHORS.md`, `docs/PRD.md`, `ROADMAP_BMMP_2026-07-28.md` (v3.0), `Decision Log.md` (D-1–D-11), `RESEARCH_battery-management-feature-sweep_2026-07-28.md`, `PROJECT_SETUP_BMMP.md`  ·  **Feeds:** `docs/TAXONOMY.md`, `docs/TECHNICAL_SPEC.md`, `docs/ERD.md`, `docs/UX_SPEC.md`, `docs/SITE_ARCHITECTURE.md`, `docs/RUNBOOK.md`, every builder brief
 
@@ -9,6 +9,15 @@
 ---
 
 ## Changelog
+
+**v1.4 · 2026-11-10 — photo checks (`Decision Log.md` D-56, D-67, D-68, D-74, D-75)**
+
+- **New Rule 1.29** — "AI suggested": wherever a value, finding or flag came from a model, it says so, and once a person has decided, it also says who.
+- **New Rules 2.36 and 2.37** — the photo half of the label check (D-56 level 2, D-68): a reference label photo per catalog entry and the "looks different" flag, and catching re-saved or edited copies of a photo (D-63 #5). They append to the end of section 2, after Rule 2.35.
+- **New Rules 6.25 and 6.26** — damage proposals from intake photos, each decided by a person, and what a failed proposal does. They append to the end of section 6, after Rule 6.24.
+- **New Rule 7.25** — decisions on proposals are kept, and the labeled damage set takes the person's decision, never the proposal.
+- **EC-39 amended** (D-75 #11) to Rule 6.14 as amended in v1.3: the paper is voided and departure refused, and the record leaves the shipment when it is moved to quarantine.
+- Authored by planning in `SPEC_photo-checks_2026-11-10.md`, transcribed by `b2-10-photo-checks`. **No rule was renumbered.**
 
 **v1.3 · 2026-10-28 — recall matching (`Decision Log.md` D-66, D-72, D-73)**
 
@@ -426,6 +435,8 @@ Eleven entities have a status. Every one is listed here and every one has a matc
 
 **1.28** An expired or revoked grant terminates access immediately, including inside a session that is already open. Access is re-checked on every request, never only at sign-in.
 
+**1.29 — "AI SUGGESTED."** Wherever a value, finding or flag came from a model, every screen, export and document that shows it says **"AI suggested"**. Once a person has decided, it also says who. The tag never appears on chemistry, a catalog match, a classification, a clock, a shipping paper, a recall or a ranking, because those are rules (D-67).
+
 ---
 
 ### 2. Battery intake and identification — B1a
@@ -520,6 +531,26 @@ Eleven entities have a status. Every one is listed here and every one has a matc
 - `chemistry_code` → `chemistry`. Only compared where the code resolves to one T-01 value through the resolution catalog matching already uses. A code with no resolution is not compared.
 
 No other field is compared.
+
+**2.36 — LABEL LOOK CHECK.**
+
+- **The reference.** A catalog entry may carry one current reference label photo, set by P6. A reference is a platform photo: the maker's image, a spec sheet, or one the platform took. **It is never copied from any organization's records.** Replacing one keeps the old one on the entry's history.
+- **When it runs.** At the same points Rule 2.35 runs. The record's label crop, or its label photo when there is no crop, is compared with the entry's current reference by the vision model.
+- **Outcomes** (T-66): looks like the reference · looks different · could not compare · no reference on file · failed.
+- **Looks different.** The record routes to review with `label_look_differs` (Rule 2.14). The card shows the two photos side by side, **This label** and **Catalog reference**, tagged "AI suggested". A person decides with the three choices of Rule 2.35.
+- **A reason to look, never a verdict.** No score, percentage or similarity number is stored, shown or exported. The model returns one outcome and no words.
+- **Failure.** A failed check never blocks, never routes to review and never reads as "looks like the reference". It is recorded with its reason.
+- **No off switch** (Rule 2.17). **History:** every check is kept with the reference it was compared against (Rule 12.15).
+
+**2.37 — RE-SAVED OR EDITED COPIES.**
+
+- Every intake photo gets a look-alike fingerprint when it is stored, beside its content hash. The fingerprint is a fixed function of the image: the same image always gives the same fingerprint.
+- A photo whose fingerprint is close to one on another battery record in the organization routes the record to review with `photo_looks_reused`, naming the other record. The exclusions are the exact check's: the same session, crops, and sessions with no record (D-63 #5).
+- An exact copy is reported once, as `duplicate_photo`, and not also as a look-alike.
+- **How close counts is platform configuration** (D-40), never code. No distance or number is stored, shown or exported.
+- A reason to look, never a verdict. It carries no "AI suggested" tag, because a fingerprint is not a model's judgment.
+- Comparison across organizations waits for the definer function in unit 17, and never reveals another tenant's record.
+- A photo with no fingerprint is not compared.
 
 ---
 
@@ -776,6 +807,19 @@ The record leaves the shipment when it is moved to quarantine (Rule 6.17). A dep
 
 **6.24 — REMOVING A RECALL ASSOCIATION IS HELD TO RULE 6.11'S DISCIPLINE.** Dismissing or withdrawing a recall association requires a stated reason recorded on the association, is attributable to the human who did it, and never deletes the original — both the association and its dismissal stay permanently visible on the record and in every export. P5 may never dismiss one. Air transport does not become available again until the record's damage assessment and its recall associations are both clear. **Clearing a recall flag is not a route around Rule 6.7**, and the audit trail is built so that using it as one is visible.
 
+**6.25 — DAMAGE PROPOSALS.**
+
+- **When.** Every `whole_pack` and `damage` photo is sent to the vision model when it is stored, at intake and when photos are attached for a re-assessment.
+- **What it may propose.** Findings from T-29 only. **Never `none_observed`**, never a DDR flag, never `defective`, never a grade. For each finding it says which photo it was seen on, and nothing else: no number and no words.
+- **What the person sees.** On the condition step each proposal reads "AI suggested: Swelling — photo 2". **Nothing is pre-ticked.** The person accepts or rejects each proposal before the condition can be confirmed, and may add findings the model did not propose.
+- **Effect.** Only what the person confirms counts (Rules 6.2, 6.6). An accepted finding sets flags exactly as a picked one does (Rule 6.4).
+- **Method.** The assessment is `model_assisted_visual` when at least one proposal was shown, and `visual_inspection` otherwise (T-59).
+- **History.** Every proposal and the decision on it stay on the record's assessment history, rejected ones included (Rule 6.12).
+- **No suggestion is not a finding.** "Nothing proposed" is never "none observed" and never "assessed sound". A person still inspects.
+- This is not §10's damage triage, which stays reserved (Rule 10.2).
+
+**6.26 — A FAILED PROPOSAL.** If the model can't be reached or returns an error, the check is recorded as failed with its reason. The condition step reads "AI suggestions unavailable — inspect as usual". Intake never waits on it and is never blocked by it.
+
 ---
 
 ### 7. Data capture, consent and training rights — B1a
@@ -829,6 +873,8 @@ The record leaves the shipment when it is moved to quarantine (Rule 6.17). A dep
 **7.23** Records created by migration or import default to **not training-eligible**, and cannot be stamped eligible by the import. An import can carry a prior acceptance forward only where that acceptance is itself imported as a record with its version, actor and timestamp intact, and the import is audited as such.
 
 **7.24** No copy, derivative, crop, embedding or aggregate of a record that is not training-eligible may enter a training set. Eligibility travels with the data, not with the file.
+
+**7.25 — DECISIONS ON PROPOSALS ARE KEPT.** Each damage proposal and the person's decision on it are stored with the photo. In the labeled damage set (Rule 7.11) the label is the person's decision, never the proposal. The photo's eligibility stamp governs both (Rule 7.6). A proposal never changes eligibility, and the proposals on an ineligible photo never enter a training set (Rule 7.24).
 
 ---
 
@@ -1125,7 +1171,7 @@ A failure is never shown as "no match".
 
 **EC-38 — A handler wants to fly a swollen pack because the customer is waiting.** Air is unavailable. There is no dialog that permits it, no supervisor who can approve it, and no support ticket that unlocks it. The handler ships by ground or re-assesses the damage honestly. Rules 6.7, 6.8, 6.10.
 
-**EC-39 — A damage indicator is confirmed on a record already loaded onto an air shipment with a generated shipping paper.** The record is removed automatically, the paper is voided, the shipment reverts to needing regeneration, and P1 and P2 are notified with the reason. Rule 6.14.
+**EC-39 — A damage indicator or a recall is confirmed on a record whose container is on an air shipment that has not departed.** The paper is voided, the shipment returns to regenerate, departure is refused, and P1 and P2 are notified with the reason. The record leaves the shipment when it is moved to quarantine. Rule 6.14.
 
 **EC-40 — A handler reverses a damage finding to unblock air transport.** Permitted only as a genuine re-assessment with a stated reason and photographic evidence, and both assessments stay permanently visible on the record and in every export. The system makes the reversal easy to do honestly and impossible to do quietly. Rules 6.11, 6.12.
 

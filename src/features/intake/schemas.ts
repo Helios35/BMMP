@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { INTAKE_FLOW_STEPS } from "@/domain/intake/steps";
+import { PROPOSABLE_FINDING_TYPES } from "@/domain/photo-checks/damage-proposals";
 import { APPLICATION_CLASSES } from "@/domain/taxonomy/application-class";
 import { CHEMISTRIES } from "@/domain/taxonomy/chemistry";
 import { DAMAGE_FINDING_TYPES } from "@/domain/taxonomy/damage-finding-type";
@@ -165,6 +166,14 @@ export const setConditionSchema = z.object({
     .min(1, "Record at least one finding."),
   /** T-30 `defective` — a human-recorded fact, never inferred. */
   isDefective: z.boolean(),
+});
+
+/** Rule 6.25 — a person accepts or rejects one AI-suggested finding. */
+export const decideDamageSuggestionSchema = z.object({
+  sessionId: uuidField,
+  photoCheckId: uuidField,
+  findingType: z.enum(PROPOSABLE_FINDING_TYPES as [string, ...string[]]),
+  decision: z.enum(["accepted", "rejected"]),
 });
 
 export const setStateOfChargeSchema = z.object({

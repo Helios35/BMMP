@@ -9,14 +9,25 @@ import { AUDIT_ACTOR_TYPE_LABELS } from "@/domain/taxonomy/audit-actor-type";
 import { AUDIT_EVENT_TYPE_LABELS } from "@/domain/taxonomy/audit-event-type";
 import { DAMAGE_FINDING_TYPE_LABELS } from "@/domain/taxonomy/damage-finding-type";
 import { HANDLER_ACTIVITY_TYPE_LABELS } from "@/domain/taxonomy/handler-activity-type";
-import { labelFor } from "@/domain/taxonomy/lookup";
+import { labelFor, readTaxonomyValue } from "@/domain/taxonomy/lookup";
+import {
+  DAMAGE_ASSESSMENT_METHOD_LABELS,
+  DAMAGE_ASSESSMENT_METHODS,
+} from "@/domain/taxonomy/damage-assessment-method";
+import type { DamageProposalDecision } from "@/domain/photo-checks/damage-proposals";
+import { AiSuggestedTag } from "@/components/ai/ai-suggested-tag";
 import type { BatteryRecord } from "@/types/battery-record";
 import type { IsoTimestamp, TimeZone, Uuid } from "@/types/common";
 import type { DamageAssessment } from "@/types/condition";
 import type { AuditEvent } from "@/types/audit";
 import { absoluteInstant } from "./format-instant";
 import { detailEntries, snapshotEntries } from "./json-text";
-import { DetailCard, NotRecorded, SnapshotList } from "./record-display";
+import {
+  DetailCard,
+  NotRecorded,
+  SnapshotList,
+  TaxonomyText,
+} from "./record-display";
 import { resolveUserNames } from "./user-names";
 
 /**
@@ -67,6 +78,10 @@ export async function HistoryTab({
   const names = await resolveUserNames(ctx, [
     ...trail.actorIds,
     ...assessments.items.flatMap((row) => [row.assessedBy, row.confirmedBy]),
+    // Rule 1.29 — who decided each AI suggestion.
+    ...assessments.items.flatMap((row) =>
+      (row.proposalDecisions ?? []).map((decision) => decision.decidedBy),
+    ),
   ]);
 
   return (
@@ -289,6 +304,47 @@ async function readRecordTrail(
 }
 
 /**
+ * Rules 6.12, 6.25, 7.25 — every AI-suggested finding shown to the person
+ * who confirmed, and their decision, rejected ones included. Each carries the
+ * tag with who decided (Rule 1.29). Nothing renders where none was shown.
+ */
+function ProposalDecisions({
+  decisions,
+  names,
+}: {
+  readonly decisions: readonly DamageProposalDecision[];
+  readonly names: ReadonlyMap<Uuid, string>;
+}) {
+  if (decisions.length === 0) return null;
+  return (
+    <div data-assessment-suggestions="true" className="grid gap-2">
+      <p className="text-label">AI suggestions</p>
+      <ul className="grid gap-1">
+        {decisions.map((decision) => (
+          <li
+            key={`${decision.photoCheckId}:${decision.findingType}`}
+            data-assessment-suggestion={decision.findingType}
+            data-suggestion-decision={decision.decision}
+            className="flex flex-wrap items-center gap-2 text-body"
+          >
+            <span className="text-body-strong">
+              {labelFor(DAMAGE_FINDING_TYPE_LABELS, decision.findingType)}
+            </span>
+            <AiSuggestedTag
+              decision={{
+                verb:
+                  decision.decision === "accepted" ? "confirmed" : "rejected",
+                byName: names.get(decision.decidedBy) ?? "a colleague",
+              }}
+            />
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+/**
  * Every damage assessment on the record, current and superseded, side by side.
  *
  * **Not a list with one hidden and not a disclosure** (Rule 6.12). The
@@ -347,6 +403,22 @@ function DamageAssessments({
                 <dd>{absoluteInstant(assessment.assessedAt, timeZone)}</dd>
               </div>
               <div className="contents">
+                <dt className="text-label">Method</dt>
+                <dd data-assessment-method={assessment.assessmentMethod}>
+                  {/* Read, never assumed — the fixtures carry values
+                      outside T-59, and an unknown method is never read as
+                      model-assisted (STATE §7 #1). */}
+                  <TaxonomyText
+                    system="T-59 damage assessment method"
+                    read={readTaxonomyValue(
+                      DAMAGE_ASSESSMENT_METHODS,
+                      DAMAGE_ASSESSMENT_METHOD_LABELS,
+                      assessment.assessmentMethod,
+                    )}
+                  />
+                </dd>
+              </div>
+              <div className="contents">
                 <dt className="text-label">Assessed by</dt>
                 <dd>
                   {assessment.assessedBy === null ? (
@@ -375,6 +447,11 @@ function DamageAssessments({
                 </div>
               )}
             </dl>
+
+            <ProposalDecisions
+              decisions={assessment.proposalDecisions ?? []}
+              names={names}
+            />
 
             <Separator />
             <SnapshotList entries={detailEntries(assessment.findingDetail)} />

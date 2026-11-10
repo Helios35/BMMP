@@ -55,7 +55,12 @@ export type IntakeFixtureImage =
   | "label-scooter.png"
   | "label-mismatch.png"
   | "whole-pack.png"
-  | "damage.png";
+  | "damage.png"
+  // b2-10 — the photo checks' scenarios.
+  | "damage-swelling.png"
+  | "damage-unavailable.png"
+  | "label-different.png"
+  | "label-resaved.png";
 
 export const INTAKE_FIXTURE_DIR = path.join(
   process.cwd(),

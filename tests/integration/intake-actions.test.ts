@@ -302,11 +302,25 @@ describe("the upload route", () => {
     ).toBe(400);
   });
 
-  it("refuses a closed session", async () => {
-    const response = await POST(
-      uploadRequest(ID.INTAKE_SESSION.vehicleCompleted, "label-clean.png"),
+  it("refuses an abandoned session", async () => {
+    const { sessionId } = ok(await actions.startIntakeSession({}));
+    ok(
+      await actions.abandonIntakeSession({
+        sessionId,
+        reason: "Wrong battery picked up.",
+      }),
     );
+    const response = await POST(uploadRequest(sessionId, "label-clean.png"));
     expect(response.status).toBe(409);
+  });
+
+  it("takes a photo onto a committed record's session — Attach a photo and re-assessment evidence (b2-10)", async () => {
+    const response = await POST(
+      uploadRequest(ID.INTAKE_SESSION.vehicleCompleted, "whole-pack.png", {
+        photoType: "whole_pack",
+      }),
+    );
+    expect(response.status).toBe(201);
   });
 });
 
@@ -881,9 +895,15 @@ describe("Enter details manually — the way on when the read cannot happen (E-4
     expect(session?.currentStep).toBe("extraction_review");
     expect(session?.isReviewRequired).toBe(true);
     expect(session?.reviewReasonCodes).toContain("extraction_failed");
-    // No T-43 type names the choice: nothing is written (the TODO(T-43) in
-    // the action), rather than a row filed under a neighbour.
-    expect(auditRows(HANDLER.correlationId)).toHaveLength(rowsBefore);
+    // No T-43 type names the choice: nothing is written for it (the
+    // TODO(T-43) in the action), rather than a row filed under a neighbour.
+    // The copy check runs beside the exact check on this path (Rule 2.37) and
+    // records its run as the system's row — the only row added.
+    expect(
+      auditRows(HANDLER.correlationId)
+        .slice(rowsBefore)
+        .map((row) => [row.eventType, row.actorType]),
+    ).toEqual([["photo_check.completed", "system"]]);
 
     // The step reads as the card's default state with every row unread —
     // not the no-read state, which would offer the path again.

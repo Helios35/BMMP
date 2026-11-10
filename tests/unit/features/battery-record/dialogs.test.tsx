@@ -229,6 +229,8 @@ describe("Edit assessed condition", () => {
       isDefective: false,
       reason: null,
       clearingPhotoIntakePhotoId: null,
+      // No AI suggestion was shown, so none was decided (Rule 6.25).
+      proposalDecisions: [],
     });
   });
 });

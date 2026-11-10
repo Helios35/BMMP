@@ -14,6 +14,7 @@ import {
   ConfidenceBandDisplaySkeleton,
 } from "@/components/confidence/confidence-band-display";
 import { ACTION_BUTTON_CLASS } from "@/components/page";
+import { AiSuggestedTag } from "@/components/ai/ai-suggested-tag";
 import {
   FieldSourceBadge,
   FieldSourceBadgeSkeleton,
@@ -249,6 +250,19 @@ export function FieldRow({
       enteredByName={field.source === "entered_by" ? ENTERED_BY_YOU : undefined}
     />
   );
+  // Rule 1.29 — a value the label read is the model's until a person confirms
+  // it, and says who did after. Never on chemistry (Rule 2.10). Beside the
+  // source rather than inside it, so §2.1.7's accessible name is unchanged.
+  const aiTag =
+    !isChemistry && field.source === "read_from_label" ? (
+      <AiSuggestedTag
+        decision={
+          field.status === "confirmed" && field.confirmedByName !== null
+            ? { verb: "confirmed", byName: field.confirmedByName }
+            : null
+        }
+      />
+    ) : null;
 
   const rowIntent =
     field.status === "confirmed"
@@ -379,6 +393,7 @@ export function FieldRow({
           {sourceBadge ?? <span className="sr-only">{NO_SOURCE_YET}</span>}
           <span className="sr-only">,</span>
         </span>
+        {aiTag}
         <span className="inline-flex flex-col">
           <ConfidenceBandDisplay
             band={field.confidenceBand}

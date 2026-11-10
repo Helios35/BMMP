@@ -184,6 +184,7 @@ export async function readDdrPacketBuild(
         ddrFlags: record.ddrFlags,
         isAirTransportProhibited: record.isAirTransportProhibited,
         findings: assessment?.findingTypes ?? [],
+        assessmentMethod: assessment?.assessmentMethod ?? null,
         assessedByName:
           confirmedBy === null ? null : (names.get(confirmedBy) ?? null),
         assessedAt: assessment?.confirmedAt ?? assessment?.assessedAt ?? null,

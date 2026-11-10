@@ -11,6 +11,7 @@ import {
 } from "@/lib/errors";
 import type { IsoTimestamp, Uuid } from "@/types/common";
 import { runRecallCheckWithoutBlocking } from "@/features/recalls/server/check";
+import { readSessionSuggestions } from "@/features/photo-checks/server/suggestions";
 
 import {
   CATALOG_ENTRY_NOT_AVAILABLE,
@@ -129,6 +130,12 @@ export async function commitIntake(
   const damagePhoto = photosPage.items.find(
     (photo) => photo.photoType === "damage",
   );
+  // Rule 6.25 — what the condition step showed, read the same way it read it.
+  const damageSuggestions = await readSessionSuggestions(ctx, {
+    intakeSessionId: session.id,
+    decisions: draft.condition?.proposalDecisions ?? [],
+    photos: photosPage.items,
+  });
 
   const built = buildIntakeConfirmation({
     ctx,
@@ -142,6 +149,7 @@ export async function commitIntake(
     organization,
     dateCodeExtractionId: dateCodeRow?.id ?? null,
     damagePhotoId: damagePhoto?.id ?? null,
+    damageSuggestions,
     hasStoredPhoto: photosPage.items.length > 0,
     today: civilDateInZone(at, rules.site.timeZone),
     at,

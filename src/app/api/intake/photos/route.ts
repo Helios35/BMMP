@@ -21,6 +21,11 @@ import {
   INTAKE_PHOTO_BUCKET,
   intakeObjectPath,
 } from "@/features/intake/server/intake-pipeline";
+import {
+  fingerprintForUpload,
+  recordFingerprintFailure,
+  runDamageProposal,
+} from "@/features/photo-checks/server/run-checks";
 import { requireWrite } from "@/lib/auth/guard";
 import { recordNotFound } from "@/lib/auth/record-denial";
 import { ConflictError, isAppError, type AppErrorCode } from "@/lib/errors";
@@ -56,6 +61,17 @@ import type { IntakeSession } from "@/types/intake";
  *   acceptance in force or in grace stamps `training_eligible`, anything else
  *   `training_excluded`, and no role recomputes it later (Rules 7.6, 7.7).
  * - **The photo is a row and an audited act** (`intake_photo.captured`).
+ * - **Its look-alike fingerprint is set beside its content hash** (Rule
+ *   2.37); a fingerprint that cannot be made leaves the photo stored with
+ *   none, never compared, and the failed copy check recorded.
+ * - **A whole-pack or damage photo is sent for damage suggestions** once it
+ *   is stored (Rule 6.25). The upload never waits on its success and is
+ *   never refused by its failure (Rule 6.26).
+ *
+ * **A committed record's session takes a photo too** — the record's Attach
+ * a photo and the re-assessment's evidence come here, because
+ * `intake_photo.intake_session_id` is the only link a photo has. Only an
+ * abandoned session, or a completed one with no record, is closed to photos.
  *
  * Errors are RFC 9457 `application/problem+json`, carrying the `AppError`
  * code the client branches on and the correlation id a person reads back
@@ -265,7 +281,12 @@ async function storeOnSession(
   session: IntakeSession,
   input: StoreRequest,
 ): Promise<Response> {
-  if (session.status === "completed" || session.status === "abandoned") {
+  const committed =
+    session.status === "completed" && session.batteryRecordId !== null;
+  if (
+    session.status === "abandoned" ||
+    (session.status === "completed" && !committed)
+  ) {
     return problem(
       "CONFLICT",
       `${PHOTO_INTAKE_CLOSED} ${INTAKE_CLOSED}`,
@@ -283,6 +304,15 @@ async function storeOnSession(
   if (dimensions === null) {
     return problem("VALIDATION", PHOTO_UNREADABLE, ctx.correlationId);
   }
+
+  // Rule 2.37 — from the EXIF-stripped bytes, the ones that are kept.
+  const fingerprint = await fingerprintForUpload({
+    bytes,
+    mimeType: input.mimeType,
+    width: dimensions.width,
+    height: dimensions.height,
+    fileName: input.fileName,
+  });
 
   const extension = fileExtensionFor(input.mimeType);
   const stored = await data.objects.put(ctx, {
@@ -314,6 +344,8 @@ async function storeOnSession(
     dataUseEligibility: input.eligibility,
     isExifStripped: true,
     takenBy: ctx.userId,
+    lookFingerprint:
+      fingerprint.kind === "set" ? fingerprint.fingerprint : null,
   };
   const photo = await data.intakePhotos.append(ctx, photoInput);
 
@@ -337,6 +369,25 @@ async function storeOnSession(
       attribution: attributionFrom(request),
     }),
   );
+
+  // The checks run after the photo is stored and audited, and neither can
+  // undo it: each records its own failure and returns (Rules 2.37, 6.26).
+  const attribution = attributionFrom(request);
+  if (fingerprint.kind === "failed") {
+    await recordFingerprintFailure(ctx, {
+      photo,
+      failure: fingerprint,
+      at,
+      attribution,
+    });
+  }
+  await runDamageProposal(ctx, {
+    photo,
+    bytes,
+    fileName: input.fileName,
+    at,
+    attribution,
+  });
 
   const body: IntakePhotoUploadResponse = {
     intakePhotoId: photo.id,

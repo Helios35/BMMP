@@ -89,9 +89,14 @@ import {
   PHOTO_NOT_A_LABEL,
   PHOTO_NOT_ON_INTAKE,
 } from "../copy";
-import { systemStepEvent } from "./audit";
+import { labelLookRoutesToReview } from "@/domain/photo-checks/label-look";
+import { checkLookAlikes } from "@/features/photo-checks/server/look-alike";
+import { runLabelLookCheck } from "@/features/photo-checks/server/run-checks";
+
+import { NO_ATTRIBUTION, systemStepEvent } from "./audit";
 import { readDuplicatePhotos } from "./duplicate-photos";
 import { compareReadWithEntry, comparisonHistory } from "./label-catalog";
+import { labelLookHistory } from "./label-look";
 
 /**
  * The intake pipeline — `TECHNICAL_SPEC.md` §11.1 steps 2–5; Rules 2.2–2.4,
@@ -576,16 +581,25 @@ async function recordExtractionFailure(
   );
 
   // D-56 level 1 — a failed read still routes on a duplicate photo; the
-  // reviewer sees both reasons.
+  // reviewer sees both reasons. The copy check runs beside it (Rule 2.37).
   const duplicates = await readDuplicatePhotos(ctx, session);
+  const lookAlikes = await checkLookAlikes(
+    ctx,
+    session,
+    new Date().toISOString(),
+    NO_ATTRIBUTION,
+  );
   const verdict = evaluateConfidenceGate(
     {
       fields: gateFields(fields),
       match: { candidates: [] },
       extractionFailed: true,
       duplicatePhoto: duplicates.matches.length > 0,
-      // Nothing was read, so nothing can disagree with an entry (Rule 2.11).
+      // Nothing was read, so nothing can disagree with an entry (Rule 2.11),
+      // and no entry was matched to look against (Rule 2.36).
       labelCatalogMismatch: false,
+      labelLookDiffers: false,
+      photoLooksReused: lookAlikes.matches.length > 0,
     },
     configuration.thresholds,
   );
@@ -900,12 +914,35 @@ export async function runIntakePipeline(
   // 5 · gate (Rules 2.13–2.16). A photo already on another record in this
   // organization routes the whole record too (D-56 level 1, Rule 2.14) — a
   // reason to look, never a verdict and never a score. So does a label that
-  // disagrees with the entry it resolved to exactly (Rule 2.35).
+  // disagrees with the entry it resolved to exactly (Rule 2.35), a label photo
+  // that looks different from that entry's reference (Rule 2.36) and a photo
+  // that looks like a copy of one on another record (Rule 2.37).
   const duplicates = await readDuplicatePhotos(ctx, session);
+  const lookAlikes = await checkLookAlikes(
+    ctx,
+    session,
+    new Date().toISOString(),
+    NO_ATTRIBUTION,
+  );
   const labelCatalog =
     exact === undefined
       ? null
       : compareReadWithEntry(fields, exact, configuration.matchTolerances);
+  // Rule 2.36 runs where 2.35 runs: after match, on the exact entry.
+  const labelLook =
+    exact === undefined
+      ? null
+      : await runLabelLookCheck(ctx, {
+          entry: exact,
+          labelPhoto,
+          crop,
+          labelFileName: request.labelFileName,
+          labelBytes: bytes,
+          at: new Date().toISOString(),
+          attribution: NO_ATTRIBUTION,
+        });
+  const labelLookDiffers =
+    labelLook !== null && labelLookRoutesToReview(labelLook.outcome);
   const verdict = evaluateConfidenceGate(
     {
       fields: gateFields(fields),
@@ -914,6 +951,8 @@ export async function runIntakePipeline(
       duplicatePhoto: duplicates.matches.length > 0,
       labelCatalogMismatch:
         labelCatalog !== null && labelCatalog.disagreements.length > 0,
+      labelLookDiffers,
+      photoLooksReused: lookAlikes.matches.length > 0,
     },
     configuration.thresholds,
   );
@@ -972,6 +1011,17 @@ export async function runIntakePipeline(
                 labelCatalog: comparisonHistory(
                   labelCatalog,
                   configuration.configurationVersion,
+                ),
+              }),
+          // Rules 2.36, 12.15 — the reference compared against; no number.
+          ...(labelLook === null || !labelLookDiffers
+            ? {}
+            : { labelLook: labelLookHistory(labelLook) }),
+          ...(lookAlikes.records.length === 0
+            ? {}
+            : {
+                photoLooksReusedOf: lookAlikes.records.map(
+                  (other) => other.recordNumber,
                 ),
               }),
         },

@@ -167,6 +167,35 @@ export interface ExtractionReviewGate {
    * §3.8). Absent or `null` renders nothing. **Never a score.**
    */
   readonly labelCatalog?: LabelCatalogDisagreementView | null;
+  /**
+   * T-52 `label_look_differs` — **This label** beside **Catalog reference**,
+   * tagged AI suggested (Rule 2.36; §3.8a). Absent or `null` renders nothing.
+   * **Never a score.**
+   */
+  readonly labelLook?: LabelLookDifferenceView | null;
+  /**
+   * T-52 `photo_looks_reused` — each other record a photo here looks like a
+   * copy of, with both photos (Rule 2.37; §3.8a). Absent or empty renders
+   * nothing. **Never a score, never an AI tag** (D-75 #8).
+   */
+  readonly photoReuse?: readonly PhotoReuseRecordView[];
+}
+
+export interface LabelLookDifferenceView {
+  readonly entryTitle: string;
+  /** `/catalog/[id]`. */
+  readonly entryHref: string;
+  readonly thisLabel: ReviewImage | null;
+  readonly reference: ReviewImage | null;
+}
+
+export interface PhotoReuseRecordView {
+  readonly id: Uuid;
+  readonly recordNumber: string;
+  /** `/batteries/[id]`, or `null` where the role cannot open it. */
+  readonly href: string | null;
+  readonly thisPhoto: ReviewImage | null;
+  readonly otherPhoto: ReviewImage | null;
 }
 
 export interface LabelCatalogDisagreementView {

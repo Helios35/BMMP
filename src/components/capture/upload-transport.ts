@@ -121,16 +121,24 @@ function parseJson(text: string): unknown {
   }
 }
 
-/** The default transport. */
-export const xhrUploadTransport: UploadTransport = (request, onProgress) =>
-  new Promise((resolve) => {
-    const body = new FormData();
-    body.set("file", request.file, request.file.name);
-    body.set("intakeSessionId", request.intakeSessionId);
-    body.set("photoType", request.photoType);
-
+/**
+ * One multipart POST with upload progress — the core every transport here
+ * shares, so the intake photo and the catalog reference photo travel the
+ * same way and report failures in the same words. `parse` reads the 201
+ * body; anything it cannot read is reported, never guessed at.
+ */
+function postMultipart<T>(
+  uploadUrl: string,
+  body: FormData,
+  onProgress: (percent: number) => void,
+  parse: (body: unknown) => T | null,
+): Promise<
+  | { readonly ok: true; readonly value: T }
+  | Extract<UploadPhotoResult, { readonly ok: false }>
+> {
+  return new Promise((resolve) => {
     const xhr = new XMLHttpRequest();
-    xhr.open("POST", request.uploadUrl);
+    xhr.open("POST", uploadUrl);
     xhr.responseType = "text";
 
     xhr.upload.addEventListener("progress", (event) => {
@@ -155,10 +163,10 @@ export const xhrUploadTransport: UploadTransport = (request, onProgress) =>
     xhr.addEventListener("load", () => {
       const parsed = parseJson(xhr.responseText);
       if (xhr.status === HTTP_CREATED) {
-        const photo = parseUploadedPhoto(parsed);
-        if (photo !== null) {
+        const value = parse(parsed);
+        if (value !== null) {
           onProgress(100);
-          resolve({ ok: true, photo });
+          resolve({ ok: true, value });
           return;
         }
         resolve({
@@ -185,3 +193,81 @@ export const xhrUploadTransport: UploadTransport = (request, onProgress) =>
 
     xhr.send(body);
   });
+}
+
+/** The default transport. */
+export const xhrUploadTransport: UploadTransport = async (
+  request,
+  onProgress,
+) => {
+  const body = new FormData();
+  body.set("file", request.file, request.file.name);
+  body.set("intakeSessionId", request.intakeSessionId);
+  body.set("photoType", request.photoType);
+  const result = await postMultipart(
+    request.uploadUrl,
+    body,
+    onProgress,
+    parseUploadedPhoto,
+  );
+  return result.ok ? { ok: true, photo: result.value } : result;
+};
+
+/**
+ * A catalog entry's reference label photo — Rule 2.36; `UX_SPEC.md`
+ * §3.19. P6 sends the image to `POST /api/catalog/reference-photos`; the
+ * route strips EXIF, reads the size from the bytes and stores it under the
+ * platform prefix. Same core as the intake transport.
+ */
+export interface UploadReferencePhotoRequest {
+  readonly file: File;
+  readonly catalogEntryId: string;
+  readonly uploadUrl: string;
+}
+
+export interface UploadedReferencePhoto {
+  readonly catalogReferencePhotoId: string;
+  readonly width: number;
+  readonly height: number;
+}
+
+export type ReferencePhotoTransport = (
+  request: UploadReferencePhotoRequest,
+  onProgress: (percent: number) => void,
+) => Promise<
+  | { readonly ok: true; readonly photo: UploadedReferencePhoto }
+  | Extract<UploadPhotoResult, { readonly ok: false }>
+>;
+
+export function parseUploadedReferencePhoto(
+  body: unknown,
+): UploadedReferencePhoto | null {
+  if (!isRecord(body)) return null;
+  const catalogReferencePhotoId = readString(body.catalogReferencePhotoId);
+  const width = readNumber(body.width);
+  const height = readNumber(body.height);
+  if (
+    catalogReferencePhotoId === undefined ||
+    width === undefined ||
+    height === undefined
+  ) {
+    return null;
+  }
+  return { catalogReferencePhotoId, width, height };
+}
+
+export const xhrReferencePhotoTransport: ReferencePhotoTransport = async (
+  request,
+  onProgress,
+) => {
+  const body = new FormData();
+  body.set("file", request.file, request.file.name);
+  body.set("catalogEntryId", request.catalogEntryId);
+  const result = await postMultipart(
+    request.uploadUrl,
+    body,
+    onProgress,
+    parseUploadedReferencePhoto,
+  );
+  return result.ok ? { ok: true, photo: result.value } : result;
+};

@@ -9,6 +9,7 @@ import type {
   Timestamped,
   Uuid,
 } from "@/types/common";
+import type { DamageProposalDecision } from "@/domain/photo-checks/damage-proposals";
 import type { ConditionGrade } from "@/domain/taxonomy/condition-grade";
 import type { DamageAssessmentStatus } from "@/domain/taxonomy/damage-assessment-status";
 import type { DamageFindingType } from "@/domain/taxonomy/damage-finding-type";
@@ -108,6 +109,14 @@ export interface DamageAssessment extends TenantScoped, Created {
   readonly clearingPhotoIntakePhotoId: Uuid | null;
   /** Corrections insert. Both stay visible side by side, permanently (Rule 6.12). */
   readonly supersedesDamageAssessmentId: Uuid | null;
+  /**
+   * Every AI-suggested finding shown to the person who confirmed, with their
+   * decision on it — rejected ones included (Rules 6.12, 6.25, 7.25). Empty or
+   * absent means none was shown, and the method is `visual_inspection`. The
+   * labeled damage set takes the decision, never the proposal (Rule 7.25).
+   * Optional so no fixture row has to change; argued for unit 17.
+   */
+  readonly proposalDecisions?: readonly DamageProposalDecision[] | null;
 }
 
 /**

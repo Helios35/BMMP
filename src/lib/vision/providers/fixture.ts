@@ -1,12 +1,23 @@
+import { createHash } from "node:crypto";
+
+import type { ProposableFindingType } from "@/domain/photo-checks/damage-proposals";
+import type { LabelLookModelOutcome } from "@/domain/photo-checks/label-look";
+
 import {
+  DAMAGE_PROPOSAL_SCHEMA_VERSION,
   LABEL_EXTRACTION_SCHEMA_VERSION,
   LABEL_FIELD_KEYS,
+  LABEL_LOOK_SCHEMA_VERSION,
   VisionProviderError,
   type BoundingBox,
+  type DamageProposalResult,
   type ExtractionRequest,
   type LabelExtractionResult,
   type LabelFieldKey,
   type LabelFieldResult,
+  type LabelLookRequest,
+  type LabelLookResult,
+  type PhotoImage,
   type RegionDetection,
   type RegionRequest,
   type VisionProvider,
@@ -229,8 +240,136 @@ function answerRequested(
   return Object.fromEntries(entries) as Record<LabelFieldKey, FieldAnswer>;
 }
 
+// --- the photo checks (b2-10; Rules 2.36, 2.37, 6.25) ------------------------------
+//
+// Keyed on the file name's last hyphen token, like the label read, and with the
+// same rule for anything unrecognised: **an unknown file name proposes nothing
+// and looks like the reference**, so every fixture image that existed before
+// these checks keeps landing exactly where it did. The fingerprint is the one
+// exception to keying on the name — it comes from the bytes (see below).
+
+export const FIXTURE_PHOTO_CHECK_MODEL_IDENTIFIER = "fixture-photo-checker";
+export const FIXTURE_PHOTO_CHECK_PROMPT_VERSION = "2026-11-10";
+
+/** The token that keys each answer. Never rename a fixture image (STATE §6). */
+export const DAMAGE_PROPOSAL_SCENARIOS = {
+  /** `damage-swelling.png` — two suggestions: one in the damaged set, one cosmetic. */
+  swelling: ["swelling", "surface_marking"],
+} as const satisfies Readonly<Record<string, readonly ProposableFindingType[]>>;
+
+/** `damage-unavailable.png` — the service cannot be reached (Rule 6.26). */
+export const DAMAGE_PROPOSAL_FAILURE_TOKEN = "unavailable";
+
+export const LABEL_LOOK_SCENARIOS = {
+  /** `label-different.png` — reads as the clean label, looks different from its reference. */
+  different: "looks_different",
+  /** `label-uncomparable.png` — the model could not compare the two. */
+  uncomparable: "cannot_compare",
+} as const satisfies Readonly<Record<string, LabelLookModelOutcome>>;
+
+/** `label-lookfail.png` — the look check's service cannot be reached. */
+export const LABEL_LOOK_FAILURE_TOKEN = "lookfail";
+
+function tokenOf(fileName: string | null): string {
+  if (fileName === null) return "";
+  const base = fileName.split(/[\/]/).pop() ?? "";
+  const dot = base.lastIndexOf(".");
+  const stem = dot > 0 ? base.slice(0, dot) : base;
+  return stem.split("-").pop()?.trim().toLowerCase() ?? "";
+}
+
+function hasKey<K extends string>(
+  record: Readonly<Record<K, unknown>>,
+  key: string,
+): key is K {
+  return Object.prototype.hasOwnProperty.call(record, key);
+}
+
+/** The scheme every fixture fingerprint carries. Configuration states closeness for it. */
+export const FIXTURE_FINGERPRINT_SCHEME = "fixture64";
+
+/**
+ * The seeded copy target's label photo fingerprint — `src/data/mock/fixtures`
+ * seeds a record's label photo with exactly this value, and a unit test holds
+ * the two together.
+ */
+export const FIXTURE_COPY_TARGET_FINGERPRINT = "fixture64:9e3c5a1f7b2d4c80";
+
+/**
+ * `label-resaved.png` — a re-saved copy of the seeded target: two bits away
+ * from it, so it is close without being the same fingerprint, and its bytes are
+ * not the target's, so it is never the exact check's.
+ */
+export const FIXTURE_RESAVED_FINGERPRINT = "fixture64:9e3c5a1f7b2d4c83";
+export const FINGERPRINT_RESAVED_TOKEN = "resaved";
+
+/**
+ * **From the bytes, never the file name** — many e2e uploads share
+ * `label-clean.png`, each with its own unique `tEXt` chunk, and a fingerprint
+ * from the name would make every one of them a copy of every other. The first
+ * 64 bits of the SHA-256 of the stored bytes: a fixed function of the image,
+ * so the same bytes always give the same fingerprint, and two different
+ * uploads differ in about half their bits. The one scenario file is the
+ * exception that lets a spec prove a look-alike.
+ */
+export function fixtureFingerprint(image: PhotoImage): string {
+  if (tokenOf(image.fileName) === FINGERPRINT_RESAVED_TOKEN) {
+    return FIXTURE_RESAVED_FINGERPRINT;
+  }
+  const digest = createHash("sha256").update(image.bytes).digest("hex");
+  return `${FIXTURE_FINGERPRINT_SCHEME}:${digest.slice(0, 16)}`;
+}
+
 export const fixtureProvider: VisionProvider = {
   code: FIXTURE_PROVIDER_CODE,
+
+  async proposeDamageFindings(
+    image: PhotoImage,
+  ): Promise<DamageProposalResult> {
+    const token = tokenOf(image.fileName);
+    if (token === DAMAGE_PROPOSAL_FAILURE_TOKEN) {
+      throw new VisionProviderError(
+        "unavailable",
+        "The photo checker is unavailable.",
+      );
+    }
+    return {
+      schemaVersion: DAMAGE_PROPOSAL_SCHEMA_VERSION,
+      findings: hasKey(DAMAGE_PROPOSAL_SCENARIOS, token)
+        ? [...DAMAGE_PROPOSAL_SCENARIOS[token]]
+        : [],
+      providerCode: FIXTURE_PROVIDER_CODE,
+      modelIdentifier: FIXTURE_PHOTO_CHECK_MODEL_IDENTIFIER,
+      promptVersion: FIXTURE_PHOTO_CHECK_PROMPT_VERSION,
+      usage: null,
+    };
+  },
+
+  async compareLabelToReference(
+    req: LabelLookRequest,
+  ): Promise<LabelLookResult> {
+    const token = tokenOf(req.photo.fileName);
+    if (token === LABEL_LOOK_FAILURE_TOKEN) {
+      throw new VisionProviderError(
+        "unavailable",
+        "The photo checker is unavailable.",
+      );
+    }
+    return {
+      schemaVersion: LABEL_LOOK_SCHEMA_VERSION,
+      outcome: hasKey(LABEL_LOOK_SCENARIOS, token)
+        ? LABEL_LOOK_SCENARIOS[token]
+        : "looks_consistent",
+      providerCode: FIXTURE_PROVIDER_CODE,
+      modelIdentifier: FIXTURE_PHOTO_CHECK_MODEL_IDENTIFIER,
+      promptVersion: FIXTURE_PHOTO_CHECK_PROMPT_VERSION,
+      usage: null,
+    };
+  },
+
+  async fingerprintPhoto(image: PhotoImage): Promise<string> {
+    return fixtureFingerprint(image);
+  },
 
   async detectLabelRegion(req: RegionRequest): Promise<RegionDetection | null> {
     if (scenarioForFileName(req.fileName) === "manualcrop") return null;
