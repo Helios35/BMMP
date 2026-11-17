@@ -15,6 +15,12 @@ import type { DamageAssessmentStatus } from "@/domain/taxonomy/damage-assessment
 import type { DamageFindingType } from "@/domain/taxonomy/damage-finding-type";
 import type { HazardFactorCode } from "@/domain/taxonomy/hazard-factor-code";
 import type { HazardRankingBand } from "@/domain/taxonomy/hazard-ranking-band";
+import type { HazardRankingScope } from "@/domain/taxonomy/hazard-ranking-scope";
+import type { HazardRankingWhy } from "@/domain/hazard/order";
+import type {
+  ComparisonSet,
+  HazardRankingFactorEntry,
+} from "@/domain/hazard/run";
 import type { RecallMatchStatus } from "@/domain/taxonomy/recall-match-status";
 import type { RecallSource } from "@/domain/taxonomy/recall-source";
 import type { AppliedRuleVersion } from "@/domain/rules/outcome";
@@ -163,31 +169,42 @@ export interface Grade extends TenantScoped, Created {
  * product never outputs a probability of ignition — in a column, an API
  * response, an export or a PDF. **The absence of that field is the enforcement**,
  * here and in the schema.
+ *
+ * Built by `b2-11-risk-ranking` (Rules 10.19–10.26). Wider than `ERD.md` §8.3
+ * by five fields, argued for unit 17 in that unit's build-notes §3:
+ * `runId`, `comparisonSet`, `levelWithCount`, `why` and `inputsSignature`;
+ * and `factors` holds `{ code, order, level, value, basis }` — **`order` in
+ * place of the ERD's "weight", because there is no weight** (Rule 10.21).
  */
 export interface HazardRanking extends TenantScoped, Created {
   readonly id: Uuid;
-  /**
-   * What was ranked; matches whichever id below is non-null.
-   *
-   * `ERD.md` §8.3 says the values are in `TAXONOMY.md`; no system defines them —
-   * reported in this unit's build-notes.
-   */
-  readonly scopeType: string;
+  /** One run's rows share it (Rule 10.26). */
+  readonly runId: Uuid;
+  /** T-67. What was ranked; matches whichever id below is non-null. */
+  readonly scopeType: HazardRankingScope;
   readonly batteryRecordId: Uuid | null;
   readonly containerId: Uuid | null;
   readonly lotId: Uuid | null;
-  /** Position within the ranked set — **relative, not absolute**. */
+  /** What the item was ranked against — the organization's held inventory of its kind (Rule 10.19). */
+  readonly comparisonSet: ComparisonSet;
+  /** Position within the ranked set — **relative, not absolute**. Level items share the best one. */
   readonly rankPosition: number;
   /** **Ranking is meaningless without its denominator.** */
   readonly rankedSetSize: number;
+  /** How many items are level with this one (Rule 10.23). */
+  readonly levelWithCount: number;
   /** T-33. */
   readonly band: HazardRankingBand;
   /** Plain language, printed wherever the ranking is shown. */
   readonly basisStatement: string;
   /** T-34. Minimum one. */
   readonly factorCodes: readonly HazardFactorCode[];
-  /** Per factor: value, weight and **its stated basis** (Rule 10.4). */
-  readonly factors: JsonObject;
+  /** Per factor: its place in the order, its level and **its stated basis** (Rules 10.4, 10.25). */
+  readonly factors: readonly HazardRankingFactorEntry[];
+  /** Against the item just above and just below, and who it is level with (Rule 10.25). */
+  readonly why: HazardRankingWhy;
+  /** What the ranking read, so a later change reads "Changed since" (Rule 10.24). Never shown. */
+  readonly inputsSignature: string;
   readonly schemeVersion: string;
   readonly governingRuleVersionId: Uuid | null;
   readonly computedAt: IsoTimestamp;

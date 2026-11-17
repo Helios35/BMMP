@@ -53,6 +53,9 @@
  * added at TAXONOMY.md v1.9: every photo check run, a failed one with its
  * reason (Rule 6.26), and P6 setting or replacing an entry's reference label
  * photo (Rule 2.36).
+ * **`hazard_ranking.computed`** was authored by planning (D-77) and added at
+ * TAXONOMY.md v1.10: one ranking run over an organization's held batteries,
+ * containers and lots, with the scheme version (Rules 10.24, 10.26).
  *
  * **Never invent a value.** If one is needed and is not here, it does not exist
  * yet — raise it to P6 (TAXONOMY.md §1.1).
@@ -81,6 +84,7 @@ export const AUDIT_EVENT_TYPES = [
   "recall_match.confirmed",
   "recall_match.recorded",
   "recall_match.dismissed",
+  "hazard_ranking.computed",
   "container.status_changed",
   "lot.created",
   "lot.status_changed",
@@ -141,6 +145,7 @@ export const AUDIT_EVENT_TYPE_LABELS: Readonly<Record<AuditEventType, string>> =
     "recall_match.confirmed": "Recall confirmed",
     "recall_match.recorded": "Recall recorded",
     "recall_match.dismissed": "Recall dismissed",
+    "hazard_ranking.computed": "Hazard ranking run",
     "container.status_changed": "Container status changed",
     "lot.created": "Lot created",
     "lot.status_changed": "Lot status changed",

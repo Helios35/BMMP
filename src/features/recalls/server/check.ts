@@ -7,7 +7,7 @@ import type {
 import type { StorageWriteAttribution } from "@/data/contracts/storage";
 import {
   candidatesFor,
-  recallIdentities,
+  recallIdentitiesForRecord,
   recallQueryFor,
   type RecallCheckTrigger,
   type RecallIdentity,
@@ -59,19 +59,7 @@ export interface CheckSubject {
 
 /** What this record can be checked on (Rule 10.11) — the catalog entry's names first. */
 export function identitiesOf(subject: CheckSubject): readonly RecallIdentity[] {
-  const { record, catalogEntry } = subject;
-  return recallIdentities({
-    hasConfirmedCatalogEntry:
-      record.catalogEntryId !== null && catalogEntry !== null,
-    manufacturerName: catalogEntry?.manufacturerName ?? record.manufacturerName,
-    brandName: catalogEntry?.brandName ?? record.brandName,
-    modelName: catalogEntry?.modelName ?? record.modelName,
-    partNumber: catalogEntry?.partNumber ?? record.partNumber,
-    provenanceSourceType: record.provenanceSourceType,
-    sourceDeviceMake: record.sourceDeviceMake,
-    sourceDeviceModel: record.sourceDeviceModel,
-    sourceDeviceModelYear: record.sourceDeviceModelYear,
-  });
+  return recallIdentitiesForRecord(subject.record, subject.catalogEntry);
 }
 
 /**
