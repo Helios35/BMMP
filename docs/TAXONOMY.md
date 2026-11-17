@@ -1,5 +1,5 @@
 # Taxonomy — BMMP
-**Version:** 1.9 · **Date:** 2026-11-10 · **Owner:** Nathan Ivy / Next Sketch LLC
+**Version:** 1.10 · **Date:** 2026-11-17 · **Owner:** Nathan Ivy / Next Sketch LLC
 **Answers:** How is everything in this product classified?
 **Reads from:** `_ANCHORS.md` · `PRD.md` · `BUSINESS_RULES.md` · `PROJECT_SETUP_BMMP.md`  ·  **Feeds:** `TECHNICAL_SPEC.md` · `ERD.md` · `UX_SPEC.md` · `SITE_ARCHITECTURE.md` · every builder brief
 
@@ -9,6 +9,15 @@
 ---
 
 ## Changelog
+
+**v1.10 · 2026-11-17 — hazard ranking (`Decision Log.md` D-76, D-77)**
+
+- T-33, T-34, T-43, T-65, T-66 changes and T-67 authored by planning (D-76, D-77), transcribed by `b2-11-risk-ranking`.
+- **T-33:** `not_ranked` is redefined (Rule 10.23); level items share a position and a band; one neutral colour for every band.
+- **T-34:** a factor with no recorded evidence reads "Not recorded" and ranks level with its highest level, replacing "omitted, not defaulted" (Rule 10.20); `storage_aggregation` applies to containers and lots only (Rule 10.22).
+- **One system added: T-67 `hazard_ranking.scope_type`.**
+- **T-43 gains `hazard_ranking.computed`.**
+- **T-65, T-66 (D-76 #3):** "No number is stored on a run" becomes "No score, similarity or distance is stored on a run. Cost and latency are metering."
 
 **v1.9 · 2026-11-10 — photo checks (`Decision Log.md` D-74, D-75)**
 
@@ -239,6 +248,8 @@ Two citations in this document are deliberately **not** numbered, because what t
 | **K. Photo checks — added at v1.9** ||||
 | T-65 | Photo check kind | `photo_check.check_kind` | single | B2 (from `b2-10`) |
 | T-66 | Photo check outcome | `photo_check.outcome` | single | B2 (from `b2-10`) |
+| **L. Hazard ranking — added at v1.10** ||||
+| T-67 | Hazard ranking scope | `hazard_ranking.scope_type` | single | B2 (from `b2-11`) |
 
 ---
 
@@ -1105,7 +1116,7 @@ Two citations in this document are deliberately **not** numbered, because what t
 | `band_2` | Band 2 | Ranked above the middle of the comparison set. |
 | `band_3` | Band 3 | Ranked below the middle of the comparison set. |
 | `band_4` | Band 4 — lowest relative ranking in set | Ranked lowest within the stated comparison set on the recorded factors. |
-| `not_ranked` | Not ranked | Insufficient recorded factors to place this record in the comparison set. |
+| `not_ranked` | Not ranked | The comparison set has one item, or every item is level on the recorded factors (Rule 10.23). No band is given. |
 
 **Rules**
 
@@ -1114,6 +1125,8 @@ Two citations in this document are deliberately **not** numbered, because what t
 - **Bands are relative within a set, not absolute across the product.** Band 1 in a container of undamaged consumer cells is not comparable to Band 1 in a container of swollen traction modules, and the UI must not invite that comparison.
 - **Prohibited presentation, explicitly:** no percentage, no probability, no 0–100 score, no colour-only encoding that reads as a traffic light without the band label, no adjective that implies likelihood ("moderate risk", "high chance"). Prohibited in every surface including PDF exports and the evidence pack.
 - **Every band carries its factors.** A ranking row without at least one factor code (T-34) and its stated basis is invalid.
+- **Level items share a position and a band (Rule 10.23).**
+- **One neutral colour for every band.**
 - **System-produced.** No role assigns a band by hand, including P6. Governed by **Rules 10.3 and 10.4** — **Rule 10.4** fixes the only permitted output shape: a relative ranking of items against each other with a stated basis per contributing factor, in comparative language ("higher than," "ranked above"), never probabilistic.
 - **Append-only.** A re-ranking writes a new row. Rankings are never mutated. See RN-4 on band count.
 
@@ -1140,7 +1153,8 @@ Two citations in this document are deliberately **not** numbered, because what t
 - **Multi-select, minimum one.** A ranking row with no factors is invalid.
 - **Every factor carries a stated basis** — the recorded evidence for that factor on that record, at that time. The basis is what makes the ranking defensible; a factor code with no basis is not acceptable output.
 - **All factors are paperwork-level.** Nothing in this system requires a sensor, and nothing in it is presented as a measurement of battery health. The whole system is derived from data the compliance workflow already captures.
-- **A factor that has no recorded evidence is omitted, not defaulted.** A record with no charge reading (T-21 `not_captured`) simply does not carry that factor — it is never scored as if it were zero, low, or safe.
+- **A factor with no recorded evidence reads 'Not recorded' and ranks level with its highest level, so a gap never moves an item down (Rule 10.20).**
+- **`storage_aggregation` applies to containers and lots only (Rule 10.22).**
 - **System-assigned.** Governed by **Rule 10.4**, which requires that a user be able to read why one item ranks above another factor by factor — what the factor is, what value this record has for it, and where that value came from.
 - **Append-only**, written with the ranking row.
 
@@ -1397,6 +1411,7 @@ Two citations in this document are deliberately **not** numbered, because what t
 | `recall_match.confirmed` | Recall confirmed | A person confirmed a possible match (Rule 10.14). |
 | `recall_match.recorded` | Recall recorded | A person recorded a recall by hand, with its reference (Rule 10.15). |
 | `recall_match.dismissed` | Recall dismissed | A possible match was dismissed, or a confirmed one withdrawn, with a reason (Rules 10.14, 10.16). |
+| `hazard_ranking.computed` | Hazard ranking run | A ranking run ranked an organization's held batteries, containers and lots, with the scheme version. Actor: `scheduled_job` or the person who pressed Rank now. |
 | `container.status_changed` | Container status changed | The container moved between values of T-24. |
 | `lot.created` | Lot created | P1 or P6 created a lot. It starts at `open` (T-25); every later move is `lot.status_changed`. |
 | `lot.status_changed` | Lot status changed | The lot moved between values of T-25 — closed, reopened, allocated to a shipment, returned to `closed` when that shipment let it go, shipped on departure, or dissolved. A dissolved lot's row is retained for audit (T-25). |
@@ -1950,7 +1965,7 @@ Severity is set by the code that raises the alert, from the condition that raise
 
 - **Single-select.**
 - **Check runs are append-only.**
-- **No number is stored on a run.**
+- **No score, similarity or distance is stored on a run. Cost and latency are metering.**
 
 ---
 
@@ -1974,7 +1989,24 @@ Severity is set by the code that raises the alert, from the condition that raise
 
 - **Single-select.**
 - **Check runs are append-only.**
-- **No number is stored on a run.**
+- **No score, similarity or distance is stored on a run. Cost and latency are metering.**
+
+---
+
+### T-67 · Hazard ranking scope
+
+**Stored on:** `hazard_ranking.scope_type` · **Cardinality:** single-select · **Phase:** B2 (from `b2-11`)
+
+| Stored value | Display label | Definition |
+|---|---|---|
+| `battery_record` | Battery | A held battery, ranked against the organization's held batteries (Rule 10.19). |
+| `container` | Container | A held container, ranked against the organization's held containers (Rules 10.19, 10.22). |
+| `lot` | Lot | A held lot, ranked against the organization's held lots (Rules 10.19, 10.22). |
+
+**Rules**
+
+- **Single-select.** Matches whichever of `battery_record_id`, `container_id` and `lot_id` is set on the row.
+- **Each kind is ranked against its own kind only** (Rule 10.19).
 
 ---
 
@@ -2187,6 +2219,7 @@ Every enum column in the product, in one place. `text[]` marks a multi-select co
 | T-45 | `classification_decision.status` | `text` | `pending` | no | B1a |
 | T-46 | `damage_assessment.status` | `text` | `not_assessed` | no | B1a |
 | T-47 | `tos_acceptance.status` | `text` | `not_accepted` | no | B1a |
+| T-67 | `hazard_ranking.scope_type` | `text` | none — required | no | B2 |
 
 **No enum column is nullable anywhere in this product.** "Not yet known" is a value with a name and a definition — `unknown`, `undetermined`, `not_captured`, `not_assigned`, `pending` — because null cannot be filtered, cannot be counted, cannot be explained to an auditor and cannot be distinguished from a bug. The one place absence is modelled as absence is T-30 `ddr_flags`, where an empty array is the normal state and a `none` value would be actively harmful.
 
