@@ -8,7 +8,13 @@ import {
   CONTAINER_STATUS_LABELS,
   type ContainerStatus,
 } from "@/domain/taxonomy/container-status";
+import {
+  HAZARD_RANKING_BANDS,
+  HAZARD_RANKING_BAND_LABELS,
+  type HazardRankingBand,
+} from "@/domain/taxonomy/hazard-ranking-band";
 import { isTaxonomyValue, optionsFor } from "@/domain/taxonomy/lookup";
+import { ANY_BAND, BAND_FILTER } from "@/features/hazard-ranking/ranking-copy";
 import {
   LOT_STATUSES,
   LOT_STATUS_LABELS,
@@ -45,7 +51,14 @@ export const CONTAINER_FILTER_IDS = [
   "tier",
   "status",
   "location",
+  "band",
 ] as const;
+
+/**
+ * The one sortable column on both views — the Ranking (`UX_SPEC.md` §3.9):
+ * the current position, highest first ascending; unranked last.
+ */
+export const RANKING_SORT = "hazardRanking";
 
 /** `?filter=alerting` — the one value, named by Flow C2. */
 export const ALERTING = "alerting";
@@ -62,15 +75,15 @@ export function activeContainerView(query: ListQuery): ContainerViewId {
   return query.tab === "lots" ? "lots" : "containers";
 }
 
-export const LOT_FILTER_IDS = ["status"] as const;
+export const LOT_FILTER_IDS = ["status", "band"] as const;
 
 /** The Lots view's URL contract — search and T-25's status. */
 export const LOT_LIST_SPEC: ListQuerySpec = {
-  sortableColumnIds: [],
+  sortableColumnIds: [RANKING_SORT],
   defaultSort: "",
   defaultDir: "desc",
   filterIds: LOT_FILTER_IDS,
-  filterValues: { status: LOT_STATUSES },
+  filterValues: { status: LOT_STATUSES, band: HAZARD_RANKING_BANDS },
   perPageOptions: [CONTAINER_PAGE_SIZE, 50, 100],
   tabIds: CONTAINER_VIEW_IDS,
 };
@@ -82,25 +95,44 @@ export const LOT_FILTERS: readonly RecordTableFilter[] = [
     options: optionsFor(LOT_STATUSES, LOT_STATUS_LABELS),
     anyLabel: "Any status",
   },
+  {
+    // T-33 — the band of the current ranking (Rule 10.23).
+    id: "band",
+    label: BAND_FILTER,
+    options: optionsFor(HAZARD_RANKING_BANDS, HAZARD_RANKING_BAND_LABELS),
+    anyLabel: ANY_BAND,
+  },
 ];
 
-export function lotListSelection(query: ListQuery): {
+export interface LotListSelection {
   readonly search: string | null;
   readonly status: LotStatus | null;
-} {
+  readonly band: HazardRankingBand | null;
+  readonly sortByRanking: boolean;
+  readonly sortDirection: "asc" | "desc";
+}
+
+export function lotListSelection(query: ListQuery): LotListSelection {
   const status = query.filters.status;
+  const band = query.filters.band;
   return {
     search: query.q,
     status:
       status !== undefined && isTaxonomyValue(LOT_STATUSES, status)
         ? status
         : null,
+    band:
+      band !== undefined && isTaxonomyValue(HAZARD_RANKING_BANDS, band)
+        ? band
+        : null,
+    sortByRanking: query.sort === RANKING_SORT,
+    sortDirection: query.dir ?? "asc",
   };
 }
 
 export function containerListSpec(locations: readonly string[]): ListQuerySpec {
   return {
-    sortableColumnIds: [],
+    sortableColumnIds: [RANKING_SORT],
     defaultSort: "",
     defaultDir: "desc",
     filterIds: CONTAINER_FILTER_IDS,
@@ -109,6 +141,7 @@ export function containerListSpec(locations: readonly string[]): ListQuerySpec {
       tier: STORAGE_CLOCK_ALERT_BANDS,
       status: CONTAINER_STATUSES,
       location: locations,
+      band: HAZARD_RANKING_BANDS,
     },
     perPageOptions: [CONTAINER_PAGE_SIZE, 50, 100],
     tabIds: CONTAINER_VIEW_IDS,
@@ -149,6 +182,13 @@ export function containerFilters(
       })),
       anyLabel: "Any location",
     },
+    {
+      // T-33 — the band of the current ranking (Rule 10.23).
+      id: "band",
+      label: BAND_FILTER,
+      options: optionsFor(HAZARD_RANKING_BANDS, HAZARD_RANKING_BAND_LABELS),
+      anyLabel: ANY_BAND,
+    },
   ];
 }
 
@@ -158,6 +198,9 @@ export interface ContainerListSelection {
   readonly status: ContainerStatus | undefined;
   readonly storageLocation: string | undefined;
   readonly search: string | undefined;
+  readonly hazardRankingBand: HazardRankingBand | undefined;
+  readonly sortBy: typeof RANKING_SORT | undefined;
+  readonly sortDirection: "asc" | "desc" | undefined;
 }
 
 export function containerListSelection(
@@ -165,7 +208,15 @@ export function containerListSelection(
 ): ContainerListSelection {
   const tier = query.filters.tier;
   const status = query.filters.status;
+  const band = query.filters.band;
   return {
+    hazardRankingBand:
+      band !== undefined && isTaxonomyValue(HAZARD_RANKING_BANDS, band)
+        ? band
+        : undefined,
+    sortBy: query.sort === RANKING_SORT ? RANKING_SORT : undefined,
+    sortDirection:
+      query.sort === RANKING_SORT ? (query.dir ?? "asc") : undefined,
     isAlerting: query.filters.filter === ALERTING ? true : undefined,
     tier:
       tier !== undefined && isTaxonomyValue(STORAGE_CLOCK_ALERT_BANDS, tier)

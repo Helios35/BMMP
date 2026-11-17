@@ -15,6 +15,8 @@ import { APP_ROUTE_NAMES } from "@/domain/access/routes";
 import { batteryColumns } from "@/features/battery-record/battery-columns";
 import { BatteryEmptyState } from "@/features/battery-record/battery-empty-state";
 import { readIntakeGate } from "@/features/consent/read-intake-gate";
+import { rankNowControl } from "@/features/hazard-ranking/components/rank-now-control";
+import { readRankingLookup } from "@/features/hazard-ranking/server/read-rankings";
 import {
   BATTERY_EXPORT_PATH,
   BATTERY_LIST_PATH,
@@ -55,9 +57,12 @@ export default async function BatteriesPage({
   const params = await searchParams;
   const asOf = nowIso();
 
-  const [request, intakeGate] = await Promise.all([
+  const [request, intakeGate, rankings] = await Promise.all([
     readBatteryListRequest(ctx, params),
     readIntakeGate(ctx),
+    // The Ranking column — every record's current ranking, one read for the
+    // page (Rules 10.23, 10.24).
+    readRankingLookup(ctx, "battery_record", asOf),
   ]);
   const {
     spec,
@@ -94,6 +99,7 @@ export default async function BatteriesPage({
           containersById,
           clocksByContainerId,
           asOf,
+          rankingFor: (id) => rankings.viewFor(id),
         })}
         rows={result.rows}
         rowKey={(row) => row.id}
@@ -182,11 +188,13 @@ function batteryToolbar(
   href: string,
 ): ReactNode {
   const log = logABatteryAction(role, isIntakeBlocked);
+  const rank = rankNowControl(role, "/batteries");
   const canExport = mayExportList(role, "/batteries");
-  if (log === undefined && !canExport) return undefined;
+  if (log === undefined && rank === undefined && !canExport) return undefined;
   return (
     <>
       {log}
+      {rank}
       {canExport ? (
         <ExportControl
           href={href}

@@ -1,9 +1,15 @@
 import type { ReactElement } from "react";
 
+import { HazardRankingCell } from "@/components/hazard/hazard-ranking-cell";
+import { HazardRankingPanel } from "@/components/hazard/hazard-ranking-panel";
+import { RankingDetailsDialog } from "@/components/hazard/ranking-details-dialog";
 import type { RecordTableColumn } from "@/components/record-table/record-table";
 import { StatusBadge } from "@/components/status/status-badge";
 import { INTENT_TEXT_CLASSES } from "@/components/status/intent-classes";
+import type { HazardRankingView } from "@/domain/hazard/view";
 import { absoluteInstant } from "@/features/battery-record/format-instant";
+import { RANKING_COLUMN } from "@/features/hazard-ranking/ranking-copy";
+import type { Uuid } from "@/types/common";
 import { cn } from "@/lib/utils";
 
 import { LotRowActions } from "./components/lot-controls";
@@ -18,6 +24,7 @@ import {
   LOT_NO_DESCRIPTION,
   LOT_NO_START,
   LOT_OVERDUE,
+  LOT_RANKING_TITLE,
 } from "./container-copy";
 import type { LotListRow } from "./server/read-lots";
 
@@ -56,9 +63,38 @@ function EarliestStart({
   );
 }
 
+/**
+ * A lot's Ranking cell: the band and "3 of 41", and — because a lot has no
+ * page — its `HazardRankingPanel` behind **Ranking basis** (`UX_SPEC.md`
+ * §3.9; Rule 10.25). Every role may open it.
+ */
+function LotRankingCell({
+  lotCode,
+  view,
+}: {
+  readonly lotCode: string;
+  readonly view: HazardRankingView;
+}): ReactElement {
+  return (
+    <span className="flex flex-col items-start gap-2">
+      <HazardRankingCell view={view} />
+      {view.kind === "ranked" ? (
+        <RankingDetailsDialog
+          title={LOT_RANKING_TITLE(lotCode)}
+          itemCode={lotCode}
+        >
+          <HazardRankingPanel view={view} inDialog />
+        </RankingDetailsDialog>
+      ) : null}
+    </span>
+  );
+}
+
 export function lotColumns(
   timeZone: string,
   canManage: boolean,
+  /** Each lot's current hazard ranking, read once for the page (Rule 10.23). */
+  rankingFor: (lotId: Uuid) => HazardRankingView,
 ): readonly RecordTableColumn<LotListRow>[] {
   return [
     {
@@ -96,6 +132,17 @@ export function lotColumns(
       status: true,
       cell: (row) => (
         <StatusBadge system="lot_status" value={row.lot.status} size="sm" />
+      ),
+    },
+    {
+      id: "hazardRanking",
+      header: RANKING_COLUMN,
+      sortable: true,
+      cell: (row) => (
+        <LotRankingCell
+          lotCode={row.lot.lotCode}
+          view={rankingFor(row.lot.id)}
+        />
       ),
     },
     ...(canManage

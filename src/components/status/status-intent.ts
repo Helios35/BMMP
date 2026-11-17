@@ -11,6 +11,7 @@ import {
   DOCUMENT_RENDER_STATUS_LABELS,
   FORMAT_CATEGORY_LABELS,
   HANDLER_SIZE_CLASS_LABELS,
+  HAZARD_RANKING_BAND_LABELS,
   INTAKE_SESSION_STATUS_LABELS,
   LOT_STATUS_LABELS,
   RECALL_MATCH_STATUS_LABELS,
@@ -75,6 +76,7 @@ export const STATUS_SYSTEMS = {
   container_type: CONTAINER_TYPE_LABELS,
   container_status: CONTAINER_STATUS_LABELS,
   lot_status: LOT_STATUS_LABELS,
+  hazard_ranking_band: HAZARD_RANKING_BAND_LABELS,
   storage_clock_status: STORAGE_CLOCK_STATUS_LABELS,
   storage_clock_alert_band: STORAGE_CLOCK_ALERT_BAND_LABELS,
   shipment_status: SHIPMENT_STATUS_LABELS,
@@ -189,6 +191,16 @@ export const STATUS_INTENTS: Readonly<Record<StatusSystem, IntentMap>> = {
     retired: "neutral",
   },
   // T-25
+  // T-33 — **one neutral colour for every band**, never red, amber or green
+  // (Rule 10.25). A band is a place in a set, not a condition; colouring it
+  // would read as a traffic light, which T-33 prohibits outright.
+  hazard_ranking_band: {
+    band_1: "neutral",
+    band_2: "neutral",
+    band_3: "neutral",
+    band_4: "neutral",
+    not_ranked: "neutral",
+  },
   lot_status: {
     open: "ok",
     closed: "neutral",

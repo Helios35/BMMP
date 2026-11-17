@@ -21,6 +21,11 @@ import {
   RECALL_MATCH_STATUS_LABELS,
 } from "@/domain/taxonomy/recall-match-status";
 import { readTaxonomyValue } from "@/domain/taxonomy/lookup";
+import {
+  rankingCsvCells,
+  unavailableRankingView,
+  type HazardRankingView,
+} from "@/domain/hazard/view";
 import { STORAGE_CLOCK_ALERT_BAND_LABELS } from "@/domain/taxonomy/storage-clock-alert-band";
 import type { BatteryRecord } from "@/types/battery-record";
 import type { RecallMatch } from "@/types/condition";
@@ -38,6 +43,10 @@ import { absoluteInstant, UNPLACED_RECORD_TIME_ZONE } from "./format-instant";
  * is its label from its own lookup, and an unrecognised one exports as stored
  * — never blank, never coerced (TAXONOMY.md §5.8). **No probability,
  * percentage, likelihood or score appears in any column** (Rule 1.25).
+ *
+ * The four ranking columns (`UX_SPEC.md` §3.5; Rules 10.19, 10.25) carry the
+ * position and band, **the set and the as-of time beside them** — a band is
+ * never exported without both (T-33) — and every factor's level.
  *
  * Pure: records and their decorations in, cells out.
  */
@@ -62,6 +71,10 @@ export const BATTERY_CSV_HEADERS = [
   "Recall associations",
   "Identified by",
   "Damage assessed by",
+  "Hazard ranking",
+  "Ranking set",
+  "Ranked as of",
+  "Ranking factors",
 ] as const;
 
 /**
@@ -101,6 +114,11 @@ export interface BatteryCsvContext {
    * T-59 exports as stored and is never read as model-assisted (STATE §7 #1).
    */
   readonly assessmentMethodByRecordId?: ReadonlyMap<string, string>;
+  /**
+   * Each record's hazard ranking view (Rules 10.19–10.25). Absent reads as
+   * "could not be read" — never as "Not ranked", which is a fact.
+   */
+  readonly rankingFor?: (recordId: string) => HazardRankingView;
 }
 
 /** `26-041 (Possible match — needs review)`; a withdrawal says so. Never a number about the match. */
@@ -164,6 +182,9 @@ export function batteryCsvRow(
       DAMAGE_ASSESSMENT_METHODS,
       DAMAGE_ASSESSMENT_METHOD_LABELS,
       context.assessmentMethodByRecordId?.get(record.id) ?? null,
+    ),
+    ...rankingCsvCells(
+      context.rankingFor?.(record.id) ?? unavailableRankingView(),
     ),
   ];
 }

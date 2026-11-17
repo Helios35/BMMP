@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { ReactElement } from "react";
 
 import { ClassificationOutcome } from "@/components/classification/classification-outcome";
+import { HazardRankingPanel } from "@/components/hazard/hazard-ranking-panel";
 import { FieldList } from "@/components/page";
 import { AiSuggestedTag } from "@/components/ai/ai-suggested-tag";
 import {
@@ -32,6 +33,7 @@ import {
   manufactureDateSource,
   type FieldSourceInput,
 } from "./field-source";
+import { readRankingView } from "@/features/hazard-ranking/server/read-rankings";
 import { RecallsSection } from "@/features/recalls/components/recalls-section";
 import { readRecallSection } from "@/features/recalls/server/read-recalls";
 
@@ -141,6 +143,9 @@ export async function OverviewTab({
     record,
     container?.siteTimeZone ?? UNPLACED_RECORD_TIME_ZONE,
   );
+  // Rules 10.19–10.26 — the record's place in its organization's held
+  // batteries, from the last run; never computed on render.
+  const ranking = await readRankingView(ctx, "battery_record", record.id, asOf);
 
   const sourceInput: FieldSourceInput = {
     extractedFieldCodes: new Set(
@@ -365,10 +370,10 @@ export async function OverviewTab({
         ) : null}
       </DetailCard>
 
-      {/* [B2] hazard_ranking — the slot, reserved. When it arrives it is a
-          relative ranking with a stated basis per factor, and the shape it may
-          never take is Rule 1.25 and _ANCHORS.md §7.1. B1a renders nothing here:
-          no heading, no placeholder, no "coming soon", no empty card. */}
+      {/* Rules 10.19–10.26 — a relative ranking with a stated basis per
+          factor, never a probability or percentage (Rule 1.25, _ANCHORS.md
+          §7.1). The shared panel, as on a container and a lot (§3.7). */}
+      <HazardRankingPanel view={ranking} />
 
       <RecallsSection view={recalls} />
     </div>

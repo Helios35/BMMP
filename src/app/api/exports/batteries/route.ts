@@ -9,11 +9,13 @@ import {
   BATTERY_FILTER_IDS,
 } from "@/features/battery-record/list-query";
 import { readBatteryListRequest } from "@/features/battery-record/server/list-read";
+import { readRankingLookup } from "@/features/hazard-ranking/server/read-rankings";
 import {
   exportScope,
   readEveryPage,
   serveCsvExport,
 } from "@/lib/export/csv-export";
+import { nowIso } from "@/lib/auth/session";
 import type { RecallMatch } from "@/types/condition";
 
 /**
@@ -96,6 +98,8 @@ export async function GET(request: Request): Promise<Response> {
           assessment.assessmentMethod,
         );
       }
+      // The four ranking columns — the screen's own lookup (Rules 10.24, 10.25).
+      const rankings = await readRankingLookup(ctx, "battery_record", nowIso());
       return {
         kind: "file",
         file: {
@@ -106,6 +110,7 @@ export async function GET(request: Request): Promise<Response> {
               recallsByRecordId,
               identifiedByModelRecordIds,
               assessmentMethodByRecordId,
+              rankingFor: (id) => rankings.viewFor(id),
             }),
           ),
           scope: exportScope(

@@ -1,8 +1,10 @@
 import Link from "next/link";
 
+import { HazardRankingCell } from "@/components/hazard/hazard-ranking-cell";
 import type { RecordTableColumn } from "@/components/record-table/record-table";
 import { StatusBadge } from "@/components/status/status-badge";
 import { canReadRoute } from "@/domain/access/route-capability";
+import type { HazardRankingView } from "@/domain/hazard/view";
 import {
   CELL_FORM_FACTORS,
   CELL_FORM_FACTOR_LABELS,
@@ -10,6 +12,7 @@ import {
 import { CHEMISTRIES, CHEMISTRY_LABELS } from "@/domain/taxonomy/chemistry";
 import { readTaxonomyValue } from "@/domain/taxonomy/lookup";
 import type { RoleCode } from "@/domain/taxonomy/role";
+import { RANKING_COLUMN } from "@/features/hazard-ranking/ranking-copy";
 import { relativeTimeLabel } from "@/features/shell/chrome/relative-time";
 import type { BatteryRecord } from "@/types/battery-record";
 import type { IsoTimestamp, TimeZone, Uuid } from "@/types/common";
@@ -52,6 +55,8 @@ export interface BatteryColumnContext {
   readonly clocksByContainerId: ReadonlyMap<Uuid, StorageClock>;
   /** One server instant for the whole render, so no two rows disagree. */
   readonly asOf: IsoTimestamp;
+  /** Each record's current hazard ranking, read once for the page (Rule 10.23). */
+  readonly rankingFor: (recordId: Uuid) => HazardRankingView;
 }
 
 export function batteryColumns(
@@ -152,6 +157,14 @@ export function batteryColumns(
           timeZone={siteTimeZoneFor(row, context)}
         />
       ),
+    },
+    {
+      // `UX_SPEC.md` §3.5 — the band label and "3 of 41", sortable by the
+      // current position (Rule 10.23). One neutral colour for every band.
+      id: "hazardRanking",
+      header: RANKING_COLUMN,
+      sortable: true,
+      cell: (row) => <HazardRankingCell view={context.rankingFor(row.id)} />,
     },
   ];
 }
