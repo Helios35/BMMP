@@ -34,6 +34,7 @@ import type {
   ShippingPaperRepository,
 } from "./documents";
 import type { DamageAssessmentRepository } from "./condition";
+import type { HazardRankingRepository } from "./hazard-rankings";
 import type { RecallRepository } from "./recalls";
 import type {
   CatalogReferencePhotoRepository,
@@ -159,6 +160,11 @@ export interface DataAdapter {
    */
   readonly photoChecks: PhotoCheckRepository;
   readonly catalogReferencePhotos: CatalogReferencePhotoRepository;
+  /**
+   * The hazard ranking — `hazard_ranking` rows, read and written by a run,
+   * argued for unit 17 (Rules 10.19–10.26; D-77).
+   */
+  readonly hazardRankings: HazardRankingRepository;
 
   // Evidence and audit — ERD.md §10.2. evidence_pack is B1b (D-24).
   readonly auditEvents: AuditEventRepository;
@@ -202,3 +208,4 @@ export * from "./platform-configuration";
 export * from "./jobs";
 export * from "./recalls";
 export * from "./photo-checks";
+export * from "./hazard-rankings";

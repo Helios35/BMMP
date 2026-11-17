@@ -153,6 +153,14 @@ export const BATTERY = {
   photoCopyTarget: uid("0a000009", 16),
   /** b2-10 — a `model_assisted_visual` assessment: one suggestion accepted, one rejected. */
   modelAssisted: uid("0a000009", 17),
+  /** b2-11 — BR-0017: lithium metal, no damage assessment, no rated energy, the oldest age band, no marks read. */
+  rankingLithiumMetal: uid("0a000009", 18),
+  /** b2-11 — BR-0018: alkaline, a device-sourced pack whose last check found no match. */
+  rankingAlkaline: uid("0a000009", 19),
+  /** b2-11 — BR-0019: T-01 `other`, level on every factor with BR-0020. */
+  rankingLevelFirst: uid("0a000009", 20),
+  /** b2-11 — BR-0020: the other half of the level pair. */
+  rankingLevelSecond: uid("0a000009", 21),
 } as const;
 
 export const INTAKE_SESSION = {
@@ -212,6 +220,8 @@ export const CONTAINER = {
   recalledQuarantine: uid("0a00000d", 8),
   /** b2-09 — sound, on air shipment SH-0004. */
   airShipmentSound: uid("0a00000d", 9),
+  /** b2-11 — C-0010, holding BR-0017: storage aggregation "Not fully recorded". */
+  rankingUnknownEnergy: uid("0a00000d", 10),
 } as const;
 
 export const LOT = {
@@ -232,6 +242,7 @@ export const CLOCK = {
   recallChecks: uid("0a00000f", 7),
   recalledQuarantine: uid("0a00000f", 8),
   airShipmentSound: uid("0a00000f", 9),
+  rankingUnknownEnergy: uid("0a00000f", 10),
 } as const;
 
 export const ALERT = {
@@ -300,6 +311,10 @@ export const DAMAGE = {
   photoCopyTarget: uid("0a000016", 12),
   /** b2-10 — BR-0016, `model_assisted_visual`. */
   modelAssisted: uid("0a000016", 13),
+  /** b2-11 — the ranking fixtures' assessments. BR-0017 has none, on purpose. */
+  rankingAlkaline: uid("0a000016", 14),
+  rankingLevelFirst: uid("0a000016", 15),
+  rankingLevelSecond: uid("0a000016", 16),
 } as const;
 
 /** b2-10 — photo check runs (Rules 2.36, 2.37, 6.25). */
@@ -340,6 +355,8 @@ export const RECALL_CHECK = {
   nothingToMatch: uid("0a00001d", 6),
   airShipmentBattery: uid("0a00001d", 7),
   airShipmentVehicle: uid("0a00001d", 8),
+  /** b2-11 — BR-0018's device check: no match. */
+  rankingAlkalineDevice: uid("0a00001d", 9),
 } as const;
 
 export const STORAGE_EVENT = {
@@ -358,7 +375,17 @@ export const AUDIT = {
   julyPaperIssued: uid("0a000018", 4),
   /** b1a-08 — the Rule 2.35 disagreement on BR-0008's history. */
   labelMismatchRouted: uid("0a000018", 5),
+  /** b2-11 — Cascade's seeded ranking run (Rule 10.26). */
+  hazardRankingSeeded: uid("0a000018", 6),
 } as const;
+
+/** b2-11 — Cascade's seeded ranking run, so the screens show a ranking before Rank now. */
+export const HAZARD_RANKING_RUN = {
+  cascadeSeeded: uid("0a000020", 1),
+} as const;
+
+/** b2-11 — the seeded run's rows, numbered in the order the run writes them. */
+export const hazardRankingRowId = (n: number): string => uid("0a000021", n);
 
 export const DATE_CODE = {
   vehicle: uid("0a000019", 1),

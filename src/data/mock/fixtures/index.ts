@@ -43,6 +43,7 @@ import type { CatalogReferencePhoto, PhotoCheck } from "@/types/photo-check";
 import * as B1A_08 from "./b1a-08";
 import * as B2_09 from "./b2-09";
 import * as B2_10 from "./b2-10";
+import * as B2_11 from "./b2-11";
 import * as ID from "./ids";
 import { INVITE_TOKEN_HASHES } from "./invite-tokens";
 
@@ -1874,6 +1875,8 @@ export const batteryRecords: readonly BatteryRecord[] = [
   // Added by b2-09 — never an edit to a row above (STATE §7.1).
   ...B2_09.batteryRecords,
   ...B2_10.batteryRecords,
+  // Added by b2-11 — never an edit to a row above (STATE §7.1).
+  ...B2_11.batteryRecords,
 ];
 
 // ---------------------------------------------------------------------------
@@ -2462,6 +2465,8 @@ export const containers: readonly Container[] = [
   ...B1A_08.containers,
   // Added by b2-09 — never an edit to a row above (STATE §7.1).
   ...B2_09.containers,
+  // Added by b2-11 — never an edit to a row above (STATE §7.1).
+  ...B2_11.containers,
 ];
 
 export const lots: readonly Lot[] = [
@@ -2568,6 +2573,8 @@ export const storageClocks: readonly StorageClock[] = [
   ...B1A_08.storageClocks,
   // Added by b2-09 — never an edit to a row above (STATE §7.1).
   ...B2_09.storageClocks,
+  // Added by b2-11 — never an edit to a row above (STATE §7.1).
+  ...B2_11.storageClocks,
 ];
 
 export const storageEvents: readonly StorageEvent[] = [
@@ -3178,6 +3185,8 @@ export const damageAssessments: readonly DamageAssessment[] = [
   // Added by b2-09 — never an edit to a row above (STATE §7.1).
   ...B2_09.damageAssessments,
   ...B2_10.damageAssessments,
+  // Added by b2-11 — never an edit to a row above (STATE §7.1).
+  ...B2_11.damageAssessments,
 ];
 
 // ---------------------------------------------------------------------------
@@ -3293,6 +3302,8 @@ export const recallMatches: readonly RecallMatch[] = [...B2_09.recallMatches];
 
 export const recallCheckRuns: readonly RecallCheckRun[] = [
   ...B2_09.recallCheckRuns,
+  // Added by b2-11 — never an edit to a row above (STATE §7.1).
+  ...B2_11.recallCheckRuns,
 ];
 
 /** b2-10 — photo check runs (Rules 2.36, 2.37, 6.25). */
@@ -3305,3 +3316,11 @@ export const catalogReferencePhotos: readonly CatalogReferencePhoto[] = [
 
 /** b2-10 — the bytes the seeded rows point at, so a check can read them. */
 export const seededObjects = B2_10.seededObjects;
+
+/**
+ * b2-11 — when Cascade's seeded ranking ran. The rows themselves are computed
+ * from the fixtures above by the real domain at that instant
+ * (`../hazard-ranking-seed.ts`), so the screens show a ranking before anyone
+ * presses Rank now and it can never disagree with the records it read.
+ */
+export const SEEDED_RANKING_AT = B2_11.SEEDED_RANKING_AT;

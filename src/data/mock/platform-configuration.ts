@@ -4,10 +4,12 @@ import { validateIntakeGateConfiguration } from "@/domain/intake/thresholds";
 import { validateEmergencyContactConfiguration } from "@/domain/transport/emergency-verification";
 import { validateRecallMatchConfiguration } from "@/domain/recalls/configuration";
 import { validateLookAlikeConfiguration } from "@/domain/photo-checks/look-alike";
+import { validateHazardRankingScheme } from "@/domain/hazard/scheme";
 import { DataIntegrityError } from "@/lib/errors";
 
 import {
   PLATFORM_EMERGENCY_CONTACT_CONFIGURATION,
+  PLATFORM_HAZARD_RANKING_SCHEME,
   PLATFORM_INTAKE_GATE_CONFIGURATION,
   PLATFORM_LOOK_ALIKE_CONFIGURATION,
   PLATFORM_RECALL_MATCH_CONFIGURATION,
@@ -85,5 +87,20 @@ export const mockPlatformConfiguration: PlatformConfigurationRepository = {
       });
     }
     return validation.configuration;
+  },
+
+  async readHazardRankingScheme(ctx: RequestContext) {
+    const validation = validateHazardRankingScheme(
+      PLATFORM_HAZARD_RANKING_SCHEME,
+    );
+    if (!validation.ok) {
+      throw new DataIntegrityError({
+        userMessage:
+          "The ranking scheme could not be loaded. Nothing was ranked — ask an Admin.",
+        correlationId: ctx.correlationId,
+        context: { issues: validation.issues },
+      });
+    }
+    return validation.scheme;
   },
 };

@@ -13,6 +13,7 @@ import type { BatteryRecord } from "@/types/battery-record";
 import type { CatalogEntry } from "@/types/catalog";
 import type {
   DamageAssessment,
+  HazardRanking,
   RecallCheckRun,
   RecallMatch,
 } from "@/types/condition";
@@ -43,6 +44,8 @@ import type {
 } from "@/types/tenancy";
 import type { Uuid } from "@/types/common";
 import type { CatalogReferencePhoto, PhotoCheck } from "@/types/photo-check";
+
+import { HAZARD_RANKING_SEED } from "./hazard-ranking-seed";
 
 /**
  * The in-memory database.
@@ -95,15 +98,21 @@ export interface MockStore {
   readonly recallCheckRuns: TenantTable<RecallCheckRun>;
   readonly photoChecks: TenantTable<PhotoCheck>;
   readonly catalogReferencePhotos: PlatformTable<CatalogReferencePhoto>;
+  readonly hazardRankings: TenantTable<HazardRanking>;
   readonly auditEvents: TenantTable<TenantAuditEvent>;
 
   /** Object bytes, keyed `bucket:path`. */
   readonly objects: Map<string, { bytes: Uint8Array; contentType: string }>;
 }
 
-const seededAuditEvents: readonly TenantAuditEvent[] = FIXTURES.auditEvents.map(
-  (event) => ({ ...event, organizationId: event.organizationId as Uuid }),
-);
+/**
+ * The fixtures' audit rows, and b2-11's seeded ranking run's one row after
+ * them (Rule 10.26) — computed with the run, so the two always agree.
+ */
+const seededAuditEvents: readonly TenantAuditEvent[] = [
+  ...FIXTURES.auditEvents,
+  HAZARD_RANKING_SEED.auditEvent,
+].map((event) => ({ ...event, organizationId: event.organizationId as Uuid }));
 
 /**
  * Built once, per process, and **re-seeded in place** by
@@ -264,6 +273,11 @@ function buildStore(): MockStore {
       "catalogReferencePhotos",
       FIXTURES.catalogReferencePhotos,
     ),
+    hazardRankings: new TenantTable(
+      "hazard_ranking",
+      "hazardRankings",
+      HAZARD_RANKING_SEED.rankings,
+    ),
     auditEvents: new TenantTable(
       "audit_event",
       "auditEvents",
@@ -323,6 +337,7 @@ export function resetMockStore(): MockStore {
   store.recallCheckRuns.replaceAll(FIXTURES.recallCheckRuns);
   store.photoChecks.replaceAll(FIXTURES.photoChecks);
   store.catalogReferencePhotos.replaceAll(FIXTURES.catalogReferencePhotos);
+  store.hazardRankings.replaceAll(HAZARD_RANKING_SEED.rankings);
   store.auditEvents.replaceAll(seededAuditEvents);
 
   store.objects.clear();

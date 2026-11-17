@@ -3,6 +3,7 @@ import type { IntakeGateConfiguration } from "@/domain/intake/thresholds";
 import type { EmergencyContactConfiguration } from "@/domain/transport/emergency-verification";
 import type { RecallMatchConfiguration } from "@/domain/recalls/configuration";
 import type { LookAlikeConfiguration } from "@/domain/photo-checks/look-alike";
+import type { HazardRankingScheme } from "@/domain/hazard/scheme";
 
 /**
  * Platform configuration — the values P6 owns that are neither jurisdiction
@@ -75,4 +76,15 @@ export interface PlatformConfigurationRepository {
   readLookAlikeConfiguration(
     ctx: RequestContext,
   ): Promise<LookAlikeConfiguration>;
+
+  /**
+   * The hazard ranking scheme — Rules 10.20–10.23; D-40, D-77 #2. The factor
+   * order, each factor's levels, the age and energy bands and the band cut
+   * points. **Read here and nowhere else** (Rule 1.23): an order or a cut
+   * point in a TypeScript conditional is a rule in code. Its version is
+   * stamped on every ranking row (Rule 12.15). Validated with
+   * `validateHazardRankingScheme`; an invalid row throws `DataIntegrityError`,
+   * never a default.
+   */
+  readHazardRankingScheme(ctx: RequestContext): Promise<HazardRankingScheme>;
 }

@@ -103,3 +103,201 @@ export const PLATFORM_LOOK_ALIKE_CONFIGURATION = {
   fingerprintScheme: "fixture64",
   maxDifferingBits: 6,
 } as const;
+
+/**
+ * The hazard ranking scheme, v1 (Rules 10.20–10.23; D-77 #2) — **the only
+ * place in `src/` the factor order, the levels, the age and energy bands and
+ * the band cut points exist.** Stamped on every ranking row by its version;
+ * changing any of it is a new version, never an edit. Validated on every read
+ * by `validateHazardRankingScheme`.
+ *
+ * The order and levels are Rule 10.20's table; storage aggregation sits after
+ * chemistry for containers and lots (Rule 10.22); the cut points are Rule
+ * 10.23's. **The age bands and the energy bands are the builder's placeholder
+ * values** — Rules 10.20 and 10.22 leave them to the scheme, and planning has
+ * not set them — raised in `BUILD_NOTES_b2-11-risk-ranking.md` §4.
+ */
+export const PLATFORM_HAZARD_RANKING_SCHEME = {
+  schemeVersion: "hazard-ranking-v1",
+  factorOrder: {
+    battery_record: [
+      "damage_indicators",
+      "recall_status",
+      "chemistry",
+      "state_of_charge_at_intake",
+      "age_from_date_code",
+      "certification_marks",
+    ],
+    container: [
+      "damage_indicators",
+      "recall_status",
+      "chemistry",
+      "storage_aggregation",
+      "state_of_charge_at_intake",
+      "age_from_date_code",
+      "certification_marks",
+    ],
+    lot: [
+      "damage_indicators",
+      "recall_status",
+      "chemistry",
+      "storage_aggregation",
+      "state_of_charge_at_intake",
+      "age_from_date_code",
+      "certification_marks",
+    ],
+  },
+  factors: [
+    {
+      code: "damage_indicators",
+      reading: "matched",
+      notRecordedLabel: "Not recorded",
+      levels: [
+        {
+          level: "damaged_or_defective",
+          label: "Damaged or defective",
+          evidenceValues: ["damaged_or_defective"],
+        },
+        {
+          level: "cosmetic_only",
+          label: "Cosmetic only",
+          evidenceValues: ["cosmetic_only"],
+        },
+        {
+          level: "none_observed",
+          label: "None observed",
+          evidenceValues: ["none_observed"],
+        },
+      ],
+    },
+    {
+      code: "recall_status",
+      reading: "matched",
+      notRecordedLabel: "Not recorded",
+      levels: [
+        {
+          level: "confirmed",
+          label: "Confirmed",
+          evidenceValues: ["confirmed_match"],
+        },
+        {
+          level: "possible_match",
+          label: "Possible match",
+          evidenceValues: ["possible_match"],
+        },
+        { level: "no_match", label: "No match", evidenceValues: ["no_match"] },
+      ],
+    },
+    {
+      code: "chemistry",
+      reading: "matched",
+      notRecordedLabel: "Not recorded",
+      levels: [
+        {
+          level: "lithium_metal",
+          label: "Lithium metal",
+          evidenceValues: ["lithium_metal"],
+        },
+        {
+          level: "lithium_ion",
+          label: "Lithium-ion",
+          evidenceValues: [
+            "li_nmc",
+            "li_nca",
+            "li_lfp",
+            "li_lco",
+            "li_lmo",
+            "li_lto",
+            "li_ion_unspecified",
+          ],
+        },
+        {
+          level: "other_rechargeable",
+          label: "Other rechargeable",
+          evidenceValues: [
+            "lead_acid_sealed",
+            "lead_acid_flooded",
+            "nimh",
+            "nicd",
+            "sodium_ion",
+          ],
+        },
+        { level: "alkaline", label: "Alkaline", evidenceValues: ["alkaline"] },
+      ],
+    },
+    {
+      code: "state_of_charge_at_intake",
+      reading: "matched",
+      notRecordedLabel: "Not recorded",
+      levels: [
+        {
+          level: "above_storage_limit",
+          label: "Above storage limit",
+          evidenceValues: ["above_storage_limit"],
+        },
+        {
+          level: "at_or_below_storage_limit",
+          label: "At or below storage limit",
+          evidenceValues: ["at_or_below_storage_limit"],
+        },
+      ],
+    },
+    {
+      code: "age_from_date_code",
+      reading: "banded",
+      unit: "years",
+      notRecordedLabel: "Not recorded",
+      levels: [
+        { level: "age_band_oldest", label: "10 years or more", atLeast: 10 },
+        { level: "age_band_middle", label: "5 to under 10 years", atLeast: 5 },
+        { level: "age_band_newest", label: "Under 5 years", atLeast: 0 },
+      ],
+    },
+    {
+      code: "certification_marks",
+      reading: "matched",
+      notRecordedLabel: "Not recorded",
+      levels: [
+        {
+          level: "none_read",
+          label: "None read",
+          evidenceValues: ["none_read"],
+        },
+        {
+          level: "marks_read",
+          label: "Marks read",
+          evidenceValues: ["marks_read"],
+        },
+      ],
+    },
+    {
+      code: "storage_aggregation",
+      reading: "banded",
+      unit: "watt_hours",
+      notRecordedLabel: "Not fully recorded",
+      levels: [
+        {
+          level: "energy_band_largest",
+          label: "100 kWh or more held together",
+          atLeast: 100000,
+        },
+        {
+          level: "energy_band_large",
+          label: "10 kWh to under 100 kWh held together",
+          atLeast: 10000,
+        },
+        {
+          level: "energy_band_moderate",
+          label: "1 kWh to under 10 kWh held together",
+          atLeast: 1000,
+        },
+        {
+          level: "energy_band_smallest",
+          label: "Under 1 kWh held together",
+          atLeast: 0,
+        },
+      ],
+    },
+  ],
+  bandCutPoints: [0.25, 0.5, 0.75],
+} as const;

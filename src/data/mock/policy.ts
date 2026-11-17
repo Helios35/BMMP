@@ -65,6 +65,7 @@ export type PolicyTable =
   | "recall_check"
   | "photo_check"
   | "catalog_reference_photo"
+  | "hazard_ranking"
   | "audit_event";
 
 export type PolicyAction = "select" | "insert" | "update";
@@ -185,6 +186,10 @@ export const POLICY_MATRIX: Readonly<Record<PolicyTable, PolicyRow>> = {
   photo_check: { select: R, insert: [], update: [] },
   // A platform table: every member reads, only P6 writes (Rule 2.36; D-75).
   catalog_reference_photo: { select: R, insert: [], update: [] },
+  // Written by a ranking run through the definer door, never typed; the
+  // superseded row's `is_current` is the trigger's one update (§9.5; Rule
+  // 10.26). The door refuses a role that cannot set a run going (Rule 10.24).
+  hazard_ranking: { select: R, insert: [], update: [] },
 
   // Read is P2, P5, P6 only — P1 cannot read the audit log (Rule 12.8).
   // Written by trigger under security definer, never by a user statement, which
