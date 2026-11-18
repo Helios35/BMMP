@@ -80,6 +80,58 @@ export const TOS = {
 export const JURISDICTION = {
   federal: uid("0a000005", 1),
   washington: uid("0a000005", 2),
+  // b1b-12 — every other state and DC (T-40 codes; spec §6). Appended in a
+  // fixed order, so each id stays the same row forever.
+  alabama: uid("0a000005", 3),
+  alaska: uid("0a000005", 4),
+  arizona: uid("0a000005", 5),
+  arkansas: uid("0a000005", 6),
+  california: uid("0a000005", 7),
+  colorado: uid("0a000005", 8),
+  connecticut: uid("0a000005", 9),
+  delaware: uid("0a000005", 10),
+  districtOfColumbia: uid("0a000005", 11),
+  florida: uid("0a000005", 12),
+  georgia: uid("0a000005", 13),
+  hawaii: uid("0a000005", 14),
+  idaho: uid("0a000005", 15),
+  illinois: uid("0a000005", 16),
+  indiana: uid("0a000005", 17),
+  iowa: uid("0a000005", 18),
+  kansas: uid("0a000005", 19),
+  kentucky: uid("0a000005", 20),
+  louisiana: uid("0a000005", 21),
+  maine: uid("0a000005", 22),
+  maryland: uid("0a000005", 23),
+  massachusetts: uid("0a000005", 24),
+  michigan: uid("0a000005", 25),
+  minnesota: uid("0a000005", 26),
+  mississippi: uid("0a000005", 27),
+  missouri: uid("0a000005", 28),
+  montana: uid("0a000005", 29),
+  nebraska: uid("0a000005", 30),
+  nevada: uid("0a000005", 31),
+  newHampshire: uid("0a000005", 32),
+  newJersey: uid("0a000005", 33),
+  newMexico: uid("0a000005", 34),
+  newYork: uid("0a000005", 35),
+  northCarolina: uid("0a000005", 36),
+  northDakota: uid("0a000005", 37),
+  ohio: uid("0a000005", 38),
+  oklahoma: uid("0a000005", 39),
+  oregon: uid("0a000005", 40),
+  pennsylvania: uid("0a000005", 41),
+  rhodeIsland: uid("0a000005", 42),
+  southCarolina: uid("0a000005", 43),
+  southDakota: uid("0a000005", 44),
+  tennessee: uid("0a000005", 45),
+  texas: uid("0a000005", 46),
+  utah: uid("0a000005", 47),
+  vermont: uid("0a000005", 48),
+  virginia: uid("0a000005", 49),
+  westVirginia: uid("0a000005", 50),
+  wisconsin: uid("0a000005", 51),
+  wyoming: uid("0a000005", 52),
 } as const;
 
 export const JURISDICTION_RULE = {
@@ -93,6 +145,37 @@ export const JURISDICTION_RULE = {
   waContainerLabel: uid("0a000006", 6),
   /** DDR packaging and marking — `SPEC_ddr-packaging-rule-data_2026-10-22.md`, b1a-08. */
   federalDdrPackaging: uid("0a000006", 7),
+  // b1b-12 — each Appendix A state's two producer rules (Rule 8.7).
+  waProducerCoverage: uid("0a000006", 8),
+  waProducerObligations: uid("0a000006", 9),
+  ilProducerCoverage: uid("0a000006", 10),
+  ilProducerObligations: uid("0a000006", 11),
+  coProducerCoverage: uid("0a000006", 12),
+  coProducerObligations: uid("0a000006", 13),
+  ctProducerCoverage: uid("0a000006", 14),
+  ctProducerObligations: uid("0a000006", 15),
+  vtProducerCoverage: uid("0a000006", 16),
+  vtProducerObligations: uid("0a000006", 17),
+  neProducerCoverage: uid("0a000006", 18),
+  neProducerObligations: uid("0a000006", 19),
+  wiProducerCoverage: uid("0a000006", 20),
+  wiProducerObligations: uid("0a000006", 21),
+  orProducerCoverage: uid("0a000006", 22),
+  orProducerObligations: uid("0a000006", 23),
+  meProducerCoverage: uid("0a000006", 24),
+  meProducerObligations: uid("0a000006", 25),
+  caProducerCoverage: uid("0a000006", 26),
+  caProducerObligations: uid("0a000006", 27),
+  nyProducerCoverage: uid("0a000006", 28),
+  nyProducerObligations: uid("0a000006", 29),
+  mnProducerCoverage: uid("0a000006", 30),
+  mnProducerObligations: uid("0a000006", 31),
+  njProducerCoverage: uid("0a000006", 32),
+  njProducerObligations: uid("0a000006", 33),
+  iaProducerCoverage: uid("0a000006", 34),
+  iaProducerObligations: uid("0a000006", 35),
+  dcProducerCoverage: uid("0a000006", 36),
+  dcProducerObligations: uid("0a000006", 37),
 } as const;
 
 export const RULE_VERSION = {
@@ -107,6 +190,39 @@ export const RULE_VERSION = {
   federalDdrPackaging2026: uid("0a000007", 8),
   /** b2-09 — v2: the packing level authored, with its citation (D-72 #9). Supersedes v1. */
   federalDdrPackaging2026v2: uid("0a000007", 9),
+  // b1b-12 — Appendix A's versions, one per rule, California's coverage twice.
+  waProducerCoverage: uid("0a000007", 10),
+  waProducerObligations: uid("0a000007", 11),
+  ilProducerCoverage: uid("0a000007", 12),
+  ilProducerObligations: uid("0a000007", 13),
+  coProducerCoverage: uid("0a000007", 14),
+  coProducerObligations: uid("0a000007", 15),
+  ctProducerCoverage: uid("0a000007", 16),
+  ctProducerObligations: uid("0a000007", 17),
+  vtProducerCoverage: uid("0a000007", 18),
+  vtProducerObligations: uid("0a000007", 19),
+  neProducerCoverage: uid("0a000007", 20),
+  neProducerObligations: uid("0a000007", 21),
+  wiProducerCoverage: uid("0a000007", 22),
+  wiProducerObligations: uid("0a000007", 23),
+  orProducerCoverage: uid("0a000007", 24),
+  orProducerObligations: uid("0a000007", 25),
+  meProducerCoverage: uid("0a000007", 26),
+  meProducerObligations: uid("0a000007", 27),
+  caProducerCoverage: uid("0a000007", 28),
+  /** California's scheduled coverage version (SB 501), in force from 2027-01-01. */
+  caProducerCoverage2027: uid("0a000007", 29),
+  caProducerObligations: uid("0a000007", 30),
+  nyProducerCoverage: uid("0a000007", 31),
+  nyProducerObligations: uid("0a000007", 32),
+  mnProducerCoverage: uid("0a000007", 33),
+  mnProducerObligations: uid("0a000007", 34),
+  njProducerCoverage: uid("0a000007", 35),
+  njProducerObligations: uid("0a000007", 36),
+  iaProducerCoverage: uid("0a000007", 37),
+  iaProducerObligations: uid("0a000007", 38),
+  dcProducerCoverage: uid("0a000007", 39),
+  dcProducerObligations: uid("0a000007", 40),
 } as const;
 
 export const CATALOG = {
@@ -116,6 +232,14 @@ export const CATALOG = {
   mobilityScooterSla: uid("0a000008", 2),
   /** Laptop cell, LCO. */
   laptopCellLco: uid("0a000008", 3),
+  /** b1b-12 — an alkaline AA cell: portable nearly everywhere, not covered in Minnesota. */
+  tidewaterAlkalineAa: uid("0a000008", 4),
+  /** b1b-12 — a 30 lb, 1,536 Wh floor-scrubber pack: large in WA, medium in CT, not covered in DC. */
+  kestrelScrubberLfp: uid("0a000008", 5),
+  /** b1b-12 — a trolling-motor pack with **no weight on file**: can't tell. */
+  harborTrollingLfp: uid("0a000008", 6),
+  /** b1b-12 — zinc-air hearing-aid cells, T-01 `other`: can't tell. */
+  brightlineZincAir: uid("0a000008", 7),
 } as const;
 
 export const BATTERY = {
@@ -377,6 +501,12 @@ export const AUDIT = {
   labelMismatchRouted: uid("0a000018", 5),
   /** b2-11 — Cascade's seeded ranking run (Rule 10.26). */
   hazardRankingSeeded: uid("0a000018", 6),
+  /** b1b-12 — Cascade's seeded obligations run, as the nightly job (Rule 8.11). */
+  producerObligationsSeeded: uid("0a000018", 7),
+  /** b1b-12 — Priya marks DC's deadline done (Rule 8.12). */
+  dcDeadlineCompleted: uid("0a000018", 8),
+  /** b1b-12 — marking it done resolves its overdue alert (Rule 8.13). */
+  dcDeadlineAlertResolved: uid("0a000018", 9),
 } as const;
 
 /** b2-11 — Cascade's seeded ranking run, so the screens show a ranking before Rank now. */
@@ -398,4 +528,26 @@ export const FORMAT_CLASSIFICATION = {
   mobilityScooterWa: uid("0a00001a", 1),
   /** The same battery under federal scope — a different answer, which is the entire point. */
   mobilityScooterFederal: uid("0a00001a", 2),
+} as const;
+
+/** b1b-12 — the products Priya declares for Cascade (Rule 8.6). */
+export const PRODUCER_PRODUCT = {
+  tidewaterAlkalineAa: uid("0a000022", 1),
+  kestrelScrubberLfp: uid("0a000022", 2),
+  harborTrollingLfp: uid("0a000022", 3),
+  haldenLaptop: uid("0a000022", 4),
+  northvaleTraction: uid("0a000022", 5),
+  brightlineZincAir: uid("0a000022", 6),
+} as const;
+
+/** b1b-12 — the seeded run's rows, numbered in the order the run writes them. */
+export const producerObligationRowId = (n: number): string =>
+  uid("0a000023", n);
+export const obligationDeadlineRowId = (n: number): string =>
+  uid("0a000024", n);
+export const obligationAlertRowId = (n: number): string => uid("0a000025", n);
+
+/** b1b-12 — the seeded run's id, on its audit row. */
+export const PRODUCER_RUN = {
+  cascadeSeeded: uid("0a000026", 1),
 } as const;

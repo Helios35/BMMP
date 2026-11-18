@@ -7,6 +7,14 @@ import type {
   HazardRankingRunRecorded,
 } from "./hazard-rankings";
 import type {
+  DeadlineAlertDraft,
+  DeadlineAlertReading,
+  DeadlineAlertsRecorded,
+  ProducerObligationJobPlan,
+  ProducerRunRecorded,
+} from "./producer";
+import type { ProducerRunPlan } from "@/domain/producer";
+import type {
   RecallCheckRecorded,
   RecallCheckRecording,
   RecallSyncPlan,
@@ -29,7 +37,11 @@ import type {
  */
 export interface ScheduledJobContext {
   /** T-60 `actor_label` on every row the job writes. */
-  readonly job: "storage-clock-alerts" | "recall-sync" | "hazard-ranking";
+  readonly job:
+    | "storage-clock-alerts"
+    | "recall-sync"
+    | "hazard-ranking"
+    | "producer-obligations";
   /** Threads one run through every row it writes. */
   readonly correlationId: string;
 }
@@ -43,6 +55,40 @@ export interface StorageClockAlertRun {
 }
 
 export interface ScheduledJobRepository {
+  /**
+   * The producer-obligations job's reading half — Rules 8.11, 8.13; D-78 #10,
+   * #11. Every organization with a declared product, with its run inputs, and
+   * the alert configuration in force. An organization with no product is not
+   * in the plan, so it gets no run and no audit row.
+   */
+  producerObligationPlan(
+    job: ScheduledJobContext,
+  ): Promise<ProducerObligationJobPlan>;
+
+  /** One organization's run, written as the job — the same write path as **Check now**. */
+  recordProducerObligations(
+    job: ScheduledJobContext,
+    organizationId: Uuid,
+    plan: ProducerRunPlan,
+  ): Promise<ProducerRunRecorded>;
+
+  /** One organization's open deadlines, after its run, for its alerts to be decided from. */
+  deadlineAlertSubjects(
+    job: ScheduledJobContext,
+    organizationId: Uuid,
+  ): Promise<DeadlineAlertReading>;
+
+  /**
+   * Raise the wanted alerts not already open and resolve the open ones no
+   * longer wanted (Rule 8.13). Idempotent on the dedupe key.
+   */
+  recordDeadlineAlerts(
+    job: ScheduledJobContext,
+    organizationId: Uuid,
+    wanted: readonly DeadlineAlertDraft[],
+    at: IsoTimestamp,
+  ): Promise<DeadlineAlertsRecorded>;
+
   /**
    * The ranking job's reading half — Rule 10.24; D-77 #6. Every
    * organization's ranking inputs, and the scheme in force. The domain

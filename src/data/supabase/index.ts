@@ -105,6 +105,7 @@ export const supabaseAdapter: DataAdapter = {
     "readRecallMatchConfiguration",
     "readLookAlikeConfiguration",
     "readHazardRankingScheme",
+    "readObligationAlertConfiguration",
   ]),
 
   jurisdictions: unimplemented("jurisdictions", [...CRUD, "chainFrom"]),
@@ -196,6 +197,25 @@ export const supabaseAdapter: DataAdapter = {
     "set",
   ]),
   hazardRankings: unimplemented("hazardRankings", ["list", "inputs", "run"]),
+  producerProducts: unimplemented("producerProducts", [
+    "list",
+    "get",
+    "add",
+    "changeStates",
+    "remove",
+  ]),
+  producerObligations: unimplemented("producerObligations", [
+    "list",
+    "inputs",
+    "run",
+    "lastRun",
+  ]),
+  obligationDeadlines: unimplemented("obligationDeadlines", [
+    "list",
+    "get",
+    "complete",
+    "reopen",
+  ]),
   // `write` is the `security definer` door (§10.5, `app.write_audit_event()`).
   // It refuses here like everything else — an adapter that answered it silently
   // would be an audit trail nobody could tell was empty.
@@ -209,5 +229,9 @@ export const supabaseAdapter: DataAdapter = {
     "recordRecallCheck",
     "hazardRankingPlan",
     "recordHazardRanking",
+    "producerObligationPlan",
+    "recordProducerObligations",
+    "deadlineAlertSubjects",
+    "recordDeadlineAlerts",
   ]),
 };

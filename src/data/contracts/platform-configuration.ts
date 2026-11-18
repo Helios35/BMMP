@@ -4,6 +4,7 @@ import type { EmergencyContactConfiguration } from "@/domain/transport/emergency
 import type { RecallMatchConfiguration } from "@/domain/recalls/configuration";
 import type { LookAlikeConfiguration } from "@/domain/photo-checks/look-alike";
 import type { HazardRankingScheme } from "@/domain/hazard/scheme";
+import type { ObligationAlertConfiguration } from "@/domain/producer/alerts";
 
 /**
  * Platform configuration — the values P6 owns that are neither jurisdiction
@@ -87,4 +88,13 @@ export interface PlatformConfigurationRepository {
    * never a default.
    */
   readHazardRankingScheme(ctx: RequestContext): Promise<HazardRankingScheme>;
+
+  /**
+   * The deadline alert offsets — Rule 8.13; D-78 #10. Versioned platform
+   * configuration (the D-40 pattern): days before the due date, and whether a
+   * passed deadline raises its alert. Validated on every read.
+   */
+  readObligationAlertConfiguration(
+    ctx: RequestContext,
+  ): Promise<ObligationAlertConfiguration>;
 }
