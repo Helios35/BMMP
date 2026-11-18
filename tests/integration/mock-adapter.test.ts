@@ -89,15 +89,17 @@ describe("the seam", () => {
     for (const key of b1a) {
       expect(mockAdapter[key], key).toBeDefined();
     }
-    // b2-11 gave `hazard_ranking` its repository (Rules 10.19–10.26).
+    // b2-11 gave `hazard_ranking` its repository (Rules 10.19–10.26), and
+    // b1b-12 gave the producer tables theirs (Rules 8.6–8.16; D-78).
     expect(mockAdapter.hazardRankings, "hazardRankings").toBeDefined();
-    for (const later of [
-      "grades",
-      "recallMatches",
+    for (const key of [
+      "producerProducts",
       "producerObligations",
       "obligationDeadlines",
-      "evidencePacks",
-    ]) {
+    ] as const) {
+      expect(mockAdapter[key], key).toBeDefined();
+    }
+    for (const later of ["grades", "recallMatches", "evidencePacks"]) {
       expect(
         (mockAdapter as unknown as Record<string, unknown>)[later],
         later,
@@ -198,7 +200,8 @@ describe("tenant isolation", () => {
 
   it("shares the platform catalog and hides another tenant's proposals", async () => {
     const page = await mockAdapter.catalogEntries.list(HANDLER, PAGE);
-    expect(page.items.length).toBe(3);
+    // Three from B1a, and the four b1b-12 adds for Priya's products.
+    expect(page.items.length).toBe(7);
     for (const entry of page.items) {
       expect(entry.organizationId).toBeNull();
     }
@@ -273,13 +276,15 @@ describe("role enforcement, using the same sets Postgres uses", () => {
     await expect(mockAdapter.auditEvents.list(HANDLER, PAGE)).rejects.toThrow(
       PermissionError,
     );
-    // Five fixture rows, and b2-11's seeded ranking run's one (Rule 10.26).
+    // Five fixture rows, b2-11's seeded ranking run's one (Rule 10.26), and
+    // b1b-12's three: the obligations run, DC's deadline marked done, and the
+    // alert that resolved (Rules 8.11–8.13).
     await expect(
       mockAdapter.auditEvents.list(MANAGER, PAGE),
-    ).resolves.toHaveProperty("total", 6);
+    ).resolves.toHaveProperty("total", 9);
     await expect(
       mockAdapter.auditEvents.list(AUDITOR, PAGE),
-    ).resolves.toHaveProperty("total", 6);
+    ).resolves.toHaveProperty("total", 9);
   });
 
   it("refuses a rule-version publish from anyone but P6", async () => {

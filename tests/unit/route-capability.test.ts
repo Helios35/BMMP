@@ -23,10 +23,11 @@ import { ROLE_CODES } from "@/domain/taxonomy/role";
  */
 
 describe("the route inventory", () => {
-  it("is exactly the twenty B1a routes (§7.1)", () => {
-    // A twenty-first is a decision-log entry, not a builder's call.
-    expect(APP_ROUTES).toHaveLength(20);
-    expect(new Set(APP_ROUTES).size).toBe(20);
+  it("is exactly the twenty B1a routes and /obligations, the 21st (§7.1; D-78)", () => {
+    // A 22nd is a decision-log entry, not a builder's call.
+    expect(APP_ROUTES).toHaveLength(21);
+    expect(new Set(APP_ROUTES).size).toBe(21);
+    expect(APP_ROUTES).toContain("/obligations");
   });
 
   it("names every route", () => {
