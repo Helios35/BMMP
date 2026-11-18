@@ -85,6 +85,20 @@ export default async function ObligationsPage({
   ]);
   const query = decodeListQuery(params, spec);
   const tab = activeObligationTab(query);
+  // The search box narrows the tab it sits on: a deadline by its duty, state
+  // or citation; a state by its name, law or agency; a product by its name.
+  const needle = query.q?.toLocaleLowerCase() ?? null;
+  const matchesSearch = (...fields: readonly (string | null)[]): boolean =>
+    needle === null ||
+    fields.some(
+      (field) => field?.toLocaleLowerCase().includes(needle) === true,
+    );
+  const products = model.products.filter((row) =>
+    matchesSearch(row.label, row.chemistry),
+  );
+  const stateRows = model.states.filter((row) =>
+    matchesSearch(row.state.name, row.law, row.agency),
+  );
   const stateOptions = page.stateOptions;
 
   const header = (
@@ -176,13 +190,13 @@ export default async function ObligationsPage({
         <RecordTable
           caption={PRODUCTS_CAPTION}
           columns={productColumns({ role: ctx.role, stateOptions })}
-          rows={model.products}
+          rows={products}
           rowKey={(row) => row.id}
           rowLink={() => ({
             kind: "not-linked",
             reason: "Open the catalog entry from its name.",
           })}
-          total={model.products.length}
+          total={products.length}
           query={query}
           querySpec={spec}
           basePath={OBLIGATIONS_PATH}
@@ -214,13 +228,13 @@ export default async function ObligationsPage({
         <RecordTable
           caption={STATES_CAPTION}
           columns={stateColumns()}
-          rows={model.states}
+          rows={stateRows}
           rowKey={(row) => row.state.jurisdictionId}
           rowLink={() => ({
             kind: "not-linked",
             reason: "Open a state from its name.",
           })}
-          total={model.states.length}
+          total={stateRows.length}
           query={{ ...query, filters: {} }}
           querySpec={spec}
           basePath={OBLIGATIONS_PATH}
@@ -233,6 +247,7 @@ export default async function ObligationsPage({
   const selection = deadlineSelection(query);
   const filtered = model.deadlines.filter(
     (row) =>
+      matchesSearch(row.duty, row.state.name, row.citation) &&
       (selection.stateCode === null ||
         row.state.code === selection.stateCode) &&
       (selection.standing === null || row.standing === selection.standing),

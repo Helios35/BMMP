@@ -24,7 +24,13 @@ import type { DeadlineView, ProductView, StateView } from "../view";
 /**
  * The three tables on `/obligations` — `UX_SPEC.md` §3.21. Each column reads
  * a stored, decided value from `../view.ts`; none decides one.
+ *
+ * A table cell does not wrap (the primitive is `whitespace-nowrap`), and a
+ * duty or a law's citation runs to a sentence — so those cells wrap at a
+ * reading width, or the status column is pushed off the screen.
  */
+const WRAP_WIDE = "block min-w-56 max-w-[44ch] whitespace-normal";
+const WRAP_NARROW = "block min-w-32 max-w-[28ch] whitespace-normal";
 
 export function deadlineColumns(input: {
   readonly role: RoleCode;
@@ -55,7 +61,7 @@ export function deadlineColumns(input: {
       id: "obligation",
       header: "Obligation",
       cell: (row) => (
-        <span data-deadline-duty="true">
+        <span className={WRAP_WIDE} data-deadline-duty="true">
           {row.duty}
           {row.obligationStatus === "undetermined" ? (
             <span className="block text-caption text-muted-foreground">
@@ -83,7 +89,7 @@ export function deadlineColumns(input: {
           />
           {row.standing === "completed" ? (
             <span
-              className="text-caption text-muted-foreground"
+              className={`${WRAP_NARROW} text-caption text-muted-foreground`}
               data-deadline-completion="true"
             >
               Met {row.completedOn ?? ""}
@@ -103,7 +109,7 @@ export function deadlineColumns(input: {
       id: "citation",
       header: "Citation",
       cell: (row) => (
-        <span className="text-caption">
+        <span className={`${WRAP_NARROW} text-caption`}>
           {row.citation}
           <span className="block text-muted-foreground">
             Rule version {row.versionLabel}
@@ -174,10 +180,10 @@ export function stateColumns(): readonly RecordTableColumn<StateView>[] {
       header: "Law and citation",
       cell: (row) =>
         row.onFile ? (
-          <span className="text-caption">{row.law}</span>
+          <span className={`${WRAP_WIDE} text-caption`}>{row.law}</span>
         ) : (
           <span
-            className="text-caption text-muted-foreground"
+            className={`${WRAP_WIDE} text-caption text-muted-foreground`}
             data-no-rules={row.state.code}
           >
             {row.noRulesWords}
@@ -187,14 +193,16 @@ export function stateColumns(): readonly RecordTableColumn<StateView>[] {
     {
       id: "agency",
       header: "Agency",
-      cell: (row) => row.agency ?? "—",
+      cell: (row) => <span className={WRAP_NARROW}>{row.agency ?? "—"}</span>,
     },
     {
       id: "result",
       header: "Result",
       secondary: true,
       cell: (row) => (
-        <span data-state-result={row.state.code}>{row.resultWords}</span>
+        <span className={WRAP_NARROW} data-state-result={row.state.code}>
+          {row.resultWords}
+        </span>
       ),
     },
     {
@@ -204,7 +212,7 @@ export function stateColumns(): readonly RecordTableColumn<StateView>[] {
         row.nextDeadline === null ? (
           <span className="text-muted-foreground">None open</span>
         ) : (
-          <span>
+          <span className={WRAP_NARROW}>
             {row.nextDeadline.dueWords}
             <span className="block text-caption text-muted-foreground">
               {row.nextDeadline.duty}
@@ -239,7 +247,10 @@ export function productColumns(input: {
       header: "From the catalog",
       secondary: true,
       cell: (row) => (
-        <span className="text-caption" data-product-facts={row.id}>
+        <span
+          className={`${WRAP_NARROW} text-caption`}
+          data-product-facts={row.id}
+        >
           {row.chemistry} ·{" "}
           {row.massKg === null ? "No weight on file" : `${row.massKg} kg`} ·{" "}
           {row.energyWh === null ? "No energy on file" : `${row.energyWh} Wh`} ·{" "}
@@ -262,7 +273,10 @@ export function productColumns(input: {
         row.states.length === 0 ? (
           NOT_CHECKED_YET
         ) : (
-          <ul className="flex flex-col gap-1" data-product-bands={row.id}>
+          <ul
+            className={`${WRAP_WIDE} flex flex-col gap-1`}
+            data-product-bands={row.id}
+          >
             {row.states.map((state) => (
               <li
                 key={state.state.jurisdictionId}
