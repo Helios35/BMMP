@@ -97,7 +97,9 @@ src/app/
 │   │   ├── users/page.tsx ───────────────▶   /settings/users         Members and roles
 │   │   └── catalog/page.tsx ─────────────▶   /settings/catalog       Propose / edit entries
 │   │
-│   └── audit/page.tsx ───────────────────▶   /audit                  Audit log + export
+│   ├── audit/page.tsx ───────────────────▶   /audit                  Audit log + export
+│   │
+│   └── obligations/page.tsx ─────────────▶   /obligations            Producer obligations (B1b, D-78)
 │
 └── api/                                      route handlers only — no UI
 ```
@@ -139,6 +141,7 @@ Left sidebar, 240px, collapsible to a 64px icon rail. Persistent across every `(
 | 4 | Containers | `/containers` | alerting-container count | P1 P2 P3 P4 P5 P6 |
 | 5 | Shipments | `/shipments` | — | P1 P2 P3 P4 P5 P6 |
 | 6 | Catalog | `/catalog` | — | P1 P2 P3 P4 P5 P6 |
+| 6a | Obligations | `/obligations` | — | P2 P3 P5 P6 |
 | 7 | Audit | `/audit` | — | P2 P5 P6 |
 | 8 | Settings ▸ | group | — | P2 P6 (P6 only sees Catalog) |
 | 8a | ↳ Organization | `/settings/organization` | — | P2 P6 |
@@ -452,6 +455,7 @@ Derived from the FIXED table in `_ANCHORS.md` §5, with "any member" expanded to
 | `/settings/users` | — | **W** | — | — | — | **W** | Only P6 may grant or revoke the P6 role |
 | `/settings/catalog` | — | — | — | — | — | **W** | P6 only |
 | `/audit` | — | R | — | — | R | R | **P1 cannot read the audit log.** Export is available to all three who can. |
+| `/obligations` | — | R | **W** | — | R | **W** | B1b, D-78. A nav item "Obligations" for these four. |
 
 ### 5.3 Enforcement rules
 
@@ -526,7 +530,7 @@ Behavioural and visual treatment lives in `UX_SPEC.md` §5. These are the **rout
 
 ## 7. Structural constraints for the build
 
-1. **Twenty routes.** The list in §1.1 is complete for B1a. A twenty-first route is a decision-log entry.
+1. **Twenty-one routes.** `/obligations` is the 21st (D-78). A 22nd is a decision-log entry.
 2. **One role map.** §5.2 is implemented once as data and read by the guard, the navigation, the command palette and every cross-route link. Duplicating it is how nav and guard drift apart.
 3. **Nothing reaches past `src/data`.** Every route in this document is built against the `DataAdapter` contract (`PROJECT_SETUP_BMMP.md` §3.2). CI enforces it.
 4. **Filter, sort, step and tab state lives in the URL.** Every list, every stepper, every tabbed detail. A warehouse user sends a colleague a link; a lost connection restores a page; an audit row deep-links into the exact view it describes.

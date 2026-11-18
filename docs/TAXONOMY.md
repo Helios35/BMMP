@@ -1,5 +1,5 @@
 # Taxonomy — BMMP
-**Version:** 1.10 · **Date:** 2026-11-17 · **Owner:** Nathan Ivy / Next Sketch LLC
+**Version:** 1.11 · **Date:** 2026-11-18 · **Owner:** Nathan Ivy / Next Sketch LLC
 **Answers:** How is everything in this product classified?
 **Reads from:** `_ANCHORS.md` · `PRD.md` · `BUSINESS_RULES.md` · `PROJECT_SETUP_BMMP.md`  ·  **Feeds:** `TECHNICAL_SPEC.md` · `ERD.md` · `UX_SPEC.md` · `SITE_ARCHITECTURE.md` · every builder brief
 
@@ -9,6 +9,13 @@
 ---
 
 ## Changelog
+
+**v1.11 · 2026-11-18 — state producer rules (`Decision Log.md` D-78)**
+
+- T-06 and T-43 changes and T-68–T-70 authored by planning (D-78), transcribed by `b1b-12-state-rules`.
+- **T-06:** `medium_format` is live for producer obligations from `b1b-12-state-rules`; B3 adds no band.
+- **Three systems added: T-68 `producer_obligation.status`, T-69 `obligation_deadline.status` and T-70 `obligation_deadline.due_basis`.**
+- **T-43 gains `producer_product.added`, `producer_product.changed`, `producer_product.removed`, `producer_obligation.evaluated`, `obligation_deadline.completed` and `obligation_deadline.reopened`.**
 
 **v1.10 · 2026-11-17 — hazard ranking (`Decision Log.md` D-76, D-77)**
 
@@ -250,6 +257,10 @@ Two citations in this document are deliberately **not** numbered, because what t
 | T-66 | Photo check outcome | `photo_check.outcome` | single | B2 (from `b2-10`) |
 | **L. Hazard ranking — added at v1.10** ||||
 | T-67 | Hazard ranking scope | `hazard_ranking.scope_type` | single | B2 (from `b2-11`) |
+| **M. Producer obligations — added at v1.11** ||||
+| T-68 | Producer obligation status | `producer_obligation.status` | single | B1b (from `b1b-12`) |
+| T-69 | Obligation deadline status | `obligation_deadline.status` | single | B1b (from `b1b-12`) |
+| T-70 | Deadline due basis | `obligation_deadline.due_basis` | single | B1b (from `b1b-12`) |
 
 ---
 
@@ -409,7 +420,7 @@ Two citations in this document are deliberately **not** numbered, because what t
 - **This is not a single attribute of a battery.** The same physical battery classifies differently in different states. `format_classification` is a derived row keyed on `(battery_record, jurisdiction, rule_version)` — never a single column on `battery_record`. An agent that adds `battery_record.format_category` has broken the multi-state model.
 - **Jurisdiction-varying.** The three format values are fixed here; **the weight and energy thresholds that assign them are `jurisdiction_rule` data and appear nowhere in code.** A value name that carries a threshold is a review rejection (§1.2).
 - **System-assigned**, derived from confirmed chemistry, weight, energy, removability (T-05) and the jurisdiction's active rule version. P6 may record an override with a stated reason; P1 may not.
-- **`medium_format` exists at B1a and is activated at B3.** The category, its storage, its filters and its rule-lookup path are built in the first migration. B1b builds the multi-state threshold engine including this band. B3 turns it on for the states that name it. **B3 does not add this category** — **Rule 8.3** puts the medium-format category in the jurisdiction rules data model from the first migration, and **Rule 11.2** states plainly that B3 activates existing machinery rather than building new machinery (`_ANCHORS.md` §0).
+- **`medium_format` is live for producer obligations from `b1b-12-state-rules` (D-78).** B3 adds the mobility catalog and P4. It adds no band. **B3 does not add this category** — **Rule 8.3** puts the medium-format category in the jurisdiction rules data model from the first migration, and **Rule 11.2** states plainly that B3 activates existing machinery rather than building new machinery (`_ANCHORS.md` §0).
 - **Triggers behaviour:** producer obligation determination, registration filing packets and deadline tracking (**Rule 8.1**, stub); mobility and small-battery coverage (**Rules 11.1, 11.2**, stub).
 - **Not terminal**, and expected to change: when a jurisdiction publishes a new rule version, a new `format_classification` row is written against the new version. **Existing rows are never mutated** — the classification that produced a filed document must remain readable exactly as it was.
 
@@ -1412,6 +1423,12 @@ Two citations in this document are deliberately **not** numbered, because what t
 | `recall_match.recorded` | Recall recorded | A person recorded a recall by hand, with its reference (Rule 10.15). |
 | `recall_match.dismissed` | Recall dismissed | A possible match was dismissed, or a confirmed one withdrawn, with a reason (Rules 10.14, 10.16). |
 | `hazard_ranking.computed` | Hazard ranking run | A ranking run ranked an organization's held batteries, containers and lots, with the scheme version. Actor: `scheduled_job` or the person who pressed Rank now. |
+| `producer_product.added` | Product added | P3 or P6 declared a product and the states it is sold in (Rule 8.6). |
+| `producer_product.changed` | Product changed | The states a declared product is sold in changed (Rule 8.6). |
+| `producer_product.removed` | Product removed | A declared product was removed, with the stated reason (Rule 8.6). |
+| `producer_obligation.evaluated` | Obligations checked | A run, with its trigger and the rule versions used (Rule 8.11). |
+| `obligation_deadline.completed` | Deadline marked done | A deadline was marked done, with the date it was met and the note (Rule 8.12). |
+| `obligation_deadline.reopened` | Deadline reopened | A deadline marked done was reopened, with the reason (Rule 8.12). |
 | `container.status_changed` | Container status changed | The container moved between values of T-24. |
 | `lot.created` | Lot created | P1 or P6 created a lot. It starts at `open` (T-25); every later move is `lot.status_changed`. |
 | `lot.status_changed` | Lot status changed | The lot moved between values of T-25 — closed, reopened, allocated to a shipment, returned to `closed` when that shipment let it go, shipped on departure, or dissolved. A dissolved lot's row is retained for audit (T-25). |
@@ -2010,6 +2027,55 @@ Severity is set by the code that raises the alert, from the condition that raise
 
 ---
 
+### T-68 · Producer obligation status
+
+**Stored on:** `producer_obligation.status` · **Cardinality:** single-select · **Phase:** B1b (from `b1b-12`)
+
+| Stored value | Display label | Definition |
+|---|---|---|
+| `applies` | Applies | At least one product sold in the state meets the obligation's conditions (Rule 8.9). |
+| `not_applicable` | Doesn't apply | Every product sold in the state definitely doesn't meet them (Rule 8.9). |
+| `undetermined` | Can't tell yet | A missing input means it can't be told either way (Rule 8.9). |
+
+**Rules**
+
+- **Set by an evaluation run (Rule 8.9), never by a person.**
+- **`undetermined` names the missing input and is never treated as `not_applicable`.**
+
+---
+
+### T-69 · Obligation deadline status
+
+**Stored on:** `obligation_deadline.status` · **Cardinality:** single-select · **Phase:** B1b (from `b1b-12`)
+
+| Stored value | Display label | Definition |
+|---|---|---|
+| `open` | Open | Not yet marked done. |
+| `completed` | Done | Marked done with the date it was met and a note (Rule 8.12). |
+| `withdrawn` | Withdrawn | The obligation stopped applying (Rule 8.12). |
+
+**Rules**
+
+- **Overdue is shown from the date. It is not a stored value.**
+- **Done needs a date and a note (Rule 8.12).**
+
+---
+
+### T-70 · Deadline due basis
+
+**Stored on:** `obligation_deadline.due_basis` · **Cardinality:** single-select · **Phase:** B1b (from `b1b-12`)
+
+| Stored value | Display label | Definition |
+|---|---|---|
+| `statutory_date` | Date in law | A date written in the law (Rule 8.10). |
+| `annual` | Every year | A yearly date, one deadline per year (Rule 8.10). |
+
+**Rules**
+
+- **A date that waits on an event is not a deadline and has no value here (Rule 8.10).**
+
+---
+
 ## 4. Naming Conventions
 
 Consistent with `PROJECT_SETUP_BMMP.md` §4. Where that document sets a convention, this one repeats it rather than varying it. Where this document adds a convention, it is because §4 does not cover taxonomy specifically.
@@ -2220,6 +2286,9 @@ Every enum column in the product, in one place. `text[]` marks a multi-select co
 | T-46 | `damage_assessment.status` | `text` | `not_assessed` | no | B1a |
 | T-47 | `tos_acceptance.status` | `text` | `not_accepted` | no | B1a |
 | T-67 | `hazard_ranking.scope_type` | `text` | none — required | no | B2 |
+| T-68 | `producer_obligation.status` | `text` | none — required | no | B1b |
+| T-69 | `obligation_deadline.status` | `text` | `open` | no | B1b |
+| T-70 | `obligation_deadline.due_basis` | `text` | none — required | no | B1b |
 
 **No enum column is nullable anywhere in this product.** "Not yet known" is a value with a name and a definition — `unknown`, `undetermined`, `not_captured`, `not_assigned`, `pending` — because null cannot be filtered, cannot be counted, cannot be explained to an auditor and cannot be distinguished from a bug. The one place absence is modelled as absence is T-30 `ddr_flags`, where an empty array is the normal state and a `none` value would be actively harmful.
 

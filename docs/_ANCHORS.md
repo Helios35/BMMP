@@ -66,7 +66,7 @@ Database naming is `snake_case`. Types in TypeScript are `PascalCase` singular.
 
 **Rules as data**
 
-`jurisdiction` · `jurisdiction_rule` · `rule_version` · `format_classification` (the per-jurisdiction, per-rule-version size/format result for a battery — keyed on `(battery_record, jurisdiction, rule_version)`, never a column on `battery_record`, because the same battery classifies differently by state) · `producer_obligation` (B1b) · `obligation_deadline` (B1b)
+`jurisdiction` · `jurisdiction_rule` · `rule_version` · `format_classification` (the per-jurisdiction, per-rule-version size/format result for a battery — keyed on `(battery_record, jurisdiction, rule_version)`, never a column on `battery_record`, because the same battery classifies differently by state) · `producer_obligation` (B1b) · `obligation_deadline` (B1b) · `producer_product` (B1b, Rule 8.6)
 
 **Evidence and audit**
 
@@ -119,6 +119,7 @@ Site Architecture and UX Spec must use exactly these. Route groups per `PROJECT_
 | `/settings/users` | Members and roles | P2, P6 |
 | `/settings/catalog` | Propose / edit catalog entries | P6 |
 | `/audit` | Audit log, filterable, exportable | P2, P5, P6 |
+| `/obligations` | Producer obligations — products, states, obligations and deadlines (B1b, D-78) | P3, P6 act · P2, P5 read |
 
 ---
 

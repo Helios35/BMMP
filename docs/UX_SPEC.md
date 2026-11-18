@@ -643,12 +643,12 @@ One per route in `_ANCHORS.md` §5. Access per `SITE_ARCHITECTURE.md` §5.2.
 |---|---|
 | **Purpose** | Show this role the work that needs doing today, ordered by urgency. |
 | **Who uses it** | P1 P2 P3 P4 P5 P6 — content differs by role. |
-| **Primary action** | P1/P6: **Log a battery**. P2: the most urgent storage-clock alert. P5: **Open the audit log**. |
+| **Primary action** | P1/P6: **Log a battery**. P2: the most urgent storage-clock alert. P3: **Open obligations**. P5: **Open the audit log**. |
 | **On success** | Every alert card routes to the screen where it is resolved. |
 | **On failure** | Per-region errors — a failed alerts fetch never blanks the whole page. |
 
 **What's on it.**
-- **Alerts region** (`AlertCard` §2.11), most urgent first: overdue containers → the configured alert-ladder tiers → over-limit quantity → open review items. Overdue cards pinned, non-dismissible for every role. Storage-clock alerts go to **P2 always, and to P1 for containers at their site** (Rule 4.14).
+- **Alerts region** (`AlertCard` §2.11), most urgent first: overdue containers → the configured alert-ladder tiers → over-limit quantity → open review items. Overdue cards pinned, non-dismissible for every role. Storage-clock alerts go to **P2 always, and to P1 for containers at their site** (Rule 4.14). P3's alerts region shows `obligation_deadline` alerts, each linking to its deadline.
 - **Review queue card** — routes to `/review`. **P1 and P6** see it as work: *"7 readings need confirming."* **P2** sees the same count framed as her problem: *"7 batteries in your containers aren't identified yet"* — and it lands her on §3.8b, not on P1's queue (`SITE_ARCHITECTURE.md` CL-1). P3, P4 and P5 do not see the card at all.
 - **Storage summary** — container count by clock tier, `StorageClockMeter` per attention-or-worse container.
 - **Recent activity** — last ten `audit_event`s the role may see, each linked.
@@ -1073,6 +1073,30 @@ For P6, `?entry=` gets a **Reference label photo** panel to upload or replace on
 For P5 this is the primary destination and the `ReadOnlyBanner` (§2.9) is present. Export is **not** disabled for P5.
 
 **shadcn:** Table, Input, Select, Badge, Button, Pagination, Sheet (mobile filters), Skeleton.
+
+---
+
+### 3.21 `/obligations` — Producer obligations
+
+P3 and P6 act. P2 and P5 read.
+
+- **Header:**
+  - basis line: "From your products and the states you sell in, checked against the rule data on file. Checked <time>."
+  - **Check now** (P3, P6) and **Export**
+- **Deadlines** tab (the default):
+  - `RecordTable`: due date, state, obligation, status (Open, Overdue, Done, Withdrawn), citation
+  - filters: state and status
+  - **Mark done** (date, a required note, an optional reference) and **Reopen** (a reason), for P3 and P6
+- **States** tab: one row per state the products are sold in.
+  - law and citation, agency, result (Applies: n · Doesn't apply · Can't tell yet · No rules on file), next deadline
+  - `?state=` opens `ObligationStatePanel`: each obligation per Rule 8.14, and the stewardship organizations the rule names
+- **Products** tab:
+  - each product: catalog entry (linked), chemistry, mass, energy, removability, states
+  - its band in each state, in the law's terms: "Medium format battery in WA · Not covered in DC · Can't tell in OR: energy not recorded"
+  - **Add product** (published entries only), **Edit states**, **Remove** (with a reason), for P3 and P6
+  - a missing catalog value names who can fix it (P6)
+
+Tabs, filters and `?state=` live in the URL. Colours: overdue `critical`, inside the first offset `attention`, the rest neutral. Empty state: no products yet. P3 sees **Add product**; P2 and P5 are told who can add one.
 
 ---
 
