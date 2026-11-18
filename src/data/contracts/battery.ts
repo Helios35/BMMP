@@ -28,6 +28,7 @@ import type { ApplicationClass } from "@/domain/taxonomy/application-class";
 import type { BatteryRecordStatus } from "@/domain/taxonomy/battery-record-status";
 import type { CatalogEntryStatus } from "@/domain/taxonomy/catalog-entry-status";
 import type { CellFormFactor } from "@/domain/taxonomy/cell-form-factor";
+import type { HazardRankingBand } from "@/domain/taxonomy/hazard-ranking-band";
 import type { Chemistry } from "@/domain/taxonomy/chemistry";
 import type { ConfidenceBand } from "@/domain/taxonomy/confidence-band";
 import type { DdrFlag } from "@/domain/taxonomy/ddr-flag";
@@ -74,9 +75,17 @@ export type UpdateBatteryRecord = UpdateInput<
  * `(battery_record, jurisdiction, rule_version)`, one record carries several,
  * and a column that sorts by one of them has asserted an organization-wide
  * format value (`SITE_ARCHITECTURE.md` §7.6b).
+ *
+ * `hazardRanking` sorts by the record's **current** ranking position —
+ * ascending is highest first, and a record with no current row sorts last
+ * either way (`UX_SPEC.md` §3.5; Rule 10.23).
  */
 export type BatteryRecordSortField =
-  "recordNumber" | "manufacturerName" | "assessedCondition" | "createdAt";
+  | "recordNumber"
+  | "manufacturerName"
+  | "assessedCondition"
+  | "createdAt"
+  | "hazardRanking";
 
 export interface BatteryRecordQuery
   extends BaseQuery, SortRequest<BatteryRecordSortField> {
@@ -99,6 +108,12 @@ export interface BatteryRecordQuery
    * column on the record.
    */
   readonly recallStatus?: "possible_match" | "confirmed_match";
+  /**
+   * The Ranking band filter (`UX_SPEC.md` §3.5, §3.9; Rule 10.23): items whose
+   * **current** `hazard_ranking` row is at this T-33 band — `exists` over
+   * `hazard_ranking`, never a column on the item.
+   */
+  readonly hazardRankingBand?: HazardRankingBand;
   readonly intakeSessionId?: Uuid;
   readonly chemistry?: Chemistry;
   /** A small mobility pack and a vehicle pack sit in the same list; this narrows it. */

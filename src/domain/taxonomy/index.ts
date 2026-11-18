@@ -1,6 +1,6 @@
 /**
  * The classification systems in the product — `docs/TAXONOMY.md`, T-01 through
- * T-64.
+ * T-67.
  *
  * One module per system, each exporting the value list constant, the union type
  * derived from it, and the label lookup (TAXONOMY.md §5.3). Shared read helpers
@@ -146,3 +146,5 @@ export * from "./clock-start-basis";
 export * from "./photo-check-kind";
 // T-66 · Photo check outcome
 export * from "./photo-check-outcome";
+// T-67 · Hazard ranking scope
+export * from "./hazard-ranking-scope";

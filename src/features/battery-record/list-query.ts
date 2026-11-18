@@ -13,7 +13,13 @@ import {
   CHEMISTRY_LABELS,
   type Chemistry,
 } from "@/domain/taxonomy/chemistry";
+import {
+  HAZARD_RANKING_BANDS,
+  HAZARD_RANKING_BAND_LABELS,
+  type HazardRankingBand,
+} from "@/domain/taxonomy/hazard-ranking-band";
 import { isTaxonomyValue, optionsFor } from "@/domain/taxonomy/lookup";
+import { ANY_BAND, BAND_FILTER } from "@/features/hazard-ranking/ranking-copy";
 import {
   RECALL_MATCH_STATUS_LABELS,
   type RecallMatchStatus,
@@ -64,6 +70,9 @@ export const BATTERY_SORT_FIELDS = [
   "manufacturerName",
   "assessedCondition",
   "createdAt",
+  // The Ranking column (`UX_SPEC.md` §3.5): the current position, highest
+  // first ascending; a record with no current ranking sorts last.
+  "hazardRanking",
 ] as const satisfies readonly BatteryRecordSortField[];
 
 export const BATTERY_FILTER_IDS = [
@@ -73,6 +82,7 @@ export const BATTERY_FILTER_IDS = [
   "tier",
   "matched",
   "recall",
+  "band",
   "from",
   "to",
 ] as const;
@@ -117,6 +127,7 @@ export function batteryListSpec(
       tier: STORAGE_CLOCK_ALERT_BANDS,
       matched: MATCHED_VALUES,
       recall: RECALL_FILTER_VALUES,
+      band: HAZARD_RANKING_BANDS,
     },
     perPageOptions: [BATTERY_PAGE_SIZE, 50, 100],
   };
@@ -181,6 +192,13 @@ export function batteryFilters(
       options: optionsFor(RECALL_FILTER_VALUES, RECALL_MATCH_STATUS_LABELS),
       anyLabel: "Any",
     },
+    {
+      // T-33 — the band of the record's current ranking (Rule 10.23).
+      id: "band",
+      label: BAND_FILTER,
+      options: optionsFor(HAZARD_RANKING_BANDS, HAZARD_RANKING_BAND_LABELS),
+      anyLabel: ANY_BAND,
+    },
   ];
 }
 
@@ -195,6 +213,7 @@ export interface BatteryListSelection {
   readonly tier: StorageClockAlertBand | undefined;
   readonly isCatalogMatched: boolean | undefined;
   readonly recallStatus: RecallFilterValue | undefined;
+  readonly hazardRankingBand: HazardRankingBand | undefined;
   readonly loggedAfter: IsoTimestamp | undefined;
   readonly loggedBefore: IsoTimestamp | undefined;
 }
@@ -215,6 +234,7 @@ export function batteryListSelection(query: ListQuery): BatteryListSelection {
   const tier = query.filters.tier;
   const matched = query.filters.matched;
   const recall = query.filters.recall;
+  const band = query.filters.band;
 
   return {
     search: query.q ?? undefined,
@@ -234,6 +254,10 @@ export function batteryListSelection(query: ListQuery): BatteryListSelection {
     recallStatus:
       recall !== undefined && isTaxonomyValue(RECALL_FILTER_VALUES, recall)
         ? recall
+        : undefined,
+    hazardRankingBand:
+      band !== undefined && isTaxonomyValue(HAZARD_RANKING_BANDS, band)
+        ? band
         : undefined,
     loggedAfter: dayStart(query.filters.from),
     loggedBefore: dayEnd(query.filters.to),

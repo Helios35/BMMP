@@ -1,5 +1,6 @@
 import type { ReactElement } from "react";
 
+import { HazardRankingCell } from "@/components/hazard/hazard-ranking-cell";
 import type { RecordTableColumn } from "@/components/record-table/record-table";
 import { StatusBadge } from "@/components/status/status-badge";
 import { ContainerFillMeter } from "@/components/storage/container-fill-meter";
@@ -7,8 +8,10 @@ import {
   StorageClockMeter,
   StorageClockMeterEmpty,
 } from "@/components/storage/storage-clock-meter";
+import type { HazardRankingView } from "@/domain/hazard/view";
 import { CONTAINER_TYPE_LABELS } from "@/domain/taxonomy/container-type";
-import type { IsoTimestamp } from "@/types/common";
+import { RANKING_COLUMN } from "@/features/hazard-ranking/ranking-copy";
+import type { IsoTimestamp, Uuid } from "@/types/common";
 
 import {
   COLUMN_CLOCK,
@@ -64,6 +67,8 @@ export function ClockCell({
 
 export function containerColumns(
   asOf: IsoTimestamp,
+  /** Each container's current hazard ranking, read once for the page (Rule 10.23). */
+  rankingFor: (containerId: Uuid) => HazardRankingView,
 ): readonly RecordTableColumn<ContainerListRow>[] {
   return [
     {
@@ -128,6 +133,13 @@ export function containerColumns(
           size="sm"
         />
       ),
+    },
+    {
+      // `UX_SPEC.md` §3.9 — the same Ranking column as `/batteries`.
+      id: "hazardRanking",
+      header: RANKING_COLUMN,
+      sortable: true,
+      cell: (row) => <HazardRankingCell view={rankingFor(row.container.id)} />,
     },
   ];
 }

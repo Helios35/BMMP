@@ -183,6 +183,12 @@ import {
   recallSyncPlan,
   recordRecallCheckForJob,
 } from "./recall-writes";
+import {
+  currentRankingOf,
+  hazardRankingPlan,
+  mockHazardRankings,
+  recordHazardRankingForJob,
+} from "./hazard-ranking-writes";
 import { prohibitsAir, withDamageFlags } from "@/domain/recalls/recalled-flag";
 
 /**
@@ -780,6 +786,11 @@ function matchesBatteryRecord(
             match.batteryRecordId === row.id &&
             match.status === query.recallStatus,
         )) &&
+    // The Ranking band filter — the record's **current** ranking row, never
+    // a column on the record (Rule 10.23).
+    (query.hazardRankingBand === undefined ||
+      currentRankingOf(row.organizationId, "battery_record", row.id)?.band ===
+        query.hazardRankingBand) &&
     eq(query.intakeSessionId, row.intakeSessionId ?? undefined) &&
     eq(query.chemistry, row.chemistry ?? undefined) &&
     eq(query.applicationClass, row.applicationClass) &&
@@ -813,8 +824,13 @@ const BATTERY_RECORD_SORT_KEYS = {
   manufacturerName: (row: BatteryRecord) => row.manufacturerName,
   assessedCondition: (row: BatteryRecord) => row.assessedCondition,
   createdAt: (row: BatteryRecord) => row.createdAt,
+  // Position ascending is highest first; a record with no current ranking
+  // sorts last either way (Rule 10.23).
+  hazardRanking: (row: BatteryRecord) =>
+    currentRankingOf(row.organizationId, "battery_record", row.id)
+      ?.rankPosition ?? null,
 } as const satisfies Readonly<
-  Record<BatteryRecordSortField, (row: BatteryRecord) => string | null>
+  Record<BatteryRecordSortField, (row: BatteryRecord) => string | number | null>
 >;
 
 const byNewestBatteryRecord = (a: BatteryRecord, b: BatteryRecord): number =>
@@ -1812,27 +1828,12 @@ const dateCodeDecodes = tenantAppendOnlyRepository<
 // Storage
 // ---------------------------------------------------------------------------
 
-const containersBase = tenantRepository<
-  Container,
-  CreateContainer,
-  UpdateContainer,
-  ContainerQuery
->(store().containers, {
-  compare: (a, b) => byNewest(a.createdAt, b.createdAt),
-  matches: (
-    row,
-    query: {
-      status?: string;
-      containerType?: string;
-      lotId?: Uuid;
-      shipmentId?: Uuid;
-      isOverdue?: boolean;
-      isAlerting?: boolean;
-      storageLocation?: string;
-      containerIds?: readonly Uuid[];
-      search?: string;
-    },
-  ) =>
+const byNewestContainer = (a: Container, b: Container): number =>
+  byNewest(a.createdAt, b.createdAt);
+
+/** The `/containers` filters, in one function, so the list and its count agree. */
+function matchesContainer(row: Container, query: ContainerQuery): boolean {
+  return (
     eq(query.status, row.status) &&
     eq(query.storageLocation, row.storageLocation ?? undefined) &&
     (query.containerIds === undefined || query.containerIds.includes(row.id)) &&
@@ -1849,7 +1850,28 @@ const containersBase = tenantRepository<
             (alert) =>
               alert.containerId === row.id && alert.resolvedAt === null,
           )) &&
-    matchesSearch(query.search, row.containerCode, row.storageLocation),
+    (query.hazardRankingBand === undefined ||
+      currentRankingOf(row.organizationId, "container", row.id)?.band ===
+        query.hazardRankingBand) &&
+    matchesSearch(query.search, row.containerCode, row.storageLocation)
+  );
+}
+
+/** Sorted by the current ranking: position ascending is highest first, unranked last. */
+const CONTAINER_SORT_KEYS = {
+  hazardRanking: (row: Container) =>
+    currentRankingOf(row.organizationId, "container", row.id)?.rankPosition ??
+    null,
+} as const;
+
+const containersBase = tenantRepository<
+  Container,
+  CreateContainer,
+  UpdateContainer,
+  ContainerQuery
+>(store().containers, {
+  compare: byNewestContainer,
+  matches: (row, query: ContainerQuery) => matchesContainer(row, query),
   build: (ctx, input, id) => {
     const organization = store()
       .organizations.all()
@@ -1890,18 +1912,42 @@ const containersBase = tenantRepository<
  */
 const containers: ContainerRepository = {
   ...containersBase,
+  async list(ctx, query) {
+    return store().containers.list(
+      ctx,
+      query,
+      (row) => matchesContainer(row, query),
+      orderBy(query, CONTAINER_SORT_KEYS, byNewestContainer),
+    );
+  },
   moveContents,
   recordStorageEvent,
   changeStatus,
 };
 
+const byNewestLot = (a: Lot, b: Lot): number =>
+  byNewest(a.createdAt, b.createdAt);
+
+function matchesLot(row: Lot, query: LotQuery): boolean {
+  return (
+    eq(query.status, row.status) &&
+    (query.hazardRankingBand === undefined ||
+      currentRankingOf(row.organizationId, "lot", row.id)?.band ===
+        query.hazardRankingBand) &&
+    matchesSearch(query.search, row.lotCode, row.description)
+  );
+}
+
+const LOT_SORT_KEYS = {
+  hazardRanking: (row: Lot) =>
+    currentRankingOf(row.organizationId, "lot", row.id)?.rankPosition ?? null,
+} as const;
+
 const lotsBase = tenantRepository<Lot, CreateLot, UpdateLot, LotQuery>(
   store().lots,
   {
-    compare: (a, b) => byNewest(a.createdAt, b.createdAt),
-    matches: (row, query: { status?: string; search?: string }) =>
-      eq(query.status, row.status) &&
-      matchesSearch(query.search, row.lotCode, row.description),
+    compare: byNewestLot,
+    matches: (row, query: LotQuery) => matchesLot(row, query),
     build: (ctx, input, id) => {
       const organization = store()
         .organizations.all()
@@ -1931,6 +1977,14 @@ const lotsBase = tenantRepository<Lot, CreateLot, UpdateLot, LotQuery>(
 /** The lot repository, plus the three person moves T-25 names (`./lot-writes.ts`). */
 const lots: LotRepository = {
   ...lotsBase,
+  async list(ctx, query) {
+    return store().lots.list(
+      ctx,
+      query,
+      (row) => matchesLot(row, query),
+      orderBy(query, LOT_SORT_KEYS, byNewestLot),
+    );
+  },
   open: openLot,
   changeMembership: changeLotMembership,
   changeStatus: changeLotStatus,
@@ -2662,6 +2716,7 @@ export const mockAdapter: DataAdapter = {
   recalls: mockRecalls,
   photoChecks: mockPhotoChecks,
   catalogReferencePhotos: mockCatalogReferencePhotos,
+  hazardRankings: mockHazardRankings,
   auditEvents,
 
   objects,
@@ -2670,6 +2725,8 @@ export const mockAdapter: DataAdapter = {
     runStorageClockAlerts,
     recallSyncPlan,
     recordRecallCheck: recordRecallCheckForJob,
+    hazardRankingPlan,
+    recordHazardRanking: recordHazardRankingForJob,
   },
 };
 

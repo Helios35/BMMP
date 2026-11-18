@@ -222,7 +222,7 @@ Each row shows four things, always, in this order: **field name · value · wher
 | Confidence | A `Badge` with the band as text — **High / Medium / Low / None** — intent `ok` / `attention` / `critical` / `neutral`. The numeric value appears as `caption` beneath on desktop and in the badge tooltip on mobile. Bands and threshold per D-22. |
 | Confirm control | See 2.1.4 |
 
-**"AI suggested"** (Rule 1.29; `AiSuggestedTag`, §2.16). Every value pre-filled from the label read shows the tag until confirmed. Chemistry from the catalog never does.
+**"AI suggested"** (Rule 1.29; `AiSuggestedTag`, §2.16). Every value pre-filled from the label read shows 'AI suggested' before a decision and 'AI suggested · confirmed by …' after (Rule 1.29). Chemistry from the catalog never does.
 
 #### 2.1.3 The fields, their sources, and what is gated
 
@@ -671,9 +671,11 @@ One per route in `_ANCHORS.md` §5. Access per `SITE_ARCHITECTURE.md` §5.2.
 
 **What's on it.** `RecordTable` (§2.7). Columns: Record ID (mono, primary) · Manufacturer + model · Chemistry · Form factor · Assessed condition (`StatusBadge`) · Container · Storage clock tier · Logged (relative + absolute on hover). Filters: condition, chemistry, container, clock tier, catalog-matched yes/no, date range, and **Recall** — possible match, confirmed (Rule 10.18). The filter lives in the URL. Search across ID, serial and model.
 
+**Hazard ranking** (Rules 10.19–10.26). A **Ranking** column showing the band label and "3 of 41"; sort by ranking, plus a band filter, both in the URL; **Rank now** in the toolbar for P2 and P6.
+
 **A small mobility-device pack and a vehicle traction pack render in the same table with no special case** (`PROJECT_SETUP_BMMP.md` §8.2). The mock fixtures must contain both from day one, sitting next to each other.
 
-**Exports** (Rule 1.29). The `/batteries` CSV gains **Identified by** ("AI suggested, confirmed by a person" or "Entered by a person") and **Damage assessed by** (the T-59 label). On the DDR packet, a model-assisted finding carries the T-59 label.
+**Exports** (Rule 1.29). The `/batteries` CSV gains **Identified by** ("AI suggested, confirmed by a person" or "Entered by a person") and **Damage assessed by** (the T-59 label). It also gains four ranking columns (Rules 10.19, 10.25): **Hazard ranking** ("3 of 41 · Band 1 — highest relative ranking in set"), **Ranking set**, **Ranked as of** and **Ranking factors** ("Damage: cosmetic only; Recall: no match; …"). On the DDR packet, a model-assisted finding carries the T-59 label.
 
 **shadcn:** Table, Input, Select, Badge, Button, Pagination, Sheet (mobile filters), Skeleton.
 
@@ -724,7 +726,8 @@ One per route in `_ANCHORS.md` §5. Access per `SITE_ARCHITECTURE.md` §5.2.
 **What's on it.** Header: record ID (mono, copyable), manufacturer + model, chemistry, `StatusBadge` for assessed condition, container link (P1/P2/P6 only — §5.4 of `SITE_ARCHITECTURE.md`), storage clock tier.
 
 Tabs:
-- **Overview** — identity fields with **each value's source retained and visible** (Read from label / Matched from catalog / Decoded / Detected from image / Entered by *name*). Specification. Classification outcome with its recorded reasoning. Placement and clock. `[B2]` reserves a section for `hazard_ranking` — **rendered as a relative ranking with a stated basis per factor when it arrives, never as a probability or percentage** (`_ANCHORS.md` §7.1).
+- **Overview** — identity fields with **each value's source retained and visible** (Read from label / Matched from catalog / Decoded / Detected from image / Entered by *name*). Specification. Classification outcome with its recorded reasoning. Placement and clock.
+  - **Hazard ranking** (Rules 10.19–10.26), the shared `HazardRankingPanel`, as Rule 10.25 describes: the band label; the position, the set and the as-of time; a basis statement; each factor with this item's level and where it came from; and why it sits where it does, against the item just above and the item just below. **A relative ranking with a stated basis per factor, never a probability or percentage** (`_ANCHORS.md` §7.1). One neutral colour for every band. "Not ranked yet" for an item added since the last run; "Changed since — rank again to update" when an input it read has changed.
   - **Recalls** (Rules 10.10–10.18):
     - **Standing line:** the T-35 label, the last checked time, and the source(s).
     - **Each match row:** source; recall number, linked to the recall; title, published date and remedy; **"Matched on:"** in words; status, who, when and reason.
@@ -840,6 +843,8 @@ That copy is doing real work: it explains why an intake backlog is a storage pro
 
 **What's on it.** `RecordTable` with an inline `StorageClockMeter` and `ContainerFillMeter` per row. Columns: Container label ID (mono) · Location · Record count · Fill · Storage clock tier · Ready-to-ship status. Filters: clock tier, location, over-threshold, ready-to-ship. `?filter=alerting` is a supported deep link from `/`.
 
+**Hazard ranking** (Rules 10.19–10.26). On the containers and on the Lots tab: the same **Ranking** column, sort and band filter as `/batteries` (§3.5), in the URL, and **Rank now** for P2 and P6.
+
 **For P3, P4 and P5 the rows are not links** — no hover, no pointer, no ring, and a tooltip / tap-to-reveal naming the roles who may open the detail (`SITE_ARCHITECTURE.md` §5.4). This is the single easiest thing on this route to build wrong.
 
 **shadcn:** Table, Progress, Badge, Button, Select, Tooltip, Pagination, Skeleton.
@@ -856,7 +861,7 @@ That copy is doing real work: it explains why an intake backlog is a storage pro
 | **On success** | The action routes or writes a `storage_event`, re-tiers the alert, and toasts. |
 | **On failure** | The action fails in place with a stated reason; contents and clock stay readable. |
 
-**What's on it.** Header: container label ID, location, `StorageClockMeter`, `ContainerFillMeter`, ready-to-ship `StatusBadge`, and any damaged/defective flag from its contents (Flow D3).
+**What's on it.** Header: container label ID, location, `StorageClockMeter`, `ContainerFillMeter`, ready-to-ship `StatusBadge`, and any damaged/defective flag from its contents (Flow D3). Below it, the container's `HazardRankingPanel` (§3.7; Rule 10.25).
 
 Tabs:
 - **Contents** — every `battery_record` in the container, with condition and chemistry. Add / remove for P1/P6 only.

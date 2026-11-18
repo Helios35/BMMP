@@ -89,9 +89,10 @@ describe("the seam", () => {
     for (const key of b1a) {
       expect(mockAdapter[key], key).toBeDefined();
     }
+    // b2-11 gave `hazard_ranking` its repository (Rules 10.19–10.26).
+    expect(mockAdapter.hazardRankings, "hazardRankings").toBeDefined();
     for (const later of [
       "grades",
-      "hazardRankings",
       "recallMatches",
       "producerObligations",
       "obligationDeadlines",
@@ -187,9 +188,9 @@ describe("tenant isolation", () => {
     expect(created.organizationId).toBe(ID.ORG.cascade);
     // And the counter is per-organization, allocated inside the insert.
     // The next code after every fixture container — C-0004 to C-0006 were
-    // added by b1a-08, C-0007 to C-0009 by b2-09 — so a new container never
-    // repeats one on file.
-    expect(created.containerCode).toBe("C-0010");
+    // added by b1a-08, C-0007 to C-0009 by b2-09, C-0010 by b2-11 — so a new
+    // container never repeats one on file.
+    expect(created.containerCode).toBe("C-0011");
     // The accumulation start date is not settable by any caller: it is set by
     // the first placement and travels with the records (Rule 4.4).
     expect(created.accumulationStartedAt).toBeNull();
@@ -272,12 +273,13 @@ describe("role enforcement, using the same sets Postgres uses", () => {
     await expect(mockAdapter.auditEvents.list(HANDLER, PAGE)).rejects.toThrow(
       PermissionError,
     );
+    // Five fixture rows, and b2-11's seeded ranking run's one (Rule 10.26).
     await expect(
       mockAdapter.auditEvents.list(MANAGER, PAGE),
-    ).resolves.toHaveProperty("total", 5);
+    ).resolves.toHaveProperty("total", 6);
     await expect(
       mockAdapter.auditEvents.list(AUDITOR, PAGE),
-    ).resolves.toHaveProperty("total", 5);
+    ).resolves.toHaveProperty("total", 6);
   });
 
   it("refuses a rule-version publish from anyone but P6", async () => {
@@ -457,8 +459,9 @@ describe("the awkward fixtures", () => {
     expect(created.ddrFlags).toEqual([]);
     expect(created.isAirTransportProhibited).toBe(false);
     // BR-0006 to BR-0008 are b1a-08 fixtures, BR-0009 to BR-0014 b2-09's and
-    // BR-0015, BR-0016 b2-10's; the counter starts above them.
-    expect(created.recordNumber).toBe("BR-0017");
+    // BR-0015, BR-0016 b2-10's and BR-0017 to BR-0020 b2-11's; the counter
+    // starts above them.
+    expect(created.recordNumber).toBe("BR-0021");
   });
 
   it("carries a container past its accumulation period in the hard overdue state", async () => {

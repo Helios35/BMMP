@@ -1,5 +1,5 @@
 # Business Rules — BMMP
-**Version:** 1.4 · **Date:** 2026-11-10 · **Owner:** Nathan Ivy / Next Sketch LLC
+**Version:** 1.5 · **Date:** 2026-11-17 · **Owner:** Nathan Ivy / Next Sketch LLC
 **Answers:** What decisions does the system make, and on what basis?
 **Reads from:** `docs/_ANCHORS.md`, `docs/PRD.md`, `ROADMAP_BMMP_2026-07-28.md` (v3.0), `Decision Log.md` (D-1–D-11), `RESEARCH_battery-management-feature-sweep_2026-07-28.md`, `PROJECT_SETUP_BMMP.md`  ·  **Feeds:** `docs/TAXONOMY.md`, `docs/TECHNICAL_SPEC.md`, `docs/ERD.md`, `docs/UX_SPEC.md`, `docs/SITE_ARCHITECTURE.md`, `docs/RUNBOOK.md`, every builder brief
 
@@ -9,6 +9,12 @@
 ---
 
 ## Changelog
+
+**v1.5 · 2026-11-17 — hazard ranking (`Decision Log.md` D-76, D-77)**
+
+- **New Rules 10.19–10.26** — hazard ranking: what is ranked and against what, the factors, how items are ordered, containers and lots, position and band, when it runs, what a person sees, and the history. They append to the end of section 10, after Rule 10.18; everything else in section 10 stays reserved under 10.2.
+- **EC-55 amended** to name the rules that build the ranking.
+- Authored by planning in `SPEC_hazard-ranking_2026-11-10.md`, transcribed by `b2-11-risk-ranking`. **No rule was renumbered.**
 
 **v1.4 · 2026-11-10 — photo checks (`Decision Log.md` D-56, D-67, D-68, D-74, D-75)**
 
@@ -910,11 +916,13 @@ The record leaves the shipment when it is moved to quarantine (Rule 6.17). A dep
 
 ---
 
-### 10. Grading, damage triage and hazard ranking — B2 — recall matching specified (D-73); the rest reserved
+### 10. Grading, damage triage and hazard ranking — B2 — recall matching (D-73) and hazard ranking (D-77) specified; the rest reserved
 
 *Reserved. Specified at **Gate 2** (11 December 2026), built in B2. The orchestration pattern is fixed in `_ANCHORS.md` §6: concurrent fan-out and fan-in over one record, then a sequential grading step, human gate at the end. Two rules below are not reserved — they are in force now and bind every section built before this one.*
 
-*Rules 10.10–10.18 (recall matching) are in force from `b2-09-recalls`. Everything else in this section stays reserved under 10.2.*
+*Rules 10.10–10.18 (recall matching) are in force from `b2-09-recalls`.*
+
+*Rules 10.19–10.26 (hazard ranking) are in force from `b2-11-risk-ranking`. Everything else in this section stays reserved under 10.2.*
 
 **10.1** This section will govern: visual damage triage against the labeled damage set; automated recall matching on every intake record; relative hazard ranking of stored inventory; the published grading scheme; the reuse-versus-recycle recommendation; and the provenance record binding a pack's serial to the device or vehicle it came out of.
 
@@ -1006,6 +1014,66 @@ A failure is never shown as "no match".
   2. **Possible match** — any open possible match
   3. **No match** — the last run on every applicable source found none
   4. **Not checked** — otherwise, with the reason
+
+**10.19 — WHAT IS RANKED, AND AGAINST WHAT.**
+
+- Three things are ranked, each against its own kind:
+  - **batteries** in T-22 `confirmed`, `classified`, `reclassifying`, `stored`, `quarantined` or `staged` (the Rule 10.10 list)
+  - **containers** in T-24 `open`, `full`, `overdue`, `closed` or `staged`
+  - **lots** in T-25 `open`, `closed` or `allocated`
+- **The comparison set is the organization's held inventory of that kind.** It becomes the site when sites are an entity.
+- A ranking is never shown, exported or sent without its set, its size and its as-of time (T-33).
+
+**10.20 — THE FACTORS.** A battery is ranked on these factors (T-34), each read from its confirmed record, never from a proposal:
+
+| Factor | Levels, highest first | Read from |
+|---|---|---|
+| Damage indicators | damaged or defective · cosmetic only · none observed | the current assessment (T-29, T-30) |
+| Recall status | confirmed · possible match · no match | the recall standing (Rule 10.18) |
+| Chemistry | lithium metal · lithium-ion · other rechargeable · alkaline | the confirmed chemistry (T-01) |
+| Charge at intake | above storage limit · at or below | T-21 |
+| Age from date code | bands set in the scheme | `manufactured_on` |
+| Certification marks | none read · marks read | the marks read from the label |
+
+- **A factor with no recorded evidence reads "Not recorded" and ranks level with that factor's highest level.** A gap never moves an item down, and it is never treated as low or safe. Examples: recall "Not checked", T-21 `not_captured`, no date, marks never captured, T-01 `other`.
+- No percentage appears in a ranking, not even the charge reading. The T-21 label is shown.
+
+**10.21 — HOW ITEMS ARE ORDERED.**
+
+- Items are compared factor by factor, in the scheme's order. **The first factor where two items differ decides which ranks above.** No points are added up, and no total exists.
+- Items that agree on every factor are level.
+- The order, the levels and the age bands are a versioned **ranking scheme**: platform configuration (the D-40 pattern), never code (Rule 1.23). Scheme v1 uses the order in the 10.20 table.
+
+**10.22 — CONTAINERS AND LOTS.**
+
+- A container takes each battery factor at its highest level among its batteries. A lot does the same over its containers' batteries.
+- They are also ranked on **storage aggregation**, placed after chemistry: the total rated energy of the contents, in bands set in the scheme. If any battery's energy is unknown, aggregation reads "Not fully recorded" and ranks level with the highest band.
+- An empty container or lot is `not_ranked`.
+
+**10.23 — POSITION AND BAND.**
+
+- **Position** is "3rd of 41". Level items share the best position: "3rd of 41, level with 5 others".
+- **Band** (T-33) comes from where the item's level group sits in the set. The share is (items ranked above + (group size − 1) ÷ 2) ÷ (set size − 1). The cut points are 0.25, 0.5 and 0.75, set in the scheme: below 0.25 is Band 1, up to 0.5 is Band 2, up to 0.75 is Band 3, and the rest is Band 4.
+- **`not_ranked`** applies when the set has one item, or when every item is level. Nothing sets it apart, and it is not given a band.
+
+**10.24 — WHEN IT RUNS.**
+
+- A ranking run ranks all three kinds for one organization at once. It runs from `POST /api/jobs/hazard-ranking` (`CRON_SECRET`, route only until go-live, D-63 #6) and from **Rank now** (P2, P6).
+- An item added since the last run reads "Not ranked yet".
+- If an input this ranking read has changed since its as-of time, the ranking reads **"Changed since — rank again to update"**. Inputs are an assessment, a recall decision, a move or a correction.
+- No role sets or changes a band or position by hand, P6 included (T-33).
+
+**10.25 — WHAT A PERSON SEES.** On the item:
+
+- the band label
+- the position, the set and the as-of time
+- a basis statement
+- each factor with this item's level and where it came from ("Damage: cosmetic only — assessment 4 Nov by Dana R.")
+- **why it sits where it does**: the first factor where it differs from the item just above it and the item just below it ("Ranked above BR-0012 on charge at intake: above storage limit vs at or below")
+
+Language is comparative only: ranked above, ranked below, level with. **Never** a probability, percentage, score, likelihood, "risk", or "high/moderate/low hazard". Bands use one neutral colour, never red, amber or green (T-33).
+
+**10.26 — HISTORY.** Rankings are append-only. Each run writes a row per ranked item and marks the previous row not current. Each run writes one `audit_event`, actor `scheduled_job` or the person who pressed **Rank now**.
 
 ---
 
@@ -1207,7 +1275,7 @@ A failure is never shown as "no match".
 
 **EC-54 — A builder finds a threshold they need and no jurisdiction rule holding it.** They do not write the number. They add the rule as data with its version and citation, or raise a decision-log entry if they lack the source. A hard-coded threshold is a review rejection. Rule 1.23, `PROJECT_SETUP_BMMP.md` §8.1.
 
-**EC-55 — A customer asks for a "fire risk percentage" for their insurer.** Declined, and the relative hazard ranking with its per-factor basis is offered instead, with an explanation of why the percentage is not produced. Commercial pressure does not waive Rule 10.3. Rules 1.25, 10.3, 10.4.
+**EC-55 — A customer asks for a "fire risk percentage" for their insurer.** Declined, and the relative hazard ranking with its per-factor basis is offered instead, with an explanation of why the percentage is not produced. Commercial pressure does not waive Rule 10.3. The ranking is built by Rules 10.19–10.26. Rules 1.25, 10.3, 10.4.
 
 **EC-56 — A stakeholder asks for chemistry detection from a photo of an unlabeled battery.** Declined in every document, demo and screen. The product reads labels and matches a catalog. Rules 2.9, 10.8; Decision D-7.
 

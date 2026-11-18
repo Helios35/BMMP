@@ -260,9 +260,13 @@ test.describe("the list is broader than its detail (§5.4)", () => {
       const control = page.locator("[data-create-container]");
       await expect(control).toHaveAttribute("aria-disabled", "true");
       await expect(control).not.toHaveAttribute("disabled", /.*/);
+      // New container's own gated control carries the reason. Rank now (b2-11)
+      // is gated beside it for the auditor too, with the same reason.
       await expect(
         page
-          .locator("[data-gated-control]")
+          .locator("[data-gated-control]", {
+            has: page.locator("[data-create-container]"),
+          })
           .getByText(AUDITOR_READ_ONLY_REASON),
       ).toHaveCount(1);
     });

@@ -155,6 +155,50 @@ export function recallIdentities(
   return identities;
 }
 
+/** The names on a record that recall matching reads, beside its catalog entry's. */
+export interface RecallRecordNames {
+  readonly catalogEntryId: string | null;
+  readonly manufacturerName: string | null;
+  readonly brandName: string | null;
+  readonly modelName: string | null;
+  readonly partNumber: string | null;
+  readonly provenanceSourceType: ProvenanceSourceType;
+  readonly sourceDeviceMake: string | null;
+  readonly sourceDeviceModel: string | null;
+  readonly sourceDeviceModelYear: number | null;
+}
+
+export interface RecallCatalogNames {
+  readonly manufacturerName: string | null;
+  readonly brandName: string | null;
+  readonly modelName: string | null;
+  readonly partNumber: string | null;
+}
+
+/**
+ * What a record can be checked on (Rule 10.11) — **the catalog entry's names
+ * first**, the record's where the entry has none. One mapping, read by the
+ * recall check and by the hazard ranking's recall factor, so the two can
+ * never disagree about which identities a record has.
+ */
+export function recallIdentitiesForRecord(
+  record: RecallRecordNames,
+  catalogEntry: RecallCatalogNames | null,
+): readonly RecallIdentity[] {
+  return recallIdentities({
+    hasConfirmedCatalogEntry:
+      record.catalogEntryId !== null && catalogEntry !== null,
+    manufacturerName: catalogEntry?.manufacturerName ?? record.manufacturerName,
+    brandName: catalogEntry?.brandName ?? record.brandName,
+    modelName: catalogEntry?.modelName ?? record.modelName,
+    partNumber: catalogEntry?.partNumber ?? record.partNumber,
+    provenanceSourceType: record.provenanceSourceType,
+    sourceDeviceMake: record.sourceDeviceMake,
+    sourceDeviceModel: record.sourceDeviceModel,
+    sourceDeviceModelYear: record.sourceDeviceModelYear,
+  });
+}
+
 /** What the source is asked for this identity. */
 export function recallQueryFor(identity: RecallIdentity): RecallQuery {
   if (identity.kind === "source_vehicle") {

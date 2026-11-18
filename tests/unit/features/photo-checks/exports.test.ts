@@ -37,7 +37,8 @@ function cell(row: readonly string[], heading: string): string | undefined {
 
 describe("the /batteries CSV (Rule 1.29)", () => {
   it("ends with Identified by and Damage assessed by, after every existing column", () => {
-    expect(BATTERY_CSV_HEADERS.slice(-3)).toEqual([
+    // b2-11 appended its four ranking columns after them (UX_SPEC.md §3.5).
+    expect(BATTERY_CSV_HEADERS.slice(-7, -4)).toEqual([
       "Recall associations",
       "Identified by",
       "Damage assessed by",

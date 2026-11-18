@@ -125,6 +125,9 @@ export const LOT_NO_CONTAINERS = "None";
 export const LOT_NO_START = "No battery placed yet";
 export const LOT_OVERDUE =
   "Overdue — a container in this lot is past its accumulation period (Rule 4.24).";
+/** The dialog that carries a lot's ranking panel — a lot has no page (Rule 10.25). */
+export const LOT_RANKING_TITLE = (lotCode: string): string =>
+  `Hazard ranking — lot ${lotCode}`;
 /** A lot row does not open: a lot has no route of its own (no 21st route). */
 export const LOT_HAS_NO_PAGE =
   "A lot has no page of its own. Its containers are named in the row.";

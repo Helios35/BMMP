@@ -20,7 +20,8 @@ export default function BatteriesLoading() {
   return (
     <PageShell>
       <PageHeaderSkeleton />
-      <RecordTableSkeleton columns={8} />
+      {/* Nine columns: the eight of §3.5 and the Ranking (b2-11). */}
+      <RecordTableSkeleton columns={9} />
     </PageShell>
   );
 }

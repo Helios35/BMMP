@@ -3,7 +3,7 @@ import "server-only";
 import { data } from "@/data";
 import type { RequestContext } from "@/data/contracts";
 import { lotStanding, type LotStanding } from "@/domain/storage/lot";
-import type { LotStatus } from "@/domain/taxonomy/lot-status";
+import type { LotListSelection } from "../list-query";
 import { isAppError } from "@/lib/errors";
 import type { Container, Lot } from "@/types/storage";
 
@@ -37,13 +37,21 @@ export interface LotListResult {
 
 export async function readLotList(
   ctx: RequestContext,
-  query: { readonly search: string | null; readonly status: LotStatus | null },
+  query: LotListSelection,
 ): Promise<LotListResult> {
   try {
     const page = await data.lots.list(ctx, {
       limit: LOT_LIMIT,
       ...(query.search === null ? {} : { search: query.search }),
       ...(query.status === null ? {} : { status: query.status }),
+      ...(query.band === null ? {} : { hazardRankingBand: query.band }),
+      // The Ranking sort is the adapter's, over the current rows (Rule 10.23).
+      ...(query.sortByRanking
+        ? {
+            sortBy: "hazardRanking" as const,
+            sortDirection: query.sortDirection,
+          }
+        : {}),
     });
     const rows: LotListRow[] = [];
     for (const lot of page.items) {
@@ -65,7 +73,11 @@ export async function readLotList(
         ),
       });
     }
-    rows.sort((a, b) => b.lot.lotCode.localeCompare(a.lot.lotCode));
+    // Newest code first unless the reader sorted by ranking, which the
+    // adapter already did.
+    if (!query.sortByRanking) {
+      rows.sort((a, b) => b.lot.lotCode.localeCompare(a.lot.lotCode));
+    }
     return { rows, total: page.total };
   } catch (cause) {
     // Nothing is swallowed: a records-service failure renders the table's

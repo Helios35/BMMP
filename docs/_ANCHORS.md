@@ -62,7 +62,7 @@ Database naming is `snake_case`. Types in TypeScript are `PascalCase` singular.
 
 **Condition**
 
-`damage_assessment` · `grade` (B2) · `hazard_ranking` (B2) · `recall_match` (B2) · `recall_check` (B2, D-74 #2) · `photo_check` (B2, Rules 2.36, 2.37, 6.25)
+`damage_assessment` · `grade` (B2) · `hazard_ranking` (B2) · `recall_match` (B2) · `recall_check` (B2, D-74 #2) · `photo_check` (B2, Rules 2.36, 2.37, 6.25) · `damage_proposal_decision` (B2, Rule 7.25; D-76 #15)
 
 **Rules as data**
 

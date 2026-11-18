@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { AlertCard } from "@/components/alert/alert-card";
+import { HazardRankingPanel } from "@/components/hazard/hazard-ranking-panel";
 import {
   ACTION_BUTTON_CLASS,
   PageHeader,
@@ -31,6 +32,7 @@ import { readTaxonomyValue } from "@/domain/taxonomy/lookup";
 import { STORAGE_CLOCK_ALERT_BAND_LABELS } from "@/domain/taxonomy/storage-clock-alert-band";
 import { CopyButton } from "@/features/battery-record/copy-button";
 import { ContainerActions } from "@/features/containers/components/container-actions";
+import { readRankingView } from "@/features/hazard-ranking/server/read-rankings";
 import { ContainerLotControl } from "@/features/containers/components/lot-controls";
 import { FIELD_LOT, NOT_IN_A_LOT } from "@/features/containers/container-copy";
 import { ContentsPanel } from "@/features/containers/components/contents-panel";
@@ -173,7 +175,12 @@ export default async function ContainerPage({
   const basePath = `/containers/${container.id}`;
   const query = decodeListQuery(rawParams, CONTAINER_TAB_SPEC);
   const tab = activeContainerTab(query);
-  const detail = await readContainer(ctx, container);
+  const [detail, ranking] = await Promise.all([
+    readContainer(ctx, container),
+    // §3.10 — the container's place among the held containers, from the
+    // last run; never computed on render (Rules 10.22, 10.25).
+    readRankingView(ctx, "container", container.id, asOf),
+  ]);
   const timeZone = detail.clock?.timeZone ?? container.siteTimeZone;
   const formatDate = civilDateIn(timeZone);
 
@@ -321,6 +328,8 @@ export default async function ContainerPage({
           />
         ) : null}
       </SectionCard>
+
+      <HazardRankingPanel view={ranking} />
 
       <ContainerActions
         containerId={container.id}

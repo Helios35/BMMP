@@ -34,6 +34,8 @@ import { optionsFor } from "@/domain/taxonomy/lookup";
 import type { RoleCode } from "@/domain/taxonomy/role";
 import { NewContainerAction } from "@/features/containers/components/new-container-action";
 import { NewLotAction } from "@/features/containers/components/lot-controls";
+import { rankNowControl } from "@/features/hazard-ranking/components/rank-now-control";
+import { readRankingLookup } from "@/features/hazard-ranking/server/read-rankings";
 import {
   CONTAINER_DETAIL_ROLES_REASON,
   LIST_CAPTION,
@@ -154,8 +156,12 @@ export default async function ContainersPage({
   if (view === "lots") {
     const lotQuery = decodeListQuery(params, LOT_LIST_SPEC);
     const organization = await data.organizations.get(ctx, ctx.organizationId);
-    const lots = await readLotList(ctx, lotListSelection(lotQuery));
+    const [lots, rankings] = await Promise.all([
+      readLotList(ctx, lotListSelection(lotQuery)),
+      readRankingLookup(ctx, "lot", asOf),
+    ]);
     const canManage = mayTakeContainerAction(ctx.role, "manage_lot");
+    const rank = rankNowControl(ctx.role, "/containers");
     return (
       <PageShell>
         {header}
@@ -165,7 +171,11 @@ export default async function ContainersPage({
         </p>
         <RecordTable
           caption={LOTS_CAPTION}
-          columns={lotColumns(organization?.timeZone ?? "UTC", canManage)}
+          columns={lotColumns(
+            organization?.timeZone ?? "UTC",
+            canManage,
+            (id) => rankings.viewFor(id),
+          )}
           rows={lots.rows}
           rowKey={(row) => row.lot.id}
           rowLink={() => ({ kind: "not-linked", reason: LOT_HAS_NO_PAGE })}
@@ -186,7 +196,14 @@ export default async function ContainersPage({
           }
           filteredEmpty={{ noun: "lots" }}
           {...(lots.error === undefined ? {} : { error: lots.error })}
-          toolbar={canManage ? <NewLotAction /> : undefined}
+          toolbar={
+            canManage || rank !== undefined ? (
+              <>
+                {canManage ? <NewLotAction /> : null}
+                {rank}
+              </>
+            ) : undefined
+          }
         />
       </PageShell>
     );
@@ -195,14 +212,22 @@ export default async function ContainersPage({
   const selection = containerListSelection(listQuery);
   const containerIds = await containersAtTier(ctx, selection.tier);
 
-  const result = await readContainerList(ctx, {
-    ...toPageRequest(listQuery),
-    search: selection.search,
-    status: selection.status,
-    storageLocation: selection.storageLocation,
-    isAlerting: selection.isAlerting,
-    containerIds,
-  });
+  const [result, rankings] = await Promise.all([
+    readContainerList(ctx, {
+      ...toPageRequest(listQuery),
+      search: selection.search,
+      status: selection.status,
+      storageLocation: selection.storageLocation,
+      isAlerting: selection.isAlerting,
+      containerIds,
+      hazardRankingBand: selection.hazardRankingBand,
+      sortBy: selection.sortBy,
+      sortDirection: selection.sortDirection,
+    }),
+    // The Ranking column — every container's current ranking, one read for
+    // the page (Rules 10.23, 10.24).
+    readRankingLookup(ctx, "container", asOf),
+  ]);
 
   const canOpen = canReadRoute(ctx.role, "/containers/[id]");
 
@@ -215,7 +240,7 @@ export default async function ContainersPage({
 
       <RecordTable
         caption={LIST_CAPTION}
-        columns={containerColumns(asOf)}
+        columns={containerColumns(asOf, (id) => rankings.viewFor(id))}
         rows={result.rows}
         rowKey={(row) => row.container.id}
         rowLink={(row) =>
@@ -232,9 +257,22 @@ export default async function ContainersPage({
         emptyState={<ZeroContainers role={ctx.role} />}
         filteredEmpty={{ noun: "containers" }}
         error={result.error}
-        toolbar={newContainerControl(ctx.role)}
+        toolbar={containerToolbar(ctx.role)}
       />
     </PageShell>
+  );
+}
+
+/** **New container** and **Rank now**, each for the roles its own map names. */
+function containerToolbar(role: RoleCode): ReactNode {
+  const create = newContainerControl(role);
+  const rank = rankNowControl(role, "/containers");
+  if (create === undefined && rank === undefined) return undefined;
+  return (
+    <>
+      {create}
+      {rank}
+    </>
   );
 }
 

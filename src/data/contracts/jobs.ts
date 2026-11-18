@@ -1,5 +1,11 @@
 import type { IsoTimestamp, Uuid } from "@/types/common";
 
+import type { HazardRankingComputation } from "@/domain/hazard/run";
+
+import type {
+  HazardRankingPlan,
+  HazardRankingRunRecorded,
+} from "./hazard-rankings";
 import type {
   RecallCheckRecorded,
   RecallCheckRecording,
@@ -23,7 +29,7 @@ import type {
  */
 export interface ScheduledJobContext {
   /** T-60 `actor_label` on every row the job writes. */
-  readonly job: "storage-clock-alerts" | "recall-sync";
+  readonly job: "storage-clock-alerts" | "recall-sync" | "hazard-ranking";
   /** Threads one run through every row it writes. */
   readonly correlationId: string;
 }
@@ -37,6 +43,24 @@ export interface StorageClockAlertRun {
 }
 
 export interface ScheduledJobRepository {
+  /**
+   * The ranking job's reading half — Rule 10.24; D-77 #6. Every
+   * organization's ranking inputs, and the scheme in force. The domain
+   * computes each organization's run; it is written back one organization at
+   * a time with `recordHazardRanking`.
+   */
+  hazardRankingPlan(job: ScheduledJobContext): Promise<HazardRankingPlan>;
+
+  /**
+   * One organization's run, written as the job — T-60 `scheduled_job`, no
+   * person — with the same write path as **Rank now** (Rule 10.26).
+   */
+  recordHazardRanking(
+    job: ScheduledJobContext,
+    organizationId: Uuid,
+    computation: HazardRankingComputation,
+  ): Promise<HazardRankingRunRecorded>;
+
   /**
    * The nightly recall check's reading half — Rule 10.10; D-73 #6. Every
    * record in `confirmed`, `classified`, `reclassifying`, `stored`,

@@ -6,8 +6,12 @@
  *
  * Names each factor that contributed to a hazard ranking, so every band can be read back to the evidence that produced it.
  *
- * Every factor carries its value, its weight and **its stated basis** (Rule 10.4).
- * A factor with no stated basis is not a factor.
+ * Every factor carries its level, its place in the scheme's order and **its
+ * stated basis** (Rules 10.4, 10.20). There is no weight: items are compared
+ * factor by factor and the first factor that differs decides (Rule 10.21). A
+ * factor with no recorded evidence reads "Not recorded" and ranks level with
+ * its highest level (Rule 10.20). `storage_aggregation` applies to containers
+ * and lots only (Rule 10.22). A factor with no stated basis is not a factor.
  *
  * Definitions for every value are in `docs/TAXONOMY.md` T-34, which is the
  * single source of truth. This module owns the stored value, the value order —

@@ -5,6 +5,7 @@ import type {
   BaseQuery,
   CreateInput,
   Repository,
+  SortRequest,
   UpdateInput,
 } from "./repository";
 import type {
@@ -18,6 +19,7 @@ import type { AlertType } from "@/domain/taxonomy/alert-type";
 import type { ContainerStatus } from "@/domain/taxonomy/container-status";
 import type { ContainerType } from "@/domain/taxonomy/container-type";
 import type { HandlerActivityType } from "@/domain/taxonomy/handler-activity-type";
+import type { HazardRankingBand } from "@/domain/taxonomy/hazard-ranking-band";
 import type { LotStatus } from "@/domain/taxonomy/lot-status";
 import type { StorageClockAlertBand } from "@/domain/taxonomy/storage-clock-alert-band";
 import type { StorageClockStatus } from "@/domain/taxonomy/storage-clock-status";
@@ -60,7 +62,15 @@ export type UpdateContainer = UpdateInput<
   | "currentNetMassKg"
 >;
 
-export interface ContainerQuery extends BaseQuery {
+/**
+ * A list of containers or lots sorted by its current hazard ranking —
+ * position ascending is highest first; an item with no current row sorts last
+ * either way (`UX_SPEC.md` §3.9).
+ */
+export type HazardRankingSortField = "hazardRanking";
+
+export interface ContainerQuery
+  extends BaseQuery, SortRequest<HazardRankingSortField> {
   readonly status?: ContainerStatus;
   readonly containerType?: ContainerType;
   readonly lotId?: Uuid;
@@ -77,6 +87,12 @@ export interface ContainerQuery extends BaseQuery {
    * and narrows this list by the containers they run on.
    */
   readonly containerIds?: readonly Uuid[];
+  /**
+   * The Ranking band filter (`UX_SPEC.md` §3.5, §3.9; Rule 10.23): items whose
+   * **current** `hazard_ranking` row is at this T-33 band — `exists` over
+   * `hazard_ranking`, never a column on the item.
+   */
+  readonly hazardRankingBand?: HazardRankingBand;
 }
 
 /** Who a person's request came from — stamped on the audit rows a storage write produces. */
@@ -225,8 +241,15 @@ export type UpdateLot = UpdateInput<
   "lotCode" | "chemistryMix" | "totalMassKg" | "totalEnergyWh"
 >;
 
-export interface LotQuery extends BaseQuery {
+export interface LotQuery
+  extends BaseQuery, SortRequest<HazardRankingSortField> {
   readonly status?: LotStatus;
+  /**
+   * The Ranking band filter (`UX_SPEC.md` §3.5, §3.9; Rule 10.23): items whose
+   * **current** `hazard_ranking` row is at this T-33 band — `exists` over
+   * `hazard_ranking`, never a column on the item.
+   */
+  readonly hazardRankingBand?: HazardRankingBand;
 }
 
 /**
