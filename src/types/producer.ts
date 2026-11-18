@@ -8,20 +8,44 @@ import type {
   Uuid,
 } from "@/types/common";
 import type { AppliedRuleVersion } from "@/domain/rules/outcome";
+import type { DeadlineDueBasis } from "@/domain/taxonomy/deadline-due-basis";
+import type { ObligationDeadlineStatus } from "@/domain/taxonomy/obligation-deadline-status";
+import type { ProducerObligationStatus } from "@/domain/taxonomy/producer-obligation-status";
 
 /**
  * Producer obligations and evidence — `ERD.md` §9 and §10.1 · B1b.
  *
- * `producer_obligation` · `obligation_deadline` · `evidence_pack`.
+ * `producer_product` · `producer_obligation` · `obligation_deadline` ·
+ * `evidence_pack`.
  *
- * Typed here from B1a so the schema and the type set are complete from the
- * start, and **given no `DataAdapter` method, no mock implementation and no
- * fixture in this unit** (D-24).
- *
- * The three `status` fields below carry no `TAXONOMY.md` system, and `ERD.md`
- * says so explicitly: they are specified at Gate 2 with Rules 8.5 and 9.1.
- * Values are a taxonomy addition at that gate, **not a builder's choice**.
+ * Typed from B1a so the schema and the type set were complete from the start
+ * (D-24). `b1b-12-state-rules` gives the first three their adapter, their
+ * mock and their fixtures (Rules 8.6–8.16; D-78), and their status fields
+ * their systems: T-68, T-69 and T-70. `evidence_pack` stays unbuilt (§9).
  */
+
+/**
+ * A product the organization declares itself the producer of, and the states
+ * it is sold in — Rule 8.6; `_ANCHORS.md` §3 (B1b, D-78).
+ *
+ * **Its facts are the catalog entry's**: chemistry, mass, energy,
+ * removability and application class are read from it, never typed here.
+ * Removal is a dated update with a reason — no row is ever deleted
+ * (`TECHNICAL_SPEC.md` §9.5). Argued for the first migration in
+ * `BUILD_NOTES_b1b-12-state-rules.md` §3.
+ */
+export interface ProducerProduct extends TenantScoped, Timestamped {
+  readonly id: Uuid;
+  /** A published catalog entry (T-07). */
+  readonly catalogEntryId: Uuid;
+  /** The states it is sold, offered for sale or distributed in or into. */
+  readonly jurisdictionIds: readonly Uuid[];
+  readonly addedAt: IsoTimestamp;
+  readonly addedBy: Uuid | null;
+  readonly removedAt: IsoTimestamp | null;
+  readonly removedBy: Uuid | null;
+  readonly removalReason: string | null;
+}
 
 export interface ProducerObligation extends TenantScoped, Timestamped {
   readonly id: Uuid;
@@ -32,13 +56,17 @@ export interface ProducerObligation extends TenantScoped, Timestamped {
   readonly obligationTitle: string;
   /** Copied from the rule version at determination time. **Never written into logic.** */
   readonly citation: string;
-  /** The inputs that triggered it — format, mass, energy, removability, sales footprint. */
+  /**
+   * The inputs that decided it — every product sold in the state with its band
+   * in the law's terms (D-78 #4), the coverage and obligations versions, the
+   * due rule, and the signature a re-run compares (Rule 8.11).
+   */
   readonly appliesBecause: JsonObject;
   readonly evaluationTrace: readonly AppliedRuleVersion[];
   /** Which stewardship organization to join. */
   readonly stewardshipOrgName: string | null;
-  /** **No `TAXONOMY.md` system governs this field** — specified at Gate 2 (Rule 8.5). */
-  readonly status: string;
+  /** T-68. Set by an evaluation run, never by a person (Rule 8.9). */
+  readonly status: ProducerObligationStatus;
   readonly determinedAt: IsoTimestamp;
   readonly determinedBy: Uuid | null;
   readonly isCurrent: boolean;
@@ -51,20 +79,22 @@ export interface ObligationDeadline extends TenantScoped, Timestamped {
   readonly deadlineKey: string;
   /** **From the rule payload. Never a literal in code.** */
   readonly dueOn: IsoDate;
-  /**
-   * Whether the date is fixed by statute or derived from an event.
-   *
-   * `ERD.md` §9.2 says the values are in `TAXONOMY.md`; no system defines them —
-   * reported in this unit's build-notes.
-   */
-  readonly dueBasis: string;
+  /** T-70. A date that waits on an event is not a deadline (Rule 8.10). */
+  readonly dueBasis: DeadlineDueBasis;
   /** Mandatory, as on `rule_version`. */
   readonly citation: string;
   readonly governingRuleVersionId: Uuid;
-  /** **No `TAXONOMY.md` system governs this field** — specified at Gate 2 (Rule 8.5). */
-  readonly status: string;
+  /** T-69. Overdue is shown from the date, never stored. */
+  readonly status: ObligationDeadlineStatus;
+  /** The date the deadline was met — Rule 8.12. */
+  readonly completedOn: IsoDate | null;
+  /** When it was marked done. */
   readonly completedAt: IsoTimestamp | null;
   readonly completedBy: Uuid | null;
+  /** What was done — required with a completion (Rule 8.12). */
+  readonly completionNote: string | null;
+  /** A filing number, a receipt, a membership id. Optional. */
+  readonly completionReference: string | null;
   /** The filing that satisfied it. */
   readonly evidenceDocumentRenderId: Uuid | null;
   readonly reminderSchedule: JsonObject | null;

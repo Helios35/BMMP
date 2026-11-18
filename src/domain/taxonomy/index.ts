@@ -1,6 +1,6 @@
 /**
  * The classification systems in the product — `docs/TAXONOMY.md`, T-01 through
- * T-67.
+ * T-70.
  *
  * One module per system, each exporting the value list constant, the union type
  * derived from it, and the label lookup (TAXONOMY.md §5.3). Shared read helpers
@@ -148,3 +148,9 @@ export * from "./photo-check-kind";
 export * from "./photo-check-outcome";
 // T-67 · Hazard ranking scope
 export * from "./hazard-ranking-scope";
+// T-68 · Producer obligation status
+export * from "./producer-obligation-status";
+// T-69 · Obligation deadline status
+export * from "./obligation-deadline-status";
+// T-70 · Deadline due basis
+export * from "./deadline-due-basis";
