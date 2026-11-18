@@ -66,6 +66,9 @@ export type PolicyTable =
   | "photo_check"
   | "catalog_reference_photo"
   | "hazard_ranking"
+  | "producer_product"
+  | "producer_obligation"
+  | "obligation_deadline"
   | "audit_event";
 
 export type PolicyAction = "select" | "insert" | "update";
@@ -190,6 +193,24 @@ export const POLICY_MATRIX: Readonly<Record<PolicyTable, PolicyRow>> = {
   // superseded row's `is_current` is the trigger's one update (§9.5; Rule
   // 10.26). The door refuses a role that cannot set a run going (Rule 10.24).
   hazard_ranking: { select: R, insert: [], update: [] },
+  // B1b, D-78 — §9.5: INSERT and UPDATE `W_PRODUCER` ∨ `PA`; no DELETE (a
+  // product's removal is a dated update). A run's rows are written through
+  // the definer door, after the action map has let the person run it.
+  producer_product: {
+    select: R,
+    insert: WRITER_SETS.W_PRODUCER,
+    update: WRITER_SETS.W_PRODUCER,
+  },
+  producer_obligation: {
+    select: R,
+    insert: WRITER_SETS.W_PRODUCER,
+    update: WRITER_SETS.W_PRODUCER,
+  },
+  obligation_deadline: {
+    select: R,
+    insert: WRITER_SETS.W_PRODUCER,
+    update: WRITER_SETS.W_PRODUCER,
+  },
 
   // Read is P2, P5, P6 only — P1 cannot read the audit log (Rule 12.8).
   // Written by trigger under security definer, never by a user statement, which

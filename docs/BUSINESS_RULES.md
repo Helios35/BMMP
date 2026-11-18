@@ -1,5 +1,5 @@
 # Business Rules — BMMP
-**Version:** 1.5 · **Date:** 2026-11-17 · **Owner:** Nathan Ivy / Next Sketch LLC
+**Version:** 1.6 · **Date:** 2026-11-18 · **Owner:** Nathan Ivy / Next Sketch LLC
 **Answers:** What decisions does the system make, and on what basis?
 **Reads from:** `docs/_ANCHORS.md`, `docs/PRD.md`, `ROADMAP_BMMP_2026-07-28.md` (v3.0), `Decision Log.md` (D-1–D-11), `RESEARCH_battery-management-feature-sweep_2026-07-28.md`, `PROJECT_SETUP_BMMP.md`  ·  **Feeds:** `docs/TAXONOMY.md`, `docs/TECHNICAL_SPEC.md`, `docs/ERD.md`, `docs/UX_SPEC.md`, `docs/SITE_ARCHITECTURE.md`, `docs/RUNBOOK.md`, every builder brief
 
@@ -9,6 +9,12 @@
 ---
 
 ## Changelog
+
+**v1.6 · 2026-11-18 — state producer rules (`Decision Log.md` D-66, D-78)**
+
+- **New Rules 8.6–8.16** — producer obligations: what a producer declares, the rule data, placing a product in a band, when an obligation applies, deadlines, evaluation runs, marking a deadline done, alerts, what a person sees, who, and the export. They append to the end of section 8, after Rule 8.5; filing packets and annual reporting (Rule 8.1) stay reserved for `b1b-13-filings`.
+- **Rule 8.5 amended** and **the P3 role's CAN and CANNOT replaced**: P3 is no longer a P1-equivalent role.
+- Authored by planning in `SPEC_state-rules_2026-11-17.md`, transcribed by `b1b-12-state-rules`. **No rule was renumbered.**
 
 **v1.5 · 2026-11-17 — hazard ranking (`Decision Log.md` D-76, D-77)**
 
@@ -201,11 +207,9 @@ Page-level access follows the fixed page list in `_ANCHORS.md` §5. Where this s
 
 ### P3 — Producer Compliance Officer (B1b)
 
-**CAN:** everything P1 can do within their organization, plus the producer-obligation surfaces specified in section 8 at Gate 2 — registration state, filing packets, the dated obligation calendar, and annual reporting.
+**CAN:** read what any member reads (`SITE_ARCHITECTURE.md` §5.2) · declare the organization's products and the states they're sold in · run **Check now** · mark an obligation deadline done or reopen it · export obligations.
 
-**CANNOT:** anything not permitted to P1 in B1a · edit jurisdiction rule data (that is P6) · disable, bypass or lower the confidence gate · clear an air-transport block · edit or delete an audit event · act in another organization.
-
-*P3's full permission set is specified at Gate 2 with section 8. Until then P3 is a P1-equivalent role and must not be built with extra reach.*
+**CANNOT:** start an intake or change a battery record · edit catalog entries or jurisdiction rules (that is P6) · disable, bypass or lower the confidence gate · clear an air-transport block · edit or delete an audit event · act in another organization.
 
 ### P4 — Mobility Supplier Technician (B3)
 
@@ -884,9 +888,11 @@ The record leaves the shipment when it is moved to quarantine (Rule 6.17). A dep
 
 ---
 
-### 8. Producer obligations and state registration — B1b — STUB
+### 8. Producer obligations and state registration — B1b — producer obligations specified (D-78); filing packets and reporting reserved
 
 *Reserved. Specified at **Gate 2** (11 December 2026). Nothing in this section may be implemented ahead of that specification.*
+
+*Rules 8.6–8.16 are in force from `b1b-12-state-rules`. Filing packets and annual reporting (Rule 8.1) stay reserved for `b1b-13-filings`.*
 
 **8.1** This section will govern: which state producer-responsibility statutes apply to a given producer and product; which stewardship organization must be joined in each state; the format classification of a product against each state's own thresholds; registration filing packets per state agency; annual sales and units-placed-on-market reporting mapped from one canonical dataset into each state's format; the dated obligation calendar; and label and marking compliance planning across divergent state schedules.
 
@@ -896,7 +902,73 @@ The record leaves the shipment when it is moved to quarantine (Rule 6.17). A dep
 
 **8.4** Producer obligation records and their deadlines are evidence artifacts under section 12: dated, cited, versioned and exportable.
 
-**8.5** Until this section is specified at Gate 2, P3 holds P1-equivalent permissions and no producer-obligation surface exists. A builder encountering a producer-obligation requirement raises it as a decision-log entry rather than implementing it.
+**8.5** P3's permissions are those in the Roles section. A builder meeting a producer requirement this section doesn't cover raises it as a decision-log entry rather than implementing it.
+
+**8.6 — WHAT A PRODUCER DECLARES.** P3 records the organization's products, each a published catalog entry, and the states each is sold, offered for sale or distributed in or into. Declaring a product says the organization is its producer as the state laws define the term. A product's chemistry, mass, energy, removability and application class are read from its catalog entry, never typed on the obligations page.
+
+**8.7 — THE RULE DATA.** A state's producer law is two rules:
+
+- `producer.coverage` (T-41 `format_threshold`): its battery classes and their limits
+- `producer.obligations` (T-41 `producer_obligation`): what a producer must do, and by when
+
+Each version carries its citation (Rule 12.15). Limits are stored in the statute's own units and converted by the shared units module. A state with no rules on file reads **"No producer rules on file for <state>. This doesn't mean none apply."**
+
+**8.8 — PLACING A PRODUCT IN A BAND.** For each product and state, the coverage rule's classes are checked in order. A class is a set of conditions on chemistry, mass, energy, removability and application class. Each condition is true, false or can't-tell.
+
+- The product takes the first class that holds, as that class's band (T-06).
+- If a class before it can't be told, the band is `undetermined`, and it names the missing input.
+- If none holds, the band is `not_covered`.
+- **`undetermined` is never `not_covered`.**
+- Exclusions the product can't test (medical devices, recalled batteries) show as "Not checked" and never change the band.
+
+**8.9 — WHEN AN OBLIGATION APPLIES.** An obligation applies in a state when at least one product sold there meets its conditions, usually a band. It is `not_applicable` only when every product sold there definitely doesn't. Otherwise it is `undetermined`, and it names the product and the missing input.
+
+**8.10 — DEADLINES.** A deadline's date comes from the rule:
+
+- a date in law (T-70 `statutory_date`)
+- a yearly date (`annual`): one deadline per year, from the first date through the next one on or after today
+
+A date that waits on an event that hasn't happened (a rule adopted, a plan approved) is not a deadline. The obligation reads "No date yet", with the event in the law's words. **No date is ever estimated.**
+
+**8.11 — EVALUATION RUNS.** One run evaluates the whole organization, as of today in the organization's time zone, with the rule versions in force that day (Rule 1.23). A run happens:
+
+- when a product or its states change
+- when P3 or P6 presses **Check now**
+- on the nightly job
+
+A run writes a new `producer_obligation` row only where the result changed, marks the old row not current, and writes one `audit_event`.
+
+**8.12 — MARKING A DEADLINE DONE.** P3 or P6 marks a deadline done with the date it was met and a note saying what was done. A reference is optional. P3 or P6 may reopen it with a reason.
+
+- A run never undoes a completion. A deadline carried into a new obligation row keeps it.
+- When an obligation stops applying, its open deadlines become withdrawn and its done ones stay done.
+
+**8.13 — ALERTS.** The nightly job raises an `obligation_deadline` alert (T-44) for an open deadline at each configured number of days before it (T-48 `attention`), and once it has passed (`critical`).
+
+- The offsets are versioned platform configuration.
+- One alert per deadline per offset.
+- Marking the deadline done, or its withdrawal, resolves its alerts.
+
+**8.14 — WHAT A PERSON SEES.** Every obligation shows:
+
+- the duty, in plain words
+- the state's citation and source link
+- the rule version and its effective date
+- the products it applies to, each with its band in the law's own terms
+- its deadlines, or "No date yet" and the event
+
+A rule version that takes effect later is shown with its date.
+
+**8.15 — WHO.**
+
+- P3 and P6 change products and states, run Check now, and mark or reopen deadlines.
+- P2 reads.
+- P5 reads inside an unexpired grant, and exports where the grant allows (Rule 1.15).
+- P1 and P4 have no obligations page.
+
+Every change and every denial writes an `audit_event`.
+
+**8.16 — EXPORT.** The obligations CSV lists every current obligation and deadline: state, law, obligation, status, products and bands, due date and basis, deadline status, who marked it done and when, the note, the citation and the rule version. It is an evidence artifact (Rule 8.4).
 
 ---
 

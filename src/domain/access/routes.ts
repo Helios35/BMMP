@@ -1,9 +1,9 @@
 /**
- * The twenty B1a routes, as their route patterns.
+ * The twenty B1a routes and `/obligations`, the 21st, as their route patterns.
  *
- * `SITE_ARCHITECTURE.md` §1.1 and §7.1: *"20 routes. That is the complete B1a
- * surface."* A twenty-first is a decision-log entry, not a builder's call. The
- * page list itself is fixed in `_ANCHORS.md` §5 and does not move.
+ * `SITE_ARCHITECTURE.md` §1.1 and §7.1: *"Twenty-one routes. `/obligations` is
+ * the 21st (D-78). A 22nd is a decision-log entry."* — not a builder's call.
+ * The page list itself is fixed in `_ANCHORS.md` §5 and does not move.
  *
  * These are Next.js route patterns, so `[id]` and `[token]` stay literal — the
  * map is keyed on the route, not on a resolved URL.
@@ -32,6 +32,8 @@ export const APP_ROUTES = [
   "/settings/users",
   "/settings/catalog",
   "/audit",
+  // B1b — D-78, Rules 8.6–8.16.
+  "/obligations",
 ] as const;
 
 export type AppRoute = (typeof APP_ROUTES)[number];
@@ -78,4 +80,5 @@ export const APP_ROUTE_NAMES: Readonly<Record<AppRoute, string>> = {
   "/settings/users": "Members and roles",
   "/settings/catalog": "Catalog administration",
   "/audit": "Audit log",
+  "/obligations": "Producer obligations",
 };

@@ -319,6 +319,24 @@ export const ROUTE_ACCESS: Readonly<Record<AppRoute, RouteAccessRule>> = {
       "classification_decision, damage_assessment, alert and document_render rather " +
       "than from the raw log. Export is available to all three who can read it.",
   },
+
+  "/obligations": {
+    route: "/obligations",
+    isPublic: false,
+    capabilities: {
+      compliance_handler: "none",
+      facility_manager: "read",
+      producer_compliance_officer: "write",
+      mobility_supplier_technician: "none",
+      auditor: "read",
+      platform_admin: "write",
+    },
+    deniedRule: "8.15",
+    note:
+      "B1b, D-78. P3 and P6 change products and states, run Check now, and mark " +
+      "or reopen deadlines; P2 reads; P5 reads inside an unexpired grant and " +
+      "exports where it allows (Rule 8.15). P1 and P4 have no obligations page.",
+  },
 };
 
 /** What one role may do on one route. */

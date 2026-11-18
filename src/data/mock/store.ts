@@ -46,6 +46,12 @@ import type { Uuid } from "@/types/common";
 import type { CatalogReferencePhoto, PhotoCheck } from "@/types/photo-check";
 
 import { HAZARD_RANKING_SEED } from "./hazard-ranking-seed";
+import { PRODUCER_SEED } from "./producer-seed";
+import type {
+  ObligationDeadline,
+  ProducerObligation,
+  ProducerProduct,
+} from "@/types/producer";
 
 /**
  * The in-memory database.
@@ -99,6 +105,9 @@ export interface MockStore {
   readonly photoChecks: TenantTable<PhotoCheck>;
   readonly catalogReferencePhotos: PlatformTable<CatalogReferencePhoto>;
   readonly hazardRankings: TenantTable<HazardRanking>;
+  readonly producerProducts: TenantTable<ProducerProduct>;
+  readonly producerObligations: TenantTable<ProducerObligation>;
+  readonly obligationDeadlines: TenantTable<ObligationDeadline>;
   readonly auditEvents: TenantTable<TenantAuditEvent>;
 
   /** Object bytes, keyed `bucket:path`. */
@@ -112,6 +121,7 @@ export interface MockStore {
 const seededAuditEvents: readonly TenantAuditEvent[] = [
   ...FIXTURES.auditEvents,
   HAZARD_RANKING_SEED.auditEvent,
+  ...PRODUCER_SEED.auditEvents,
 ].map((event) => ({ ...event, organizationId: event.organizationId as Uuid }));
 
 /**
@@ -135,6 +145,12 @@ const seededAuditEvents: readonly TenantAuditEvent[] = [
  * development-mode database client does; the first graph to load builds it and
  * every later one adopts it. Nothing else about the store changes.
  */
+/** The fixtures' alerts, and the deadline alerts b1b-12's seeded run raised (Rule 8.13). */
+const seededAlerts: readonly Alert[] = [
+  ...FIXTURES.alerts,
+  ...PRODUCER_SEED.alerts,
+];
+
 const STORE_SLOT: unique symbol = Symbol.for("bmmp.data.mock.store");
 
 interface StoreHost {
@@ -224,7 +240,7 @@ function buildStore(): MockStore {
       "storageEvents",
       FIXTURES.storageEvents,
     ),
-    alerts: new TenantTable("alert", "alerts", FIXTURES.alerts),
+    alerts: new TenantTable("alert", "alerts", seededAlerts),
 
     classificationDecisions: new TenantTable(
       "classification_decision",
@@ -278,6 +294,21 @@ function buildStore(): MockStore {
       "hazardRankings",
       HAZARD_RANKING_SEED.rankings,
     ),
+    producerProducts: new TenantTable(
+      "producer_product",
+      "producerProducts",
+      FIXTURES.producerProducts,
+    ),
+    producerObligations: new TenantTable(
+      "producer_obligation",
+      "producerObligations",
+      PRODUCER_SEED.obligations,
+    ),
+    obligationDeadlines: new TenantTable(
+      "obligation_deadline",
+      "obligationDeadlines",
+      PRODUCER_SEED.deadlines,
+    ),
     auditEvents: new TenantTable(
       "audit_event",
       "auditEvents",
@@ -324,7 +355,7 @@ export function resetMockStore(): MockStore {
   store.lots.replaceAll(FIXTURES.lots);
   store.storageClocks.replaceAll(FIXTURES.storageClocks);
   store.storageEvents.replaceAll(FIXTURES.storageEvents);
-  store.alerts.replaceAll(FIXTURES.alerts);
+  store.alerts.replaceAll(seededAlerts);
 
   store.classificationDecisions.replaceAll(FIXTURES.classificationDecisions);
   store.shipments.replaceAll(FIXTURES.shipments);
@@ -338,6 +369,9 @@ export function resetMockStore(): MockStore {
   store.photoChecks.replaceAll(FIXTURES.photoChecks);
   store.catalogReferencePhotos.replaceAll(FIXTURES.catalogReferencePhotos);
   store.hazardRankings.replaceAll(HAZARD_RANKING_SEED.rankings);
+  store.producerProducts.replaceAll(FIXTURES.producerProducts);
+  store.producerObligations.replaceAll(PRODUCER_SEED.obligations);
+  store.obligationDeadlines.replaceAll(PRODUCER_SEED.deadlines);
   store.auditEvents.replaceAll(seededAuditEvents);
 
   store.objects.clear();

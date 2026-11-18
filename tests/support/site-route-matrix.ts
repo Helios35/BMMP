@@ -37,6 +37,7 @@ export const MATRIX: Readonly<
   "/settings/users": ["—", "W", "—", "—", "—", "W"],
   "/settings/catalog": ["—", "—", "—", "—", "—", "W"],
   "/audit": ["—", "R", "—", "—", "R", "R"],
+  "/obligations": ["—", "R", "W", "—", "R", "W"],
 };
 
 export const CAPABILITY: Readonly<Record<Cell, string>> = {

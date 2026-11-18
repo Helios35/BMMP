@@ -165,19 +165,21 @@ describe("the primary action", () => {
     ).toMatchObject({ href: "/audit" });
   });
 
-  it("gives P3 and P4 no primary action", () => {
-    for (const role of [
-      "producer_compliance_officer",
-      "mobility_supplier_technician",
-    ] as const) {
-      expect(
-        dashboardPrimaryAction({
-          role,
-          hasStorageClockAlert: true,
-          isIntakeBlocked: false,
-        }),
-      ).toBeNull();
-    }
+  it("gives P3 Open obligations (D-78) and P4 no primary action", () => {
+    expect(
+      dashboardPrimaryAction({
+        role: "producer_compliance_officer",
+        hasStorageClockAlert: true,
+        isIntakeBlocked: false,
+      }),
+    ).toMatchObject({ href: "/obligations", label: "Open obligations" });
+    expect(
+      dashboardPrimaryAction({
+        role: "mobility_supplier_technician",
+        hasStorageClockAlert: true,
+        isIntakeBlocked: false,
+      }),
+    ).toBeNull();
   });
 });
 
@@ -459,7 +461,7 @@ describe("every region reads without a denial, for every role", () => {
     });
   }
 
-  it("shows P1 two alert cards, P2 one, and P3, P4 and P5 the empty state", async () => {
+  it("shows P1 two alert cards, P2 one, P3 its deadline alerts (Rule 8.13), and P4 and P5 the empty state", async () => {
     const seen = async (role: RoleCode) => {
       const element = await AlertsRegion({
         ctx: ctx({ userId: ROLE_USERS[role], role }),
@@ -470,7 +472,7 @@ describe("every region reads without a denial, for every role", () => {
 
     expect(await seen("compliance_handler")).toBe("default");
     expect(await seen("facility_manager")).toBe("default");
-    expect(await seen("producer_compliance_officer")).toBe("empty");
+    expect(await seen("producer_compliance_officer")).toBe("default");
     expect(await seen("mobility_supplier_technician")).toBe("empty");
     expect(await seen("auditor")).toBe("empty");
   });

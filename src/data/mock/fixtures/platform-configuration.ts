@@ -301,3 +301,16 @@ export const PLATFORM_HAZARD_RANKING_SCHEME = {
   ],
   bandCutPoints: [0.25, 0.5, 0.75],
 } as const;
+
+/**
+ * The deadline alert offsets, v1 (Rule 8.13; D-78 #10) — **the only place in
+ * `src/` these day counts exist.** An open deadline raises an `attention`
+ * alert 90, 30 and 7 days before it, and a `critical` one once it has passed.
+ * Stamped on every alert's trigger snapshot; changing it is a new version.
+ * Validated on every read by `validateObligationAlertConfiguration`.
+ */
+export const PLATFORM_OBLIGATION_ALERT_CONFIGURATION = {
+  configurationVersion: "obligation-alerts-v1",
+  daysBefore: [90, 30, 7],
+  overdue: true,
+} as const;

@@ -14,6 +14,7 @@ import {
   HAZARD_RANKING_BAND_LABELS,
   INTAKE_SESSION_STATUS_LABELS,
   LOT_STATUS_LABELS,
+  PRODUCER_OBLIGATION_STATUS_LABELS,
   RECALL_MATCH_STATUS_LABELS,
   ROLE_LABELS,
   RULE_VERSION_STATUS_LABELS,
@@ -30,6 +31,7 @@ import {
   type AlertSeverity,
 } from "@/domain/taxonomy/alert-severity";
 import { isTaxonomyValue } from "@/domain/taxonomy/lookup";
+import { DEADLINE_STANDING_LABELS } from "@/domain/producer/deadlines";
 
 /**
  * The five status intents, and the single map from a stored status value to one
@@ -77,6 +79,8 @@ export const STATUS_SYSTEMS = {
   container_status: CONTAINER_STATUS_LABELS,
   lot_status: LOT_STATUS_LABELS,
   hazard_ranking_band: HAZARD_RANKING_BAND_LABELS,
+  producer_obligation_status: PRODUCER_OBLIGATION_STATUS_LABELS,
+  obligation_deadline_standing: DEADLINE_STANDING_LABELS,
   storage_clock_status: STORAGE_CLOCK_STATUS_LABELS,
   storage_clock_alert_band: STORAGE_CLOCK_ALERT_BAND_LABELS,
   shipment_status: SHIPMENT_STATUS_LABELS,
@@ -200,6 +204,22 @@ export const STATUS_INTENTS: Readonly<Record<StatusSystem, IntentMap>> = {
     band_3: "neutral",
     band_4: "neutral",
     not_ranked: "neutral",
+  },
+  // T-68 (Rule 8.9). The words carry it; "Can't tell yet" is never coloured as
+  // settled, and "Doesn't apply" never as an all-clear.
+  producer_obligation_status: {
+    applies: "neutral",
+    not_applicable: "neutral",
+    undetermined: "neutral",
+  },
+  // T-69 as read on a date (UX_SPEC.md §3.21): overdue is `critical`; inside
+  // the first configured offset escalates to `attention` at the call site,
+  // because that depends on today, not on the value; the rest are neutral.
+  obligation_deadline_standing: {
+    open: "neutral",
+    overdue: "critical",
+    completed: "neutral",
+    withdrawn: "neutral",
   },
   lot_status: {
     open: "ok",

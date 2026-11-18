@@ -189,6 +189,15 @@ import {
   mockHazardRankings,
   recordHazardRankingForJob,
 } from "./hazard-ranking-writes";
+import {
+  deadlineAlertSubjectsForJob,
+  mockObligationDeadlines,
+  mockProducerObligations,
+  mockProducerProducts,
+  producerObligationPlan,
+  recordDeadlineAlertsForJob,
+  recordProducerObligationsForJob,
+} from "./producer-writes";
 import { prohibitsAir, withDamageFlags } from "@/domain/recalls/recalled-flag";
 
 /**
@@ -204,6 +213,7 @@ const NO_REQUEST_ATTRIBUTION = {
 import { assertPolicy } from "./policy";
 import { sequenceStart } from "./sequence-start";
 import { mockStore, type TenantAuditEvent } from "./store";
+import { ruleVersionCandidate } from "./rule-candidate";
 import {
   platformAppendOnlyRepository,
   platformRepository,
@@ -642,27 +652,7 @@ async function ruleCandidates(
     .flatMap((version): RuleVersionCandidate[] => {
       const rule = byRuleId.get(version.jurisdictionRuleId);
       if (rule === undefined) return [];
-      return [
-        {
-          ruleVersionId: version.id,
-          jurisdictionRuleId: rule.id,
-          jurisdictionId: rule.jurisdictionId,
-          ruleKey: rule.ruleKey,
-          domain: rule.domain,
-          title: rule.title,
-          versionLabel: version.versionLabel,
-          effectiveOn: version.effectiveOn,
-          expiresOn: version.expiresOn,
-          citation: version.citation,
-          citationUrl: version.citationUrl,
-          payload: version.payload,
-          payloadSchemaKey: version.payloadSchemaKey,
-          appliesToApplicationClasses: rule.appliesToApplicationClasses,
-          publishedAt: version.publishedAt,
-          isRuleActive: rule.isActive,
-          supersedesRuleVersionId: version.supersedesRuleVersionId,
-        },
-      ];
+      return [ruleVersionCandidate(rule, version)];
     });
   return { chain, candidates };
 }
@@ -2717,6 +2707,9 @@ export const mockAdapter: DataAdapter = {
   photoChecks: mockPhotoChecks,
   catalogReferencePhotos: mockCatalogReferencePhotos,
   hazardRankings: mockHazardRankings,
+  producerProducts: mockProducerProducts,
+  producerObligations: mockProducerObligations,
+  obligationDeadlines: mockObligationDeadlines,
   auditEvents,
 
   objects,
@@ -2727,6 +2720,10 @@ export const mockAdapter: DataAdapter = {
     recordRecallCheck: recordRecallCheckForJob,
     hazardRankingPlan,
     recordHazardRanking: recordHazardRankingForJob,
+    producerObligationPlan,
+    recordProducerObligations: recordProducerObligationsForJob,
+    deadlineAlertSubjects: deadlineAlertSubjectsForJob,
+    recordDeadlineAlerts: recordDeadlineAlertsForJob,
   },
 };
 

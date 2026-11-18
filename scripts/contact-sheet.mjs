@@ -68,6 +68,10 @@ const PERSONAS = {
     email: "marta.bellini@cascade-recyclers.example",
     label: "P2 · Facility Manager, Cascade",
   },
+  p3: {
+    email: "priya.narang@cascade-recyclers.example",
+    label: "P3 · Producer Compliance Officer, Cascade",
+  },
   p5: {
     email: "s.reyes@northbeam-underwriting.example",
     label: "P5 · Auditor, Cascade",
@@ -734,6 +738,44 @@ const SCREENS = [
     path: "/audit?from=2099-01-01",
     as: "p2",
     note: "The route's own filtered-empty copy rather than the generic sentence.",
+  },
+
+  // --- obligations (b1b-12) ----------------------------------------------
+  {
+    id: "obligations-deadlines",
+    group: "Obligations",
+    route: "/obligations",
+    title: "Obligations — deadlines",
+    path: "/obligations",
+    as: "p3",
+    note: "The default tab. Overdue reads critical, inside the first notice attention, the rest neutral. Rule 8.12's Mark done on each open row.",
+  },
+  {
+    id: "obligations-states",
+    group: "Obligations",
+    route: "/obligations",
+    title: "Obligations — a state's panel",
+    path: "/obligations?tab=states&state=US-CA",
+    as: "p3",
+    note: "California: the obligations, their deadlines and 'No date yet', and the coverage version that takes effect later (Rule 8.14).",
+  },
+  {
+    id: "obligations-products",
+    group: "Obligations",
+    route: "/obligations",
+    title: "Obligations — products",
+    path: "/obligations?tab=products",
+    as: "p3",
+    note: "Each product's band in each state, in the law's terms; a missing weight names who can fix it.",
+  },
+  {
+    id: "obligations-auditor",
+    group: "Obligations",
+    route: "/obligations",
+    title: "Obligations — auditor",
+    path: "/obligations",
+    as: "p5",
+    note: "Read-only: the banner, Check now and Mark done shown disabled with the reason, Export enabled.",
   },
 
   // --- denial ------------------------------------------------------------

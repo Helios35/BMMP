@@ -17,6 +17,7 @@ import type { Alert } from "@/types/storage";
 import {
   batteryRecordLink,
   CONTAINERS_WITH_ALERTS,
+  obligationDeadlinesLink,
   REVIEW_QUEUE,
   shipmentLink,
   type DashboardLink,
@@ -96,6 +97,10 @@ function alertTarget(alert: Alert): DashboardLink | null {
   }
   if (alert.intakeSessionId !== null) return REVIEW_QUEUE;
   if (alert.shipmentId !== null) return shipmentLink(alert.shipmentId);
+  if (alert.obligationDeadlineId !== null) {
+    const code = alert.triggerSnapshot.jurisdictionCode;
+    return obligationDeadlinesLink(typeof code === "string" ? code : null);
+  }
   return null;
 }
 

@@ -56,6 +56,12 @@
  * **`hazard_ranking.computed`** was authored by planning (D-77) and added at
  * TAXONOMY.md v1.10: one ranking run over an organization's held batteries,
  * containers and lots, with the scheme version (Rules 10.24, 10.26).
+ * **`producer_product.added`, `.changed`, `.removed`,
+ * `producer_obligation.evaluated`, `obligation_deadline.completed` and
+ * `.reopened`** were authored by planning (D-78) and added at TAXONOMY.md
+ * v1.11: a declared product and its states (Rule 8.6), one evaluation run
+ * with its trigger and rule versions (Rule 8.11), and a deadline marked done
+ * or reopened (Rule 8.12).
  *
  * **Never invent a value.** If one is needed and is not here, it does not exist
  * yet — raise it to P6 (TAXONOMY.md §1.1).
@@ -85,6 +91,12 @@ export const AUDIT_EVENT_TYPES = [
   "recall_match.recorded",
   "recall_match.dismissed",
   "hazard_ranking.computed",
+  "producer_product.added",
+  "producer_product.changed",
+  "producer_product.removed",
+  "producer_obligation.evaluated",
+  "obligation_deadline.completed",
+  "obligation_deadline.reopened",
   "container.status_changed",
   "lot.created",
   "lot.status_changed",
@@ -146,6 +158,12 @@ export const AUDIT_EVENT_TYPE_LABELS: Readonly<Record<AuditEventType, string>> =
     "recall_match.recorded": "Recall recorded",
     "recall_match.dismissed": "Recall dismissed",
     "hazard_ranking.computed": "Hazard ranking run",
+    "producer_product.added": "Product added",
+    "producer_product.changed": "Product changed",
+    "producer_product.removed": "Product removed",
+    "producer_obligation.evaluated": "Obligations checked",
+    "obligation_deadline.completed": "Deadline marked done",
+    "obligation_deadline.reopened": "Deadline reopened",
     "container.status_changed": "Container status changed",
     "lot.created": "Lot created",
     "lot.status_changed": "Lot status changed",

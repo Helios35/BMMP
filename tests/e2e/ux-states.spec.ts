@@ -101,8 +101,10 @@ test.describe("the dashboard's alerts (§2.11; E-6)", () => {
     });
   });
 
-  test.describe("p3", () => {
-    test.use({ storageState: storageStateFor("p3") });
+  // P3 receives obligation_deadline alerts from b1b-12 (T-44; D-78), so the
+  // role no alert is routed to is now P4.
+  test.describe("p4", () => {
+    test.use({ storageState: storageStateFor("p4") });
 
     test("a role no alert is routed to reads the empty state, as a good state", async ({
       page,

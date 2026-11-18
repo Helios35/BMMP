@@ -40,7 +40,9 @@ import type {
 } from "@/types/tenancy";
 import type { AppliedRuleVersion } from "@/domain/rules/outcome";
 import type { CatalogReferencePhoto, PhotoCheck } from "@/types/photo-check";
+import type { ProducerProduct } from "@/types/producer";
 import * as B1A_08 from "./b1a-08";
+import * as B1B_12 from "./b1b-12";
 import * as B2_09 from "./b2-09";
 import * as B2_10 from "./b2-10";
 import * as B2_11 from "./b2-11";
@@ -893,6 +895,8 @@ export const jurisdictions: readonly Jurisdiction[] = [
     createdAt: T.orgCreated,
     updatedAt: T.orgCreated,
   },
+  // b1b-12 — every other state and DC (spec §6).
+  ...B1B_12.jurisdictions,
 ];
 
 export const jurisdictionRules: readonly JurisdictionRule[] = [
@@ -1006,6 +1010,8 @@ export const jurisdictionRules: readonly JurisdictionRule[] = [
     createdBy: ID.USER.platformAdmin,
     updatedBy: ID.USER.platformAdmin,
   },
+  // b1b-12 — each Appendix A state's two producer rules.
+  ...B1B_12.jurisdictionRules,
 ];
 
 export const ruleVersions: readonly RuleVersion[] = [
@@ -1259,6 +1265,8 @@ export const ruleVersions: readonly RuleVersion[] = [
   },
   // Added by b2-09 — never an edit to a row above (STATE §7.1).
   ...B2_09.ruleVersions,
+  // b1b-12 — Appendix A, transcribed (Rule 8.7).
+  ...B1B_12.ruleVersions,
 ];
 
 /**
@@ -1428,6 +1436,8 @@ export const catalogEntries: readonly CatalogEntry[] = [
     createdBy: ID.USER.platformAdmin,
     updatedBy: ID.USER.platformAdmin,
   },
+  // b1b-12 — four entries Priya declares (spec §6).
+  ...B1B_12.catalogEntries,
 ];
 
 // ---------------------------------------------------------------------------
@@ -3324,3 +3334,14 @@ export const seededObjects = B2_10.seededObjects;
  * presses Rank now and it can never disagree with the records it read.
  */
 export const SEEDED_RANKING_AT = B2_11.SEEDED_RANKING_AT;
+
+// ---------------------------------------------------------------------------
+// Producer obligations — b1b-12 (Rules 8.6–8.16; D-78)
+// ---------------------------------------------------------------------------
+
+/** Priya's declared products. The run's rows are seeded from them (`../producer-seed.ts`). */
+export const producerProducts: readonly ProducerProduct[] = [
+  ...B1B_12.producerProducts,
+];
+export const SEEDED_OBLIGATIONS_AT = B1B_12.SEEDED_OBLIGATIONS_AT;
+export const SEEDED_COMPLETION = B1B_12.SEEDED_COMPLETION;

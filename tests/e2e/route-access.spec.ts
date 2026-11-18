@@ -41,6 +41,7 @@ const URL_FOR: Readonly<Record<keyof typeof MATRIX, string>> = {
   "/settings/users": "/settings/users",
   "/settings/catalog": "/settings/catalog",
   "/audit": "/audit",
+  "/obligations": "/obligations",
 };
 
 const PERSONA_FOR_COLUMN: readonly PersonaKey[] = [

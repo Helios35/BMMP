@@ -5,6 +5,7 @@ import { validateEmergencyContactConfiguration } from "@/domain/transport/emerge
 import { validateRecallMatchConfiguration } from "@/domain/recalls/configuration";
 import { validateLookAlikeConfiguration } from "@/domain/photo-checks/look-alike";
 import { validateHazardRankingScheme } from "@/domain/hazard/scheme";
+import { validateObligationAlertConfiguration } from "@/domain/producer/alerts";
 import { DataIntegrityError } from "@/lib/errors";
 
 import {
@@ -12,6 +13,7 @@ import {
   PLATFORM_HAZARD_RANKING_SCHEME,
   PLATFORM_INTAKE_GATE_CONFIGURATION,
   PLATFORM_LOOK_ALIKE_CONFIGURATION,
+  PLATFORM_OBLIGATION_ALERT_CONFIGURATION,
   PLATFORM_RECALL_MATCH_CONFIGURATION,
 } from "./fixtures/platform-configuration";
 
@@ -102,5 +104,20 @@ export const mockPlatformConfiguration: PlatformConfigurationRepository = {
       });
     }
     return validation.scheme;
+  },
+
+  async readObligationAlertConfiguration(ctx: RequestContext) {
+    const validation = validateObligationAlertConfiguration(
+      PLATFORM_OBLIGATION_ALERT_CONFIGURATION,
+    );
+    if (!validation.ok) {
+      throw new DataIntegrityError({
+        userMessage:
+          "The deadline alert configuration could not be loaded. No alert was raised — ask an Admin.",
+        correlationId: ctx.correlationId,
+        context: { issues: validation.issues },
+      });
+    }
+    return validation.configuration;
   },
 };
