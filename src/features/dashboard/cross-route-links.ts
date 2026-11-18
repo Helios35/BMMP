@@ -66,6 +66,33 @@ export const LOG_A_BATTERY: DashboardLink = {
   remedy: "Ask a Handler or an Admin to log a battery.",
 };
 
+/** P3's primary action — `UX_SPEC.md` §3.4 (D-78). */
+export const OPEN_OBLIGATIONS: DashboardLink = {
+  route: "/obligations",
+  href: "/obligations",
+  label: "Open obligations",
+  remedy: "Ask a Producer Compliance Officer or an Admin to open obligations.",
+};
+
+/**
+ * Where an `obligation_deadline` alert is resolved: that state's deadlines,
+ * where **Mark done** sits (`UX_SPEC.md` §3.4, §3.21). The state's code is
+ * the alert's own frozen snapshot — carried in the URL, never parsed.
+ */
+export function obligationDeadlinesLink(
+  jurisdictionCode: string | null,
+): DashboardLink {
+  return {
+    route: "/obligations",
+    href:
+      jurisdictionCode === null || jurisdictionCode === ""
+        ? "/obligations"
+        : `/obligations?state=${encodeURIComponent(jurisdictionCode)}`,
+    label: "Open the deadline",
+    remedy: "Ask a Producer Compliance Officer or an Admin to mark it done.",
+  };
+}
+
 export const CATALOG: DashboardLink = {
   route: "/catalog",
   href: "/catalog",

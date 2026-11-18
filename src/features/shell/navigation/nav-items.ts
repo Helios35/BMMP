@@ -5,6 +5,7 @@ import {
   BookOpen,
   Building2,
   ClipboardCheck,
+  Landmark,
   LayoutDashboard,
   ScrollText,
   Truck,
@@ -117,6 +118,13 @@ export const NAV_ITEMS: readonly NavItem[] = [
     icon: BookOpen,
     group: "primary",
     matchPrefix: "/catalog",
+  },
+  {
+    // B1b, D-78 — P2, P3, P5, P6 (SITE_ARCHITECTURE.md §2.1 row 6a).
+    route: "/obligations",
+    navLabel: "Obligations",
+    icon: Landmark,
+    group: "primary",
   },
   {
     route: "/audit",

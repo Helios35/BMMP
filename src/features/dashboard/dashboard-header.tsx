@@ -5,6 +5,7 @@ import {
   AUDIT_LOG,
   CONTAINERS_WITH_ALERTS,
   LOG_A_BATTERY,
+  OPEN_OBLIGATIONS,
   type DashboardLink,
 } from "./cross-route-links";
 
@@ -24,8 +25,9 @@ import {
  * |---|---|---|
  * | `write` on `/batteries/new` | P1, P6 | **Log a battery** |
  * | `write` on `/containers/[id]` | P2 | the most urgent storage-clock alert's own action |
+ * | `write` on `/obligations` | P3 | **Open obligations** (D-78) |
  * | `read` on `/audit` | P5 | **Open the audit log** |
- * | none of the above | P3, P4 | no primary action |
+ * | none of the above | P4 | no primary action |
  *
  * P2 is asked for `write` on the container detail rather than for her name: she
  * is the role that *resolves* a container alert, which is exactly what §3.4
@@ -63,6 +65,8 @@ export function dashboardPrimaryAction(
       ? CONTAINERS_WITH_ALERTS
       : null;
   }
+
+  if (canWriteRoute(role, OPEN_OBLIGATIONS.route)) return OPEN_OBLIGATIONS;
 
   if (canReadRoute(role, AUDIT_LOG.route)) return AUDIT_LOG;
 
