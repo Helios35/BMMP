@@ -36,9 +36,11 @@ import type {
 import type { DamageAssessmentRepository } from "./condition";
 import type { HazardRankingRepository } from "./hazard-rankings";
 import type {
+  FilingPacketRepository,
   ObligationDeadlineRepository,
   ProducerObligationRepository,
   ProducerProductRepository,
+  ProducerSalesRepository,
 } from "./producer";
 import type { RecallRepository } from "./recalls";
 import type {
@@ -175,6 +177,9 @@ export interface DataAdapter {
   readonly producerProducts: ProducerProductRepository;
   readonly producerObligations: ProducerObligationRepository;
   readonly obligationDeadlines: ObligationDeadlineRepository;
+  // Filings — the sales dataset and filing packets (B1b, D-81). Rules 8.17–8.23.
+  readonly producerSales: ProducerSalesRepository;
+  readonly filingPackets: FilingPacketRepository;
 
   // Evidence and audit — ERD.md §10.2. evidence_pack is B1b (D-24).
   readonly auditEvents: AuditEventRepository;

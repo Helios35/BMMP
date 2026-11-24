@@ -216,6 +216,8 @@ export const supabaseAdapter: DataAdapter = {
     "complete",
     "reopen",
   ]),
+  producerSales: unimplemented("producerSales", ["list", "record"]),
+  filingPackets: unimplemented("filingPackets", ["source", "issue"]),
   // `write` is the `security definer` door (§10.5, `app.write_audit_event()`).
   // It refuses here like everything else — an adapter that answered it silently
   // would be an audit trail nobody could tell was empty.

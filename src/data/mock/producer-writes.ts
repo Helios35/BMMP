@@ -52,6 +52,7 @@ import {
 import { now } from "./factory";
 import { nextId } from "./ids";
 import { mockPlatformConfiguration } from "./platform-configuration";
+import { issuedPacketOf } from "./filing-writes";
 import { deadlineAlertSubjects } from "./producer-alert-subjects";
 import { activeProducts, gatherProducerInputs } from "./producer-inputs";
 import { mockStore } from "./store";
@@ -589,6 +590,7 @@ function deadlineSnapshot(row: ObligationDeadline): JsonObject {
     completedOn: row.completedOn,
     completionNote: row.completionNote,
     completionReference: row.completionReference,
+    evidenceDocumentRenderId: row.evidenceDocumentRenderId,
   };
 }
 
@@ -639,6 +641,16 @@ export const mockObligationDeadlines: ObligationDeadlineRepository = {
       );
     }
     const reference = input.reference?.trim() ?? "";
+    // Rule 8.19 — the evidence is one of this deadline's issued packets, or
+    // nothing. A superseded packet, or another deadline's, is refused.
+    const evidenceId = input.evidenceDocumentRenderId ?? null;
+    if (evidenceId !== null && issuedPacketOf(ctx, id, evidenceId) === null) {
+      invalid(
+        ctx,
+        "That packet isn't an issued packet of this deadline. Pick one listed under it, or none.",
+        "evidenceDocumentRenderId",
+      );
+    }
     return atomically(async () => {
       const updated = await s.obligationDeadlines.update(ctx, id, {
         status: "completed",
@@ -647,6 +659,7 @@ export const mockObligationDeadlines: ObligationDeadlineRepository = {
         completedBy: ctx.userId,
         completionNote: note,
         completionReference: reference === "" ? null : reference,
+        evidenceDocumentRenderId: evidenceId,
         updatedAt: now(),
       });
       await writeTriggerAudit(ctx, input.at, input.attribution, {
@@ -662,6 +675,7 @@ export const mockObligationDeadlines: ObligationDeadlineRepository = {
           "completedBy",
           "completionNote",
           "completionReference",
+          "evidenceDocumentRenderId",
         ],
         governingRuleVersionId: existing.governingRuleVersionId,
       });
@@ -694,6 +708,9 @@ export const mockObligationDeadlines: ObligationDeadlineRepository = {
         completedBy: null,
         completionNote: null,
         completionReference: null,
+        // The packet stays issued and readable; it is no longer this
+        // deadline's evidence of completion.
+        evidenceDocumentRenderId: null,
         updatedAt: now(),
       });
       await writeTriggerAudit(ctx, input.at, input.attribution, {
@@ -709,6 +726,7 @@ export const mockObligationDeadlines: ObligationDeadlineRepository = {
           "completedBy",
           "completionNote",
           "completionReference",
+          "evidenceDocumentRenderId",
         ],
         governingRuleVersionId: existing.governingRuleVersionId,
         reason,

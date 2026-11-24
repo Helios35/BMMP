@@ -198,6 +198,7 @@ import {
   recordDeadlineAlertsForJob,
   recordProducerObligationsForJob,
 } from "./producer-writes";
+import { mockFilingPackets, mockProducerSales } from "./filing-writes";
 import { prohibitsAir, withDamageFlags } from "@/domain/recalls/recalled-flag";
 
 /**
@@ -2405,6 +2406,7 @@ const documentRenderBase = tenantAppendOnlyRepository<
       shipmentId?: Uuid;
       containerId?: Uuid;
       batteryRecordId?: Uuid;
+      obligationDeadlineId?: Uuid;
       verificationCode?: string;
       contentHash?: Sha256;
       search?: string;
@@ -2415,6 +2417,7 @@ const documentRenderBase = tenantAppendOnlyRepository<
     eq(query.shipmentId, row.shipmentId ?? undefined) &&
     eq(query.containerId, row.containerId ?? undefined) &&
     eq(query.batteryRecordId, row.batteryRecordId ?? undefined) &&
+    eq(query.obligationDeadlineId, row.obligationDeadlineId ?? undefined) &&
     eq(query.verificationCode, row.verificationCode) &&
     eq(query.contentHash, row.contentHash) &&
     matchesSearch(query.search, row.templateKey, row.verificationCode),
@@ -2710,6 +2713,8 @@ export const mockAdapter: DataAdapter = {
   producerProducts: mockProducerProducts,
   producerObligations: mockProducerObligations,
   obligationDeadlines: mockObligationDeadlines,
+  producerSales: mockProducerSales,
+  filingPackets: mockFilingPackets,
   auditEvents,
 
   objects,

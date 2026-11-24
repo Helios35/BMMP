@@ -139,7 +139,10 @@ export async function writeRender(
     readonly at: IsoTimestamp;
     readonly documentType: RenderedDocumentType;
     readonly subject:
-      { readonly shipmentId: Uuid } | { readonly containerId: Uuid };
+      | { readonly shipmentId: Uuid }
+      | { readonly containerId: Uuid }
+      // A filing packet belongs to one deadline (TECH §8.2; Rule 8.19).
+      | { readonly obligationDeadlineId: Uuid };
     readonly supersedesDocumentRenderId: Uuid | null;
   },
 ): Promise<DocumentRender> {
@@ -198,6 +201,10 @@ export async function writeRender(
       "containerId" in input.subject ? input.subject.containerId : null,
     batteryRecordId: null,
     evidencePackId: null,
+    obligationDeadlineId:
+      "obligationDeadlineId" in input.subject
+        ? input.subject.obligationDeadlineId
+        : null,
     templateKey: composed.templateKey,
     templateVersion: composed.templateVersion,
     rendererName: composed.rendererName,
@@ -235,7 +242,11 @@ export async function recordRenderFailure(
     readonly documentType: RenderedDocumentType;
     readonly subject:
       | { readonly entityTable: "shipment"; readonly entityId: Uuid }
-      | { readonly entityTable: "container"; readonly entityId: Uuid };
+      | { readonly entityTable: "container"; readonly entityId: Uuid }
+      | {
+          readonly entityTable: "obligation_deadline";
+          readonly entityId: Uuid;
+        };
     readonly inputs: JsonObject;
   },
 ): Promise<void> {
@@ -258,7 +269,7 @@ export async function recordRenderFailure(
 }
 
 /** Run a write that renders; on a render failure, roll back and record it. */
-async function renderingAtomically<T>(
+export async function renderingAtomically<T>(
   ctx: RequestContext,
   at: IsoTimestamp,
   attribution: StorageWriteAttribution,

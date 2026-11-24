@@ -51,6 +51,7 @@ import type {
   ObligationDeadline,
   ProducerObligation,
   ProducerProduct,
+  ProducerSalesRecord,
 } from "@/types/producer";
 
 /**
@@ -108,6 +109,7 @@ export interface MockStore {
   readonly producerProducts: TenantTable<ProducerProduct>;
   readonly producerObligations: TenantTable<ProducerObligation>;
   readonly obligationDeadlines: TenantTable<ObligationDeadline>;
+  readonly producerSalesRecords: TenantTable<ProducerSalesRecord>;
   readonly auditEvents: TenantTable<TenantAuditEvent>;
 
   /** Object bytes, keyed `bucket:path`. */
@@ -123,6 +125,15 @@ const seededAuditEvents: readonly TenantAuditEvent[] = [
   HAZARD_RANKING_SEED.auditEvent,
   ...PRODUCER_SEED.auditEvents,
 ].map((event) => ({ ...event, organizationId: event.organizationId as Uuid }));
+
+/**
+ * The fixtures' renders, and b1b-13's seeded California notice after them —
+ * built by the real domain with the seeded run it belongs to (Rule 8.19).
+ */
+const seededDocumentRenders: readonly DocumentRender[] = [
+  ...FIXTURES.documentRenders,
+  ...PRODUCER_SEED.documentRenders,
+];
 
 /**
  * Built once, per process, and **re-seeded in place** by
@@ -261,7 +272,7 @@ function buildStore(): MockStore {
     documentRenders: new TenantTable(
       "document_render",
       "documentRenders",
-      FIXTURES.documentRenders,
+      seededDocumentRenders,
     ),
 
     damageAssessments: new TenantTable(
@@ -308,6 +319,11 @@ function buildStore(): MockStore {
       "obligation_deadline",
       "obligationDeadlines",
       PRODUCER_SEED.deadlines,
+    ),
+    producerSalesRecords: new TenantTable(
+      "producer_sales_record",
+      "producerSalesRecords",
+      FIXTURES.producerSalesRecords,
     ),
     auditEvents: new TenantTable(
       "audit_event",
@@ -361,7 +377,7 @@ export function resetMockStore(): MockStore {
   store.shipments.replaceAll(FIXTURES.shipments);
   store.shippingPapers.replaceAll(FIXTURES.shippingPapers);
   store.containerLabels.replaceAll(FIXTURES.containerLabels);
-  store.documentRenders.replaceAll(FIXTURES.documentRenders);
+  store.documentRenders.replaceAll(seededDocumentRenders);
 
   store.damageAssessments.replaceAll(FIXTURES.damageAssessments);
   store.recallMatches.replaceAll(FIXTURES.recallMatches);
@@ -372,6 +388,7 @@ export function resetMockStore(): MockStore {
   store.producerProducts.replaceAll(FIXTURES.producerProducts);
   store.producerObligations.replaceAll(PRODUCER_SEED.obligations);
   store.obligationDeadlines.replaceAll(PRODUCER_SEED.deadlines);
+  store.producerSalesRecords.replaceAll(FIXTURES.producerSalesRecords);
   store.auditEvents.replaceAll(seededAuditEvents);
 
   store.objects.clear();
