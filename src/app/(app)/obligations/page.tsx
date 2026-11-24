@@ -239,7 +239,9 @@ export default async function ObligationsPage({
           rowKey={(row) => row.key}
           rowLink={() => ({
             kind: "not-linked",
-            reason: "Record or correct a year's units from the row.",
+            // The phone card has no row actions; the toolbar's Record sales
+            // reaches every pair there.
+            reason: "Record or correct a year's units with Record sales.",
           })}
           total={salesRows.length}
           query={query}

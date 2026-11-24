@@ -89,8 +89,9 @@ export const SALES_CAPTION = "Units sold, by product, state and year";
 export const RECORD_SALES = "Record sales";
 export const RECORDING = "Recording…";
 export const SALES_YEAR = "Year";
+/** The year filter's default — short enough for the filter's width. */
 export function latestYearLabel(year: number): string {
-  return `${String(year)} — the latest full calendar year`;
+  return `${String(year)} (latest)`;
 }
 export const SALES_BODY =
   "Units sold, offered for sale or distributed in or into the state that calendar year — a whole number, zero allowed. Weight and energy are worked out from the catalog entry, never typed.";
