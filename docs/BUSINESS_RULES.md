@@ -1,5 +1,5 @@
 # Business Rules — BMMP
-**Version:** 1.6 · **Date:** 2026-11-18 · **Owner:** Nathan Ivy / Next Sketch LLC
+**Version:** 1.7 · **Date:** 2026-11-24 · **Owner:** Nathan Ivy / Next Sketch LLC
 **Answers:** What decisions does the system make, and on what basis?
 **Reads from:** `docs/_ANCHORS.md`, `docs/PRD.md`, `ROADMAP_BMMP_2026-07-28.md` (v3.0), `Decision Log.md` (D-1–D-11), `RESEARCH_battery-management-feature-sweep_2026-07-28.md`, `PROJECT_SETUP_BMMP.md`  ·  **Feeds:** `docs/TAXONOMY.md`, `docs/TECHNICAL_SPEC.md`, `docs/ERD.md`, `docs/UX_SPEC.md`, `docs/SITE_ARCHITECTURE.md`, `docs/RUNBOOK.md`, every builder brief
 
@@ -9,6 +9,14 @@
 ---
 
 ## Changelog
+
+**v1.7 · 2026-11-24 — filings (`Decision Log.md` D-79, D-80, D-81)**
+
+- **New Rules 8.17–8.23** — the sales dataset, what a filing holds, making a packet, gaps in a packet, the period, who, and a product's plan. They append to the end of section 8, after Rule 8.16. **Section 8 is complete**; its stub lines come off.
+- **Rule 8.1** reads "This section governs:". Nothing else in 8.1 changes.
+- **The P3 role's CAN** gains recording sales and making filing packets and annual reports.
+- **Rules 10.22 and 10.23 reworded** (D-79 #5, #7): aggregation is the rated energy of the contents held together; the band cut points are stated as inclusive and compared in whole parts per million.
+- Authored by planning in `SPEC_filings_2026-11-24.md`, transcribed by `b1b-13-filings`. **No rule was renumbered.**
 
 **v1.6 · 2026-11-18 — state producer rules (`Decision Log.md` D-66, D-78)**
 
@@ -207,7 +215,7 @@ Page-level access follows the fixed page list in `_ANCHORS.md` §5. Where this s
 
 ### P3 — Producer Compliance Officer (B1b)
 
-**CAN:** read what any member reads (`SITE_ARCHITECTURE.md` §5.2) · declare the organization's products and the states they're sold in · run **Check now** · mark an obligation deadline done or reopen it · export obligations.
+**CAN:** read what any member reads (`SITE_ARCHITECTURE.md` §5.2) · declare the organization's products and the states they're sold in · run **Check now** · mark an obligation deadline done or reopen it · export obligations · record sales · make filing packets and annual reports.
 
 **CANNOT:** start an intake or change a battery record · edit catalog entries or jurisdiction rules (that is P6) · disable, bypass or lower the confidence gate · clear an air-transport block · edit or delete an audit event · act in another organization.
 
@@ -888,13 +896,11 @@ The record leaves the shipment when it is moved to quarantine (Rule 6.17). A dep
 
 ---
 
-### 8. Producer obligations and state registration — B1b — producer obligations specified (D-78); filing packets and reporting reserved
+### 8. Producer obligations and state registration — B1b
 
-*Reserved. Specified at **Gate 2** (11 December 2026). Nothing in this section may be implemented ahead of that specification.*
+*Rules 8.6–8.16 are in force from `b1b-12-state-rules`, and 8.17–8.23 from `b1b-13-filings` (D-78, D-81).*
 
-*Rules 8.6–8.16 are in force from `b1b-12-state-rules`. Filing packets and annual reporting (Rule 8.1) stay reserved for `b1b-13-filings`.*
-
-**8.1** This section will govern: which state producer-responsibility statutes apply to a given producer and product; which stewardship organization must be joined in each state; the format classification of a product against each state's own thresholds; registration filing packets per state agency; annual sales and units-placed-on-market reporting mapped from one canonical dataset into each state's format; the dated obligation calendar; and label and marking compliance planning across divergent state schedules.
+**8.1** This section governs: which state producer-responsibility statutes apply to a given producer and product; which stewardship organization must be joined in each state; the format classification of a product against each state's own thresholds; registration filing packets per state agency; annual sales and units-placed-on-market reporting mapped from one canonical dataset into each state's format; the dated obligation calendar; and label and marking compliance planning across divergent state schedules.
 
 **8.2** Every threshold, deadline, statutory citation and covered-category definition in this section is jurisdiction data under Rule 1.23. The same battery classifies differently in different states, and the engine must express that as data, never as branching logic per state.
 
@@ -969,6 +975,52 @@ A rule version that takes effect later is shown with its date.
 Every change and every denial writes an `audit_event`.
 
 **8.16 — EXPORT.** The obligations CSV lists every current obligation and deadline: state, law, obligation, status, products and bands, due date and basis, deadline status, who marked it done and when, the note, the citation and the rule version. It is an evidence artifact (Rule 8.4).
+
+**8.17 — THE SALES DATASET.** A producer keeps one sales dataset. Each entry is a product, a state, a calendar year and the number of units sold, offered for sale or distributed in or into that state that year, with a note saying where the number came from.
+
+- Only units are typed. Weight and energy are worked out from the product's catalog entry, never typed.
+- A missing entry is a gap. It is never read as zero. Zero is an entry someone typed.
+- A correction is a new entry that replaces the old one. The old one is kept and shown as replaced.
+
+**8.18 — WHAT A FILING HOLDS.** What each state's filing must contain is rule data: `producer.filings` (T-41 `producer_obligation`), one version per state, each item with its citation (Rule 12.15). A filing belongs to one obligation in that state's `producer.obligations` rule. It names:
+
+- its document type (T-38 `filing_packet` or `annual_report`) and its title, in the law's words
+- where and how it is sent, in the law's words
+- the period it covers (Rule 8.21)
+- its items, in order, each drawn from one source (T-71)
+
+**8.19 — MAKING A PACKET.** P3 or P6 makes a packet for one deadline whose obligation applies (T-68 `applies`) and has a filing in the rule data.
+
+- Before issuing, the person sees what is filled and what is a gap.
+- Issuing stores the packet as a document (Rule 5.12) with the rule versions and the inputs it used. A packet is issued in one deliberate act. It has no draft.
+- When an input changes, a new packet supersedes the old one (Rule 5.15). Nothing is edited.
+- **A packet is not the filing.** Every packet says so, and says where and how to send it.
+- Making a packet never marks a deadline done. When marking it done, P3 or P6 may link an issued packet as its evidence.
+- An obligation that is `undetermined` gets no packet. The page names the missing input.
+
+**8.20 — GAPS IN A PACKET.** A packet never fills a gap and never leaves one out.
+
+- A value the platform should hold but doesn't (a missing sales entry, a catalog entry with no weight) reads "Not on file", with who can fix it.
+- An item the platform doesn't keep (a tax ID, a signature, a stewardship organization's collection figures) reads "Not held here — add it on the agency's form", by name.
+- A total with any gap in it says how many entries are missing. It is never shown as complete.
+
+**8.21 — THE PERIOD.** An annual report covers the period its filing rule names:
+
+- the calendar year, or years, before the deadline's year, where the law says so
+- where the law states no period, the person picks the calendar year when making the packet. The packet says who picked it and that the law doesn't state one.
+
+No period is guessed.
+
+**8.22 — WHO.**
+
+- P3 and P6 record sales and make packets.
+- P2 reads both.
+- P5 reads both inside an unexpired grant, and downloads a packet where the grant allows (Rules 1.15, 5.27).
+- P1 and P4 can't open a filing packet or an annual report.
+
+Every entry, every packet and every denial writes an `audit_event`.
+
+**8.23 — A PRODUCT'S PLAN.** For one product, the platform lists every obligation that applies to it across the states it is sold in, earliest date first: the duty in the law's words, the state, the date or "No date yet", and the deadline's status. Marking duties appear here with the rest. This needs no rule data of its own.
 
 ---
 
@@ -1119,13 +1171,13 @@ A failure is never shown as "no match".
 **10.22 — CONTAINERS AND LOTS.**
 
 - A container takes each battery factor at its highest level among its batteries. A lot does the same over its containers' batteries.
-- They are also ranked on **storage aggregation**, placed after chemistry: the total rated energy of the contents, in bands set in the scheme. If any battery's energy is unknown, aggregation reads "Not fully recorded" and ranks level with the highest band.
+- They are also ranked on **storage aggregation**, placed after chemistry: the rated energy of the contents held together, in bands set in the scheme. If any battery's energy is unknown, aggregation reads "Not fully recorded" and ranks level with the highest band.
 - An empty container or lot is `not_ranked`.
 
 **10.23 — POSITION AND BAND.**
 
 - **Position** is "3rd of 41". Level items share the best position: "3rd of 41, level with 5 others".
-- **Band** (T-33) comes from where the item's level group sits in the set. The share is (items ranked above + (group size − 1) ÷ 2) ÷ (set size − 1). The cut points are 0.25, 0.5 and 0.75, set in the scheme: below 0.25 is Band 1, up to 0.5 is Band 2, up to 0.75 is Band 3, and the rest is Band 4.
+- **Band** (T-33) comes from where the item's level group sits in the set. The share is (items ranked above + (group size − 1) ÷ 2) ÷ (set size − 1). The cut points are 0.25, 0.5 and 0.75, set in the scheme: below 0.25 is Band 1; from 0.25 up to and including 0.5 is Band 2; above 0.5 up to and including 0.75 is Band 3; above 0.75 is Band 4. Shares are compared in whole parts per million, so a cut point never rounds.
 - **`not_ranked`** applies when the set has one item, or when every item is level. Nothing sets it apart, and it is not given a band.
 
 **10.24 — WHEN IT RUNS.**

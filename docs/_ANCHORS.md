@@ -66,7 +66,7 @@ Database naming is `snake_case`. Types in TypeScript are `PascalCase` singular.
 
 **Rules as data**
 
-`jurisdiction` · `jurisdiction_rule` · `rule_version` · `format_classification` (the per-jurisdiction, per-rule-version size/format result for a battery — keyed on `(battery_record, jurisdiction, rule_version)`, never a column on `battery_record`, because the same battery classifies differently by state) · `producer_obligation` (B1b) · `obligation_deadline` (B1b) · `producer_product` (B1b, Rule 8.6)
+`jurisdiction` · `jurisdiction_rule` · `rule_version` · `format_classification` (the per-jurisdiction, per-rule-version size/format result for a battery — keyed on `(battery_record, jurisdiction, rule_version)`, never a column on `battery_record`, because the same battery classifies differently by state) · `producer_obligation` (B1b) · `obligation_deadline` (B1b) · `producer_product` (B1b, Rule 8.6) · `producer_sales_record` (B1b, Rule 8.17)
 
 **Evidence and audit**
 
@@ -87,9 +87,9 @@ Every rule is numbered `<section>.<n>`. Other docs cite rules by number. **These
 | **5** | Transport documentation and shipping papers | B1a |
 | **6** | Damage, defect and the air-transport prohibition | B1a |
 | **7** | Data capture, consent and training rights | B1a |
-| **8** | Producer obligations and state registration | B1b — stub |
+| **8** | Producer obligations and state registration | B1b — specified (D-78, D-81) |
 | **9** | Insurance evidence and fire-code volume | B1b — stub |
-| **10** | Grading, damage triage and hazard ranking | B2 — stub |
+| **10** | Grading, damage triage and hazard ranking | B2 — recall matching and hazard ranking specified (D-73, D-77); grading reserved |
 | **11** | Mobility and small-battery coverage | B3 — stub |
 | **12** | Audit, retention and export | B1a |
 
