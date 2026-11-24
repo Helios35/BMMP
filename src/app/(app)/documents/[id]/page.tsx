@@ -1,18 +1,30 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
-import { PageHeader, PageShell } from "@/components/page";
+import { CircleAlert } from "lucide-react";
+
+import { FilingPacketSummary } from "@/components/documents/filing-packet-summary";
+import { PageHeader, PageSection, PageShell } from "@/components/page";
 import { ReadOnlyBanner } from "@/components/access/read-only-banner";
+import { INTENT_SURFACE_CLASSES } from "@/components/status/intent-classes";
+import { Alert, AlertTitle } from "@/components/ui/alert";
 import { data } from "@/data";
 import { showsReadOnlyBanner } from "@/domain/access/control-treatment";
+import {
+  FILING_DOCUMENT_REFUSAL,
+  FILING_DOCUMENT_RULE,
+  mayOpenDocumentType,
+} from "@/domain/access/document-access";
 import { APP_ROUTE_NAMES } from "@/domain/access/routes";
 import { VerifyCodeForm } from "@/features/documents/components/verify-code-form";
+import { FILING_CONTENT_HEADING } from "@/features/documents/document-copy";
 import { DocumentPanel } from "@/features/documents/document-page";
 import { readDocument } from "@/features/documents/server/read-document";
 import { Breadcrumbs } from "@/features/shell/chrome/breadcrumbs";
 import { breadcrumbTrail } from "@/features/shell/navigation/breadcrumb-ancestors";
 import { requireRoute } from "@/lib/auth/guard";
-import { recordNotFound } from "@/lib/auth/record-denial";
+import { recordDocumentDenial, recordNotFound } from "@/lib/auth/record-denial";
+import { cn } from "@/lib/utils";
 
 /**
  * `/documents/[id]` — `UX_SPEC.md` §3.14.
@@ -29,6 +41,12 @@ import { recordNotFound } from "@/lib/auth/record-denial";
  * A paper copy's footer code can be checked against the render here
  * (`TECHNICAL_SPEC.md` §8.4). A fixture render with no stored file shows the
  * page composed from its rows, and says so.
+ *
+ * **A filing packet or an annual report follows `/obligations` access**
+ * (Rule 8.22; `SITE_ARCHITECTURE.md` §5.2): P1 and P4 are refused, citing
+ * the rule, and the refusal is audited. A packet's content is also shown as
+ * text, from the input it was issued with — "a packet is not the filing"
+ * and where to send it first (Rule 8.19).
  */
 
 export const metadata: Metadata = {
@@ -47,6 +65,30 @@ export default async function DocumentPage({
     // (Rules 1.2, 1.16).
     await recordNotFound(ctx, "document_render", id);
     notFound();
+  }
+
+  if (!mayOpenDocumentType(ctx.role, render.documentType)) {
+    await recordDocumentDenial(
+      ctx,
+      render.id,
+      render.documentType,
+      FILING_DOCUMENT_RULE,
+    );
+    return (
+      <PageShell>
+        <PageHeader title={APP_ROUTE_NAMES["/documents/[id]"]} />
+        <Alert
+          role="alert"
+          data-document-refused={FILING_DOCUMENT_RULE}
+          className={cn(INTENT_SURFACE_CLASSES.critical, "gap-2 px-4 py-4")}
+        >
+          <CircleAlert aria-hidden="true" />
+          <AlertTitle className="text-body-strong">
+            {FILING_DOCUMENT_REFUSAL}
+          </AlertTitle>
+        </Alert>
+      </PageShell>
+    );
   }
 
   const view = await readDocument(ctx, render);
@@ -77,6 +119,15 @@ export default async function DocumentPage({
           ) : undefined
         }
       />
+      {view.page.kind === "filing_packet" &&
+      view.storedFile.state === "stored" ? (
+        <PageSection
+          title={FILING_CONTENT_HEADING}
+          dataAttributes={{ "data-filing-content": "true" }}
+        >
+          <FilingPacketSummary content={view.page.content} />
+        </PageSection>
+      ) : null}
       <DocumentPanel view={view} />
       {view.storedFile.state === "stored" ? (
         <VerifyCodeForm renderId={render.id} statusLabel={view.statusLabel} />

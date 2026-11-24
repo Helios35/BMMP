@@ -24,9 +24,16 @@ import {
   addProductSchema,
   changeStatesSchema,
   markDoneSchema,
+  packetSchema,
+  recordSalesSchema,
   removeProductSchema,
   reopenSchema,
 } from "./schemas";
+import {
+  issuePacketFor,
+  readPacketPreview,
+  type PacketPreview,
+} from "./server/packets";
 import { checkObligationsFor } from "./server/run";
 
 /**
@@ -225,6 +232,7 @@ export async function markDeadlineDone(
         completedOn: parsed.data.completedOn,
         note: parsed.data.note,
         reference: parsed.data.reference ?? null,
+        evidenceDocumentRenderId: parsed.data.evidenceDocumentRenderId ?? null,
         at: nowIso(),
         attribution: await requestAttribution(),
       },
@@ -262,6 +270,111 @@ export async function reopenDeadline(
     );
     revalidatePath("/", "layout");
     return actionSucceeded({ id: deadline.id });
+  } catch (error) {
+    return actionFailedFrom(error, ctx.correlationId);
+  }
+}
+
+/**
+ * **Record sales** — Rule 8.17. Recording again for the same product, state
+ * and year is a correction; the old entry is kept and shown as replaced.
+ */
+export async function recordSales(
+  input: unknown,
+): Promise<ActionResult<{ readonly id: string; readonly corrected: boolean }>> {
+  const guard = await guarded("recordProducerSales", "record_sales");
+  if (!guard.ok) return guard.result;
+  const { ctx } = guard;
+  const parsed = recordSalesSchema.safeParse(input);
+  if (!parsed.success) {
+    return invalid(
+      ctx,
+      parsed.error.issues,
+      "The sales could not be recorded.",
+    );
+  }
+  try {
+    const recorded = await data.producerSales.record(ctx, {
+      producerProductId: parsed.data.productId,
+      jurisdictionId: parsed.data.jurisdictionId,
+      year: parsed.data.year,
+      units: parsed.data.units,
+      basisNote: parsed.data.basisNote,
+      at: nowIso(),
+      attribution: await requestAttribution(),
+    });
+    revalidatePath(ROUTE);
+    return actionSucceeded({
+      id: recorded.record.id,
+      corrected: recorded.replaced !== null,
+    });
+  } catch (error) {
+    return actionFailedFrom(error, ctx.correlationId);
+  }
+}
+
+/**
+ * What **Make packet** would issue — Rules 8.19–8.21. Every filled value and
+ * every gap, before anything is issued; nothing is stored.
+ */
+export async function previewPacket(
+  input: unknown,
+): Promise<ActionResult<PacketPreview>> {
+  const guard = await guarded("previewFilingPacket", "make_packets");
+  if (!guard.ok) return guard.result;
+  const { ctx } = guard;
+  const parsed = packetSchema.safeParse(input);
+  if (!parsed.success) {
+    return invalid(
+      ctx,
+      parsed.error.issues,
+      "The packet could not be prepared.",
+    );
+  }
+  try {
+    return actionSucceeded(
+      await readPacketPreview(
+        ctx,
+        parsed.data.deadlineId,
+        nowIso(),
+        parsed.data.year,
+      ),
+    );
+  } catch (error) {
+    return actionFailedFrom(error, ctx.correlationId);
+  }
+}
+
+/**
+ * **Issue packet** — one deliberate act, no draft (Rule 8.19). It never
+ * marks the deadline done; a new packet supersedes the deadline's last one.
+ */
+export async function issuePacket(input: unknown): Promise<
+  ActionResult<{
+    readonly id: string;
+    readonly supersededId: string | null;
+  }>
+> {
+  const guard = await guarded("issueFilingPacket", "make_packets");
+  if (!guard.ok) return guard.result;
+  const { ctx } = guard;
+  const parsed = packetSchema.safeParse(input);
+  if (!parsed.success) {
+    return invalid(ctx, parsed.error.issues, "The packet could not be issued.");
+  }
+  try {
+    const issued = await issuePacketFor(
+      ctx,
+      parsed.data.deadlineId,
+      nowIso(),
+      parsed.data.year,
+      await requestAttribution(),
+    );
+    revalidatePath(ROUTE);
+    return actionSucceeded({
+      id: issued.documentRender.id,
+      supersededId: issued.supersededDocumentRenderId,
+    });
   } catch (error) {
     return actionFailedFrom(error, ctx.correlationId);
   }

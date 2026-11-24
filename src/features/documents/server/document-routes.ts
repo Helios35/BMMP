@@ -2,8 +2,13 @@ import "server-only";
 
 import { data } from "@/data";
 import type { RequestContext } from "@/data/contracts";
+import {
+  FILING_DOCUMENT_REFUSAL,
+  FILING_DOCUMENT_RULE,
+  mayOpenDocumentType,
+} from "@/domain/access/document-access";
 import { canReadRoute } from "@/domain/access/route-capability";
-import { recordNotFound } from "@/lib/auth/record-denial";
+import { recordDocumentDenial, recordNotFound } from "@/lib/auth/record-denial";
 import { resolveRequestContext } from "@/lib/auth/session";
 import { isAppError, type AppErrorCode } from "@/lib/errors";
 import type { DocumentRender } from "@/types/documents";
@@ -132,6 +137,25 @@ export async function openDocument(
         "NOT_FOUND",
         404,
         "That document could not be found.",
+        instance,
+      ),
+    };
+  }
+  // Rule 8.22 — a filing packet or annual report follows `/obligations`
+  // access, for the bytes as for the page; the refusal is evidence.
+  if (!mayOpenDocumentType(ctx.role, render.documentType)) {
+    await recordDocumentDenial(
+      ctx,
+      render.id,
+      render.documentType,
+      FILING_DOCUMENT_RULE,
+    );
+    return {
+      ok: false,
+      response: documentProblem(
+        "FORBIDDEN",
+        403,
+        FILING_DOCUMENT_REFUSAL,
         instance,
       ),
     };

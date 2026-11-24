@@ -35,6 +35,35 @@ export const markDoneSchema = z.object({
     .trim()
     .min(1, { error: "Say what was done — the note is required." }),
   reference: z.string().trim().max(200).optional(),
+  /** Rule 8.19 — an issued packet of this deadline, linked as evidence. Optional. */
+  evidenceDocumentRenderId: z
+    .uuid({ error: "That packet could not be identified." })
+    .optional(),
+});
+
+/** Rule 8.17 — units are a whole number, zero allowed; the note is required. */
+export const recordSalesSchema = z.object({
+  productId: ID,
+  jurisdictionId: z.uuid({ error: "Choose the state." }),
+  year: z
+    .number({ error: "Choose the calendar year." })
+    .int({ error: "Choose the calendar year." })
+    .min(1900, { error: "Choose the calendar year." }),
+  units: z
+    .number({ error: "Units are a whole number, zero or more." })
+    .int({ error: "Units are a whole number, zero or more." })
+    .min(0, { error: "Units are a whole number, zero or more." }),
+  basisNote: z
+    .string()
+    .trim()
+    .min(1, { error: "Say where the number came from — the note is required." })
+    .max(500),
+});
+
+/** Rules 8.19, 8.21 — a deadline, and the year picked where the law names none. */
+export const packetSchema = z.object({
+  deadlineId: ID,
+  year: z.number().int().nullable(),
 });
 
 export const reopenSchema = z.object({

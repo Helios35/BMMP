@@ -8,10 +8,14 @@ import {
   noRulesOnFile,
   versionWords,
   bandInStateWords,
+  productPlan,
   type DeadlineStanding,
   type Due,
   type MissingInput,
   type ObligationAlertConfiguration,
+  type PlanObligation,
+  type ProductPlan,
+  type Truth,
 } from "@/domain/producer";
 import { basisCivilDate } from "@/domain/hazard/words";
 import type { RuleVersionCandidate } from "@/domain/rules/resolve";
@@ -77,6 +81,9 @@ export interface DeadlineView {
   readonly completionReference: string | null;
   readonly completedBy: Uuid | null;
   readonly completedAt: string | null;
+  /** The issued packet linked when it was marked done (Rule 8.19), if any. */
+  readonly evidenceDocumentRenderId: Uuid | null;
+  readonly obligationKey: string;
   readonly versionLabel: string;
 }
 
@@ -201,7 +208,9 @@ interface StoredProduct {
   readonly missing: readonly MissingInput[];
 }
 
-function storedProducts(row: ProducerObligation): readonly StoredProduct[] {
+export function storedProducts(
+  row: ProducerObligation,
+): readonly StoredProduct[] {
   return listOf(row.appliesBecause.products).flatMap((value) => {
     const product = objectOf(value);
     if (product === null) return [];
@@ -288,6 +297,8 @@ export function deadlineView(input: {
     completionReference: deadline.completionReference,
     completedBy: deadline.completedBy,
     completedAt: deadline.completedAt,
+    evidenceDocumentRenderId: deadline.evidenceDocumentRenderId,
+    obligationKey: obligation.obligationKey,
     versionLabel: textOf(version?.versionLabel) ?? "",
   };
 }
@@ -539,4 +550,59 @@ function stateView(
     ),
     products,
   };
+}
+
+// --- a product's plan (Rule 8.23) -------------------------------------------------------------
+
+function isTruth(value: string): value is Truth {
+  return value === "true" || value === "false" || value === "cant_tell";
+}
+
+/**
+ * One product's plan, from the stored rows — Rule 8.23. The domain orders it;
+ * this reads, for each current obligation in the product's states, the truth
+ * the run stored for this product and the due rule it stored.
+ */
+export function productPlanView(input: {
+  readonly productId: Uuid;
+  readonly today: IsoDate;
+  readonly jurisdictions: readonly Jurisdiction[];
+  readonly obligations: readonly ProducerObligation[];
+  readonly deadlines: readonly ObligationDeadline[];
+}): ProductPlan {
+  const states = new Map(
+    input.jurisdictions.map((row) => [row.id, stateLabel(row)]),
+  );
+  const obligations: PlanObligation[] = input.obligations.flatMap((row) => {
+    const state = states.get(row.jurisdictionId);
+    const stored = storedProducts(row).find(
+      (product) => product.productId === input.productId,
+    );
+    if (state === undefined || stored === undefined) return [];
+    return [
+      {
+        obligationId: row.id,
+        stateName: state.name,
+        stateCode: state.code,
+        duty: row.obligationTitle,
+        citation: row.citation,
+        status: row.status,
+        productTruth: isTruth(stored.truth) ? stored.truth : null,
+        due: storedDue(row),
+      },
+    ];
+  });
+  const ids = new Set(obligations.map((row) => row.obligationId));
+  return productPlan({
+    obligations,
+    deadlines: input.deadlines
+      .filter((row) => ids.has(row.producerObligationId))
+      .map((row) => ({
+        deadlineId: row.id,
+        obligationId: row.producerObligationId,
+        dueOn: row.dueOn,
+        status: row.status,
+      })),
+    today: input.today,
+  });
 }

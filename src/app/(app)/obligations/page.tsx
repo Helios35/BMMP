@@ -18,15 +18,20 @@ import { Button } from "@/components/ui/button";
 import { mayTakeProducerAction } from "@/domain/access/producer-actions";
 import { showsReadOnlyBanner } from "@/domain/access/control-treatment";
 import { APP_ROUTE_NAMES } from "@/domain/access/routes";
+import { latestFullCalendarYear } from "@/domain/producer";
 import { CheckNowButton } from "@/features/obligations/components/check-now-button";
 import {
   deadlineColumns,
   productColumns,
+  salesColumns,
+  salesPairOf,
   stateColumns,
 } from "@/features/obligations/components/columns";
 import { producerControl } from "@/features/obligations/components/obligation-controls";
 import { ObligationStatePanel } from "@/features/obligations/components/obligation-state-panel";
 import { AddProductDialog } from "@/features/obligations/components/product-dialogs";
+import { ProductPlanPanel } from "@/features/obligations/components/product-plan-panel";
+import { RecordSalesDialog } from "@/features/obligations/components/record-sales-dialog";
 import {
   activeObligationTab,
   deadlineFilters,
@@ -35,6 +40,8 @@ import {
   OBLIGATIONS_EXPORT_PATH,
   OBLIGATIONS_PATH,
   obligationsListSpec,
+  salesYear,
+  salesYearFilter,
 } from "@/features/obligations/list-query";
 import {
   ADD_PRODUCT,
@@ -42,6 +49,8 @@ import {
   DEADLINES_CAPTION,
   EXPORT,
   PRODUCTS_CAPTION,
+  RECORD_SALES,
+  SALES_CAPTION,
   STATES_CAPTION,
   ZERO_DEADLINES_BODY,
   ZERO_DEADLINES_TITLE,
@@ -49,7 +58,13 @@ import {
   ZERO_PRODUCTS_TITLE,
   ZERO_PRODUCTS_WHO_CAN,
 } from "@/features/obligations/obligation-copy";
+import {
+  correctionWords,
+  salesReadModel,
+  salesYears,
+} from "@/features/obligations/sales-view";
 import { readObligationsPage } from "@/features/obligations/server/read-obligations";
+import { productPlanView, stateLabel } from "@/features/obligations/view";
 import { requireRoute } from "@/lib/auth/guard";
 import { nowIso } from "@/lib/auth/session";
 
@@ -61,6 +76,10 @@ import { nowIso } from "@/lib/auth/session";
  * guard turns them away and audits it. **Everything shown was decided by a
  * run and stored**: the bands in the law's own terms, each obligation's
  * status, the dated deadlines. Tabs, filters and `?state=` live in the URL.
+ *
+ * `b1b-13` (Rules 8.17–8.23, D-81) adds the Sales tab (`?year=`), Make
+ * packet and the packets under each deadline, Mark done's evidence, and a
+ * product's plan on `?product=`.
  */
 
 export const metadata: Metadata = {
@@ -76,13 +95,22 @@ export default async function ObligationsPage({
   const { model } = page;
 
   const states = [...model.states.map((view) => view.state)];
-  const spec = obligationsListSpec([
-    ...new Set(
-      [...states, ...model.deadlines.map((row) => row.state)].map(
-        (s) => s.code,
+  const latestYear = latestFullCalendarYear(page.today);
+  const yearOptions = salesYears(
+    latestYear,
+    page.sales.map((row) => row.year),
+  );
+  const spec = obligationsListSpec(
+    [
+      ...new Set(
+        [...states, ...model.deadlines.map((row) => row.state)].map(
+          (s) => s.code,
+        ),
       ),
-    ),
-  ]);
+    ],
+    model.products.map((row) => row.id),
+    yearOptions,
+  );
   const query = decodeListQuery(params, spec);
   const tab = activeObligationTab(query);
   // The search box narrows the tab it sits on: a deadline by its duty, state
@@ -182,11 +210,85 @@ export default async function ObligationsPage({
     />
   );
 
-  if (tab === "products") {
+  if (tab === "sales") {
+    const year = salesYear(query, latestYear);
+    const salesRows = salesReadModel({
+      year,
+      timeZone: page.timeZone,
+      products: page.rows.products,
+      catalogEntries: page.rows.catalogEntries,
+      states: new Map(
+        page.rows.jurisdictions.map((row) => [row.id, stateLabel(row)]),
+      ),
+      sales: page.sales,
+      people: page.people,
+    }).filter((row) => matchesSearch(row.productLabel, row.state.name));
+    const correction = (row: (typeof salesRows)[number]): string | null =>
+      row.entry === null ? null : correctionWords(row.entry);
+    const pairs = salesRows
+      .filter((row) => !row.replaced)
+      .map((row) => salesPairOf(row, correction));
     return (
       <PageShell>
         {header}
         {tabs}
+        <RecordTable
+          caption={`${SALES_CAPTION} — ${String(year)}`}
+          columns={salesColumns({ role: ctx.role, year, correction })}
+          rows={salesRows}
+          rowKey={(row) => row.key}
+          rowLink={() => ({
+            kind: "not-linked",
+            reason: "Record or correct a year's units from the row.",
+          })}
+          total={salesRows.length}
+          query={query}
+          querySpec={spec}
+          basePath={OBLIGATIONS_PATH}
+          filters={[salesYearFilter(yearOptions, latestYear)]}
+          emptyState={noProducts}
+          filteredEmpty={{ noun: "sales entries" }}
+          toolbar={producerControl({
+            role: ctx.role,
+            action: "record_sales",
+            isDestructive: false,
+            label: RECORD_SALES,
+            dataAttributes: { "data-record-sales": "toolbar" },
+            live: () => <RecordSalesDialog pairs={pairs} year={year} />,
+          })}
+        />
+      </PageShell>
+    );
+  }
+
+  if (tab === "products") {
+    const selectedProduct = query.filters.product;
+    const planned = model.products.find((row) => row.id === selectedProduct);
+    return (
+      <PageShell>
+        {header}
+        {tabs}
+        {planned === undefined ? null : (
+          <ProductPlanPanel
+            label={planned.label}
+            productId={planned.id}
+            plan={productPlanView({
+              productId: planned.id,
+              today: page.today,
+              jurisdictions: page.rows.jurisdictions,
+              obligations: page.rows.obligations.filter((row) =>
+                planned.stateIds.includes(row.jurisdictionId),
+              ),
+              deadlines: page.rows.deadlines,
+            })}
+            closeHref={encodeListQuery(
+              OBLIGATIONS_PATH,
+              query,
+              { filters: {} },
+              spec,
+            )}
+          />
+        )}
         <RecordTable
           caption={PRODUCTS_CAPTION}
           columns={productColumns({ role: ctx.role, stateOptions })}
@@ -263,6 +365,8 @@ export default async function ObligationsPage({
           role: ctx.role,
           today: page.today,
           people: page.people,
+          packets: page.packets,
+          filings: page.filings,
         })}
         rows={filtered.slice(start, start + query.perPage)}
         rowKey={(row) => row.id}

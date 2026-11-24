@@ -191,3 +191,33 @@ export async function recordWriteDenial(
     reason: `write_denied:${route}:${attempted}`,
   });
 }
+
+/**
+ * Rule 8.22 — a member reached a document their role can't open: a filing
+ * packet or an annual report, for P1 or P4. The route is theirs; the
+ * document is not. The subject is the render they asked for.
+ */
+export async function recordDocumentDenial(
+  ctx: RequestContext,
+  documentRenderId: Uuid,
+  documentType: string,
+  rule: string,
+): Promise<void> {
+  const attribution = await requestAttribution();
+  const at = new Date().toISOString();
+  const afterState: JsonObject = {
+    route: "/documents/[id]",
+    role: ctx.role,
+    documentType,
+    rule,
+    outcome: "refused",
+  };
+
+  await writeDenialEvent(ctx, {
+    ...baseEvent(ctx, attribution, at),
+    entityTable: "document_render",
+    entityId: documentRenderId,
+    afterState,
+    reason: `document_access_denied:${documentType}`,
+  });
+}

@@ -14,6 +14,10 @@ import {
 } from "@/domain/documents/build-container-label-payload";
 import { buildDdrPacketPayload } from "@/domain/documents/build-ddr-packet-payload";
 import {
+  buildFilingPacketPayload,
+  type FilingPacketContent,
+} from "@/domain/documents/build-filing-packet-payload";
+import {
   buildShippingPaperDocumentPayload,
   buildShippingPaperDraftPayload,
   type DocumentPayloadBuild,
@@ -44,6 +48,10 @@ import {
   DDR_PACKET_TEMPLATE,
   DdrPacketTemplate,
 } from "../templates/ddr-packet-template";
+import {
+  FILING_PACKET_TEMPLATE,
+  FilingPacketTemplate,
+} from "../templates/filing-packet-template";
 import {
   SHIPPING_PAPER_TEMPLATE,
   ShippingPaperTemplate,
@@ -273,6 +281,42 @@ export function composeDdrPacket(input: {
       payload,
       outcome,
       (verificationCode) => DdrPacketTemplate({ payload, verificationCode }),
+    );
+  };
+}
+
+/**
+ * A filing packet or an annual report, exactly as
+ * `buildFilingPacketContent` decided it (Rules 8.19–8.21) — one template for
+ * both types, its gaps printed where they fall. Issued in one deliberate act;
+ * there is no draft of a packet.
+ */
+export function composeFilingPacket(input: {
+  readonly content: RuleOutcome<FilingPacketContent>;
+  /** The organization's zone — the issue instant prints in it. */
+  readonly timeZone: TimeZone;
+}): DocumentComposer {
+  return async (identity) => {
+    const documentType = input.content.result.documentType;
+    const outcome = accepted(
+      buildFilingPacketPayload({
+        content: input.content,
+        document: identityFor(
+          identity,
+          documentType,
+          FILING_PACKET_TEMPLATE,
+          input.timeZone,
+          "",
+        ),
+      }),
+    );
+    const payload = outcome.result;
+    return compose(
+      documentType,
+      FILING_PACKET_TEMPLATE,
+      payload,
+      outcome,
+      (verificationCode) => FilingPacketTemplate({ payload, verificationCode }),
     );
   };
 }
