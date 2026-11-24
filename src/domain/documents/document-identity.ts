@@ -21,10 +21,18 @@ import {
  * site's zone (Rule 4.29) — the template prints the string and reads no clock.
  */
 
-/** The document types the engine renders — the damaged/defective packet joined in `b1a-08` (Rule 6.16). */
+/**
+ * The document types the engine renders — the damaged/defective packet joined
+ * in `b1a-08` (Rule 6.16), the filing packet and the annual report in
+ * `b1b-13` (Rules 8.19, 8.22).
+ */
 export type RenderedDocumentType = Extract<
   DocumentType,
-  "shipping_paper" | "container_label" | "ddr_packet"
+  | "shipping_paper"
+  | "container_label"
+  | "ddr_packet"
+  | "filing_packet"
+  | "annual_report"
 >;
 
 /** A render is issued, or it is a draft (Rule 5.28). Supersession and voiding come later, by mark. */
