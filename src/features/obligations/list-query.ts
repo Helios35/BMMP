@@ -10,7 +10,14 @@ import {
 } from "@/domain/producer";
 import { isTaxonomyValue, optionsFor } from "@/domain/taxonomy/lookup";
 
-import { TAB_DEADLINES, TAB_PRODUCTS, TAB_STATES } from "./obligation-copy";
+import {
+  latestYearLabel,
+  SALES_YEAR,
+  TAB_DEADLINES,
+  TAB_PRODUCTS,
+  TAB_SALES,
+  TAB_STATES,
+} from "./obligation-copy";
 
 /**
  * `/obligations`' URL — `UX_SPEC.md` §3.21; `SITE_ARCHITECTURE.md` §7.4.
@@ -26,26 +33,49 @@ export const OBLIGATIONS_PATH = "/obligations";
 export const OBLIGATIONS_EXPORT_PATH = "/api/exports/obligations";
 export const OBLIGATIONS_PAGE_SIZE = 25;
 
-export const OBLIGATION_TAB_IDS = ["deadlines", "states", "products"] as const;
+export const OBLIGATION_TAB_IDS = [
+  "deadlines",
+  "states",
+  "products",
+  "sales",
+] as const;
 export type ObligationTabId = (typeof OBLIGATION_TAB_IDS)[number];
 
 export const OBLIGATION_TABS = [
   { id: "deadlines", label: TAB_DEADLINES },
   { id: "states", label: TAB_STATES },
   { id: "products", label: TAB_PRODUCTS },
+  { id: "sales", label: TAB_SALES },
 ] as const;
 
-export const OBLIGATION_FILTER_IDS = ["state", "status"] as const;
+/**
+ * `state` and `status` narrow Deadlines (and `state` opens a state's panel);
+ * `product` opens a product's plan (Rule 8.23); `year` picks the Sales tab's
+ * calendar year — absent, the latest full one (UX §3.21).
+ */
+export const OBLIGATION_FILTER_IDS = [
+  "state",
+  "status",
+  "product",
+  "year",
+] as const;
 
 export function obligationsListSpec(
   stateCodes: readonly string[],
+  productIds: readonly string[] = [],
+  years: readonly number[] = [],
 ): ListQuerySpec {
   return {
     sortableColumnIds: [],
     defaultSort: "",
     defaultDir: "asc",
     filterIds: OBLIGATION_FILTER_IDS,
-    filterValues: { state: stateCodes, status: DEADLINE_STANDINGS },
+    filterValues: {
+      state: stateCodes,
+      status: DEADLINE_STANDINGS,
+      product: productIds,
+      year: years.map(String),
+    },
     perPageOptions: [OBLIGATIONS_PAGE_SIZE, 50, 100],
     tabIds: OBLIGATION_TAB_IDS,
     defaultTab: "deadlines",
@@ -53,9 +83,32 @@ export function obligationsListSpec(
 }
 
 export function activeObligationTab(query: ListQuery): ObligationTabId {
-  return query.tab === "states" || query.tab === "products"
+  return query.tab === "states" ||
+    query.tab === "products" ||
+    query.tab === "sales"
     ? query.tab
     : "deadlines";
+}
+
+/** The Sales tab's year: the URL's, or the latest full calendar year. */
+export function salesYear(query: ListQuery, latest: number): number {
+  const year = query.filters.year;
+  return year === undefined ? latest : Number(year);
+}
+
+/** The year filter — the default year is the "any" option, so it never reaches the URL. */
+export function salesYearFilter(
+  years: readonly number[],
+  latest: number,
+): RecordTableFilter {
+  return {
+    id: "year",
+    label: SALES_YEAR,
+    options: years
+      .filter((year) => year !== latest)
+      .map((year) => ({ value: String(year), label: String(year) })),
+    anyLabel: latestYearLabel(latest),
+  };
 }
 
 export function deadlineFilters(

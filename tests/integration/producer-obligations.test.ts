@@ -270,7 +270,8 @@ describe("marking a deadline done (Rule 8.12)", () => {
       completedBy: ID.USER.priyaProducer,
       completionReference: "BN-IL-1",
     });
-    expect(auditOf("obligation_deadline.completed")).toHaveLength(2);
+    // DC's and California's seeded completions (b1b-12, b1b-13), and this one.
+    expect(auditOf("obligation_deadline.completed")).toHaveLength(3);
     const open = mockStore()
       .alerts.all()
       .filter(

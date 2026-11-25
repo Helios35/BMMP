@@ -4,6 +4,11 @@ import { data } from "@/data";
 import type { RequestContext } from "@/data/contracts";
 import { canReadRoute } from "@/domain/access/route-capability";
 import {
+  readStoredFilingPacket,
+  type StoredFilingPacket,
+} from "@/domain/documents/stored-filing-packet";
+import { isFilingDocumentType } from "@/domain/producer/filings";
+import {
   DOCUMENT_RENDER_STATUSES,
   DOCUMENT_RENDER_STATUS_LABELS,
 } from "@/domain/taxonomy/document-render-status";
@@ -61,6 +66,11 @@ export type DocumentPage =
       readonly shipment: Shipment | null;
       readonly shipper: string;
     }
+  /**
+   * A filing packet or annual report — its content from the render's stored
+   * input, never today's rule data or sales (Rule 8.19).
+   */
+  | { readonly kind: "filing_packet"; readonly content: StoredFilingPacket }
   /** A type whose page arrives with its own unit — shown as the render's own record. */
   | { readonly kind: "render_record" };
 
@@ -176,6 +186,9 @@ export async function readDocument(
         ...(render.shipmentId === null
           ? {}
           : { shipmentId: render.shipmentId }),
+        ...(render.obligationDeadlineId === null
+          ? {}
+          : { obligationDeadlineId: render.obligationDeadlineId }),
         documentType: render.documentType,
         limit: 50,
       }),
@@ -201,6 +214,10 @@ export async function readDocument(
     render.status,
   );
 
+  const filing = isFilingDocumentType(render.documentType)
+    ? readStoredFilingPacket(render.inputSnapshot)
+    : null;
+
   const source: DocumentSource =
     container !== null
       ? {
@@ -216,25 +233,36 @@ export async function readDocument(
               ? `/shipments/${shipment.id}`
               : null,
           }
-        : { label: "Not recorded", href: null };
+        : filing !== null
+          ? {
+              // A packet belongs to one deadline (TECH §8.2); its state's
+              // Deadlines list is where that deadline is marked done.
+              label: `Deadline ${filing.deadline.dueOnText} — ${filing.obligation.duty} (${filing.state.name})`,
+              href: canReadRoute(ctx.role, "/obligations")
+                ? `/obligations?state=${encodeURIComponent(filing.state.code)}`
+                : null,
+            }
+          : { label: "Not recorded", href: null };
 
   const label = labels?.items[0] ?? null;
   const paper = papers?.items[0] ?? null;
   const page: DocumentPage =
-    render.documentType === "container_label" && label !== null
-      ? { kind: "container_label", label, container }
-      : render.documentType === "shipping_paper" && paper !== null
-        ? {
-            kind: "shipping_paper",
-            paper,
-            header: readStoredPaperHeader(render.inputSnapshot),
-            shipment,
-            shipper:
-              organization === null
-                ? "Not recorded"
-                : (organization.legalName ?? organization.name),
-          }
-        : { kind: "render_record" };
+    filing !== null
+      ? { kind: "filing_packet", content: filing }
+      : render.documentType === "container_label" && label !== null
+        ? { kind: "container_label", label, container }
+        : render.documentType === "shipping_paper" && paper !== null
+          ? {
+              kind: "shipping_paper",
+              paper,
+              header: readStoredPaperHeader(render.inputSnapshot),
+              shipment,
+              shipper:
+                organization === null
+                  ? "Not recorded"
+                  : (organization.legalName ?? organization.name),
+            }
+          : { kind: "render_record" };
 
   const [storedFile, voidRecord] = await Promise.all([
     readStoredFile(ctx, render),

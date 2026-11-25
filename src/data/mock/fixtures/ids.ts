@@ -176,6 +176,13 @@ export const JURISDICTION_RULE = {
   iaProducerObligations: uid("0a000006", 35),
   dcProducerCoverage: uid("0a000006", 36),
   dcProducerObligations: uid("0a000006", 37),
+  // b1b-13 — Appendix B's six states' filings rule (Rule 8.18).
+  vtProducerFilings: uid("0a000006", 38),
+  ctProducerFilings: uid("0a000006", 39),
+  meProducerFilings: uid("0a000006", 40),
+  caProducerFilings: uid("0a000006", 41),
+  coProducerFilings: uid("0a000006", 42),
+  njProducerFilings: uid("0a000006", 43),
 } as const;
 
 export const RULE_VERSION = {
@@ -223,6 +230,13 @@ export const RULE_VERSION = {
   iaProducerObligations: uid("0a000007", 38),
   dcProducerCoverage: uid("0a000007", 39),
   dcProducerObligations: uid("0a000007", 40),
+  // b1b-13 — Appendix B's versions, one per state, dated as its obligations version.
+  vtProducerFilings: uid("0a000007", 41),
+  ctProducerFilings: uid("0a000007", 42),
+  meProducerFilings: uid("0a000007", 43),
+  caProducerFilings: uid("0a000007", 44),
+  coProducerFilings: uid("0a000007", 45),
+  njProducerFilings: uid("0a000007", 46),
 } as const;
 
 export const CATALOG = {
@@ -407,6 +421,8 @@ export const DOCUMENT_RENDER = {
   soundDrumLabel: uid("0a000013", 2),
   /** b2-09 — SH-0004's issued paper. */
   airShippingPaper: uid("0a000013", 3),
+  /** b1b-13 — California's notice for the 2026-07-01 deadline, issued by Priya (spec §6). */
+  caNoticePacket: uid("0a000013", 4),
 } as const;
 
 export const SHIPPING_PAPER = {
@@ -507,6 +523,12 @@ export const AUDIT = {
   dcDeadlineCompleted: uid("0a000018", 8),
   /** b1b-12 — marking it done resolves its overdue alert (Rule 8.13). */
   dcDeadlineAlertResolved: uid("0a000018", 9),
+  /** b1b-13 — Priya issues California's notice (Rule 8.19). */
+  caNoticeIssued: uid("0a000018", 10),
+  /** b1b-13 — she marks its deadline done, with the packet as evidence (Rule 8.19). */
+  caNoticeDeadlineCompleted: uid("0a000018", 11),
+  /** b1b-13 — marking it done resolves its overdue alert (Rule 8.13). */
+  caNoticeAlertResolved: uid("0a000018", 12),
 } as const;
 
 /** b2-11 — Cascade's seeded ranking run, so the screens show a ranking before Rank now. */
@@ -550,4 +572,15 @@ export const obligationAlertRowId = (n: number): string => uid("0a000025", n);
 /** b1b-12 — the seeded run's id, on its audit row. */
 export const PRODUCER_RUN = {
   cascadeSeeded: uid("0a000026", 1),
+} as const;
+
+/** b1b-13 — Priya's sales entries (Rule 8.17), numbered in the order she recorded them. */
+export const producerSalesRecordId = (n: number): string => uid("0a000027", n);
+
+/** b1b-13 — the entries a spec names. */
+export const PRODUCER_SALES = {
+  /** Tidewater in Illinois, 2025, as first recorded — replaced. */
+  tidewaterIllinois2025: producerSalesRecordId(2),
+  /** Its correction. */
+  tidewaterIllinois2025Corrected: producerSalesRecordId(19),
 } as const;

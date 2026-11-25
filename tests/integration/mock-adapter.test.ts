@@ -276,15 +276,17 @@ describe("role enforcement, using the same sets Postgres uses", () => {
     await expect(mockAdapter.auditEvents.list(HANDLER, PAGE)).rejects.toThrow(
       PermissionError,
     );
-    // Five fixture rows, b2-11's seeded ranking run's one (Rule 10.26), and
+    // Five fixture rows, b2-11's seeded ranking run's one (Rule 10.26),
     // b1b-12's three: the obligations run, DC's deadline marked done, and the
-    // alert that resolved (Rules 8.11–8.13).
+    // alert that resolved (Rules 8.11–8.13); and b1b-13's three: California's
+    // notice issued, its deadline marked done with the notice as evidence,
+    // and its alert resolved (Rule 8.19).
     await expect(
       mockAdapter.auditEvents.list(MANAGER, PAGE),
-    ).resolves.toHaveProperty("total", 9);
+    ).resolves.toHaveProperty("total", 12);
     await expect(
       mockAdapter.auditEvents.list(AUDITOR, PAGE),
-    ).resolves.toHaveProperty("total", 9);
+    ).resolves.toHaveProperty("total", 12);
   });
 
   it("refuses a rule-version publish from anyone but P6", async () => {

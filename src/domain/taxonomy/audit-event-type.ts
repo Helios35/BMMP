@@ -62,6 +62,10 @@
  * v1.11: a declared product and its states (Rule 8.6), one evaluation run
  * with its trigger and rule versions (Rule 8.11), and a deadline marked done
  * or reopened (Rule 8.12).
+ * **`producer_sales.recorded` and `producer_sales.corrected`** were authored
+ * by planning (D-81) and added at TAXONOMY.md v1.12: units for a product,
+ * state and year (Rule 8.17), and an entry replaced, with the old and new
+ * units.
  *
  * **Never invent a value.** If one is needed and is not here, it does not exist
  * yet — raise it to P6 (TAXONOMY.md §1.1).
@@ -97,6 +101,8 @@ export const AUDIT_EVENT_TYPES = [
   "producer_obligation.evaluated",
   "obligation_deadline.completed",
   "obligation_deadline.reopened",
+  "producer_sales.recorded",
+  "producer_sales.corrected",
   "container.status_changed",
   "lot.created",
   "lot.status_changed",
@@ -164,6 +170,8 @@ export const AUDIT_EVENT_TYPE_LABELS: Readonly<Record<AuditEventType, string>> =
     "producer_obligation.evaluated": "Obligations checked",
     "obligation_deadline.completed": "Deadline marked done",
     "obligation_deadline.reopened": "Deadline reopened",
+    "producer_sales.recorded": "Sales recorded",
+    "producer_sales.corrected": "Sales corrected",
     "container.status_changed": "Container status changed",
     "lot.created": "Lot created",
     "lot.status_changed": "Lot status changed",

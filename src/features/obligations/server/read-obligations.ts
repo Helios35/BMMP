@@ -3,10 +3,29 @@ import "server-only";
 import { data } from "@/data";
 import type { ProducerLastRun, RequestContext } from "@/data/contracts";
 import { basisInstant } from "@/domain/hazard/words";
-import { basisLine } from "@/domain/producer";
+import {
+  basisLine,
+  FILING_DOCUMENT_TYPES,
+  FILINGS_RULE_KEY,
+  resolveFiling,
+} from "@/domain/producer";
 import { civilDateInZone } from "@/domain/storage/clock-display";
+import { DOCUMENT_TYPE_LABELS } from "@/domain/taxonomy/document-type";
 import type { IsoDate, IsoTimestamp, TimeZone, Uuid } from "@/types/common";
+import type { CatalogEntry } from "@/types/catalog";
+import type {
+  ObligationDeadline,
+  ProducerObligation,
+  ProducerProduct,
+  ProducerSalesRecord,
+} from "@/types/producer";
+import type { Jurisdiction } from "@/types/rules-as-data";
 
+import {
+  packetLinksByDeadline,
+  type FilingSummary,
+  type PacketLink,
+} from "../packet-view";
 import { obligationsReadModel, type ObligationsReadModel } from "../view";
 
 /**
@@ -34,8 +53,65 @@ export interface ObligationsPage {
   readonly entryOptions: readonly Option[];
   /** Every state and DC, by name, with its T-40 code for the URL. */
   readonly stateOptions: readonly (Option & { readonly code: string })[];
-  /** Who marked a deadline done, by id. */
+  /** Who marked a deadline done, or recorded a sales entry, by id. */
   readonly people: ReadonlyMap<Uuid, string>;
+  /** Every sales entry, replaced ones included (Rule 8.17). */
+  readonly sales: readonly ProducerSalesRecord[];
+  /** Each deadline's packets, newest first (Rule 8.19). */
+  readonly packets: ReadonlyMap<Uuid, readonly PacketLink[]>;
+  /** The filing in force today for each current obligation that has one (Rule 8.18). */
+  readonly filings: ReadonlyMap<Uuid, FilingSummary>;
+  /** The rows a product's plan reads (Rule 8.23). */
+  readonly rows: {
+    readonly jurisdictions: readonly Jurisdiction[];
+    readonly products: readonly ProducerProduct[];
+    readonly catalogEntries: readonly CatalogEntry[];
+    readonly obligations: readonly ProducerObligation[];
+    readonly deadlines: readonly ObligationDeadline[];
+  };
+}
+
+/**
+ * Which current obligations have a filing in force today — read from each
+ * state's `producer.filings` versions, resolved on the state alone (Rules
+ * 8.7, 8.18). Make packet shows on exactly these.
+ */
+async function filingsByObligation(
+  ctx: RequestContext,
+  today: IsoDate,
+  jurisdictions: readonly Jurisdiction[],
+  obligations: readonly ProducerObligation[],
+): Promise<ReadonlyMap<Uuid, FilingSummary>> {
+  const filings = new Map<Uuid, FilingSummary>();
+  const stateIds = [...new Set(obligations.map((row) => row.jurisdictionId))];
+  for (const jurisdictionId of stateIds) {
+    const state = jurisdictions.find((row) => row.id === jurisdictionId);
+    if (state === undefined) continue;
+    const candidates = await data.ruleVersions.findCandidates(ctx, {
+      ruleKeys: [FILINGS_RULE_KEY],
+      jurisdictionId,
+      asOf: today,
+    });
+    for (const obligation of obligations.filter(
+      (row) => row.jurisdictionId === jurisdictionId,
+    )) {
+      const resolved = resolveFiling(
+        {
+          filingCandidates: candidates,
+          state: { jurisdictionId, code: state.code, name: state.name },
+          obligation,
+        },
+        today,
+      );
+      if (resolved !== null) {
+        filings.set(obligation.id, {
+          title: resolved.filing.title,
+          typeLabel: DOCUMENT_TYPE_LABELS[resolved.filing.documentType],
+        });
+      }
+    }
+  }
+  return filings;
 }
 
 export async function readObligationsPage(
@@ -51,6 +127,8 @@ export async function readObligationsPage(
     deadlines,
     configuration,
     lastRun,
+    sales,
+    ...packetPages
   ] = await Promise.all([
     data.producerObligations.inputs(ctx),
     data.jurisdictions.list(ctx, { level: "state", limit: READ_LIMIT }),
@@ -60,9 +138,19 @@ export async function readObligationsPage(
     data.obligationDeadlines.list(ctx, { limit: READ_LIMIT }),
     data.platformConfiguration.readObligationAlertConfiguration(ctx),
     data.producerObligations.lastRun(ctx),
+    data.producerSales.list(ctx, { includeReplaced: true, limit: READ_LIMIT }),
+    ...FILING_DOCUMENT_TYPES.map((documentType) =>
+      data.documentRenders.list(ctx, { documentType, limit: READ_LIMIT }),
+    ),
   ]);
   const timeZone = inputs.timeZone;
   const today = civilDateInZone(at, timeZone);
+  const filings = await filingsByObligation(
+    ctx,
+    today,
+    jurisdictions.items,
+    obligations.items,
+  );
 
   const model = obligationsReadModel({
     today,
@@ -88,14 +176,19 @@ export async function readObligationsPage(
     .sort((a, b) => a.label.localeCompare(b.label));
 
   const people = new Map<Uuid, string>();
-  for (const id of new Set(
-    deadlines.items.flatMap((row) =>
+  for (const id of new Set([
+    ...deadlines.items.flatMap((row) =>
       row.completedBy === null ? [] : [row.completedBy],
     ),
-  )) {
+    ...sales.items.map((row) => row.recordedBy),
+  ])) {
     const user = await data.users.get(ctx, id);
     if (user !== null) people.set(id, user.fullName ?? user.email);
   }
+  const packets = packetLinksByDeadline(
+    packetPages.flatMap((page) => page.items),
+    timeZone,
+  );
 
   return {
     model,
@@ -108,5 +201,15 @@ export async function readObligationsPage(
     entryOptions,
     stateOptions,
     people,
+    sales: sales.items,
+    packets,
+    filings,
+    rows: {
+      jurisdictions: jurisdictions.items,
+      products: products.items,
+      catalogEntries: entries.items,
+      obligations: obligations.items,
+      deadlines: deadlines.items,
+    },
   };
 }

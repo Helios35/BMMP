@@ -69,6 +69,7 @@ export type PolicyTable =
   | "producer_product"
   | "producer_obligation"
   | "obligation_deadline"
+  | "producer_sales_record"
   | "audit_event";
 
 export type PolicyAction = "select" | "insert" | "update";
@@ -163,9 +164,18 @@ export const POLICY_MATRIX: Readonly<Record<PolicyTable, PolicyRow>> = {
   },
   shipping_paper: { select: R, insert: WRITER_SETS.W_SHIP, update: [] },
   container_label: { select: R, insert: WRITER_SETS.W_STORAGE, update: [] },
+  // `W_PRODUCER` joins for the filing packet and annual report (T-38: P3 or
+  // P6; Rule 8.19). TECH §9.5's row still reads `W_SHIP` ∨ `W_STORAGE` ∨
+  // `PA` — raised in BUILD_NOTES_b1b-13-filings.md §4, not changed there.
+  // The one insert path is `writeRender`, and every caller also holds its
+  // own table's insert, so P3 reaches no other document type through this.
   document_render: {
     select: R,
-    insert: [...WRITER_SETS.W_SHIP, ...WRITER_SETS.W_STORAGE],
+    insert: [
+      ...WRITER_SETS.W_SHIP,
+      ...WRITER_SETS.W_STORAGE,
+      ...WRITER_SETS.W_PRODUCER,
+    ],
     update: [],
   },
   damage_assessment: {
@@ -210,6 +220,13 @@ export const POLICY_MATRIX: Readonly<Record<PolicyTable, PolicyRow>> = {
     select: R,
     insert: WRITER_SETS.W_PRODUCER,
     update: WRITER_SETS.W_PRODUCER,
+  },
+  // B1b, D-81 — §9.5: INSERT `W_PRODUCER` ∨ `PA`; UPDATE only by the
+  // supersede trigger (the definer door), so no role holds it; no DELETE.
+  producer_sales_record: {
+    select: R,
+    insert: WRITER_SETS.W_PRODUCER,
+    update: [],
   },
 
   // Read is P2, P5, P6 only — P1 cannot read the audit log (Rule 12.8).

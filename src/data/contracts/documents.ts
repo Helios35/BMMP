@@ -543,6 +543,8 @@ export interface DocumentRenderQuery extends BaseQuery {
   readonly shipmentId?: Uuid;
   readonly containerId?: Uuid;
   readonly batteryRecordId?: Uuid;
+  /** A deadline's filing packets (Rule 8.19). */
+  readonly obligationDeadlineId?: Uuid;
   readonly verificationCode?: string;
   readonly contentHash?: Sha256;
 }

@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { ReactElement } from "react";
 
 import { ContainerLabelDocument } from "@/components/documents/container-label-document";
+import { FilingPacketSummary } from "@/components/documents/filing-packet-summary";
 import { ShippingPaperDocument } from "@/components/documents/shipping-paper-document";
 import {
   DocumentStatusMarking,
@@ -20,6 +21,7 @@ import {
   INTEGRITY_FAILED_BODY,
   INTEGRITY_FAILED_TITLE,
   NO_STORED_FILE,
+  NO_STORED_FILE_FILING,
   OPEN_SOURCE_RECORD,
   VOIDED_DETAIL_ELSEWHERE,
   voidedDetail,
@@ -111,6 +113,16 @@ export function DocumentPageContent({
         verificationCode={render.verificationCode}
         marking={marking}
       />
+    );
+  }
+
+  if (view.page.kind === "filing_packet") {
+    return (
+      <div className="flex flex-col gap-6" data-filing-packet-page="true">
+        {marking}
+        <p className="text-h1">{view.page.content.title}</p>
+        <FilingPacketSummary content={view.page.content} />
+      </div>
     );
   }
 
@@ -232,7 +244,9 @@ export function DocumentPanel({
         data-document-no-stored-file="true"
         className="max-w-[72ch] text-body"
       >
-        {NO_STORED_FILE}
+        {view.page.kind === "filing_packet"
+          ? NO_STORED_FILE_FILING
+          : NO_STORED_FILE}
       </p>
       <RenderViewer
         renderId={render.id}

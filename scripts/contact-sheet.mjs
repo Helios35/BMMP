@@ -232,6 +232,20 @@ const RESOLVE = {
     as: "p1",
     label: "the quarantine drum's label, generated for the sheet",
   },
+  // b1b-13 — California's seeded notice, read off the deadline it is filed
+  // under, and the first declared product's plan, off its Plan link.
+  caNoticePacket: {
+    on: "/obligations?state=US-CA",
+    as: "p3",
+    selector: "a[data-deadline-packet]",
+    label: "California's notice, issued and linked as its deadline's evidence",
+  },
+  productPlan: {
+    on: "/obligations?tab=products",
+    as: "p3",
+    selector: "a[data-product-plan-link]",
+    label: "a declared product's plan",
+  },
   draftPaper: {
     act: {
       fromResolved: "augustDraft",
@@ -776,6 +790,34 @@ const SCREENS = [
     path: "/obligations",
     as: "p5",
     note: "Read-only: the banner, Check now and Mark done shown disabled with the reason, Export enabled.",
+  },
+  // --- filings (b1b-13) --------------------------------------------------
+  {
+    id: "obligations-sales",
+    group: "Filings",
+    route: "/obligations",
+    title: "Obligations — sales",
+    path: "/obligations?tab=sales",
+    as: "p3",
+    note: "The latest full year by default: every product and state, a number or Not on file; Illinois' first entry kept, marked replaced (Rule 8.17).",
+  },
+  {
+    id: "obligations-plan",
+    group: "Filings",
+    route: "/obligations",
+    title: "Obligations — a product's plan",
+    path: (r) => r.productPlan,
+    as: "p3",
+    note: "Every duty the product carries across its states, earliest first, marking with the rest (Rule 8.23).",
+  },
+  {
+    id: "document-filing-packet",
+    group: "Filings",
+    route: "/documents/[id]",
+    title: "Document — California's notice",
+    path: (r) => r.caNoticePacket,
+    as: "p3",
+    note: "A packet is not the filing, and where to send it; each item filled or a gap (Rules 8.19, 8.20). The seeded packet has no stored file, and says so.",
   },
 
   // --- denial ------------------------------------------------------------

@@ -40,9 +40,10 @@ import type {
 } from "@/types/tenancy";
 import type { AppliedRuleVersion } from "@/domain/rules/outcome";
 import type { CatalogReferencePhoto, PhotoCheck } from "@/types/photo-check";
-import type { ProducerProduct } from "@/types/producer";
+import type { ProducerProduct, ProducerSalesRecord } from "@/types/producer";
 import * as B1A_08 from "./b1a-08";
 import * as B1B_12 from "./b1b-12";
+import * as B1B_13 from "./b1b-13";
 import * as B2_09 from "./b2-09";
 import * as B2_10 from "./b2-10";
 import * as B2_11 from "./b2-11";
@@ -1012,6 +1013,8 @@ export const jurisdictionRules: readonly JurisdictionRule[] = [
   },
   // b1b-12 — each Appendix A state's two producer rules.
   ...B1B_12.jurisdictionRules,
+  // b1b-13 — each Appendix B state's filings rule (Rule 8.18).
+  ...B1B_13.jurisdictionRules,
 ];
 
 export const ruleVersions: readonly RuleVersion[] = [
@@ -1267,6 +1270,8 @@ export const ruleVersions: readonly RuleVersion[] = [
   ...B2_09.ruleVersions,
   // b1b-12 — Appendix A, transcribed (Rule 8.7).
   ...B1B_12.ruleVersions,
+  // b1b-13 — Appendix B, transcribed (Rule 8.18).
+  ...B1B_13.ruleVersions,
 ];
 
 /**
@@ -2878,6 +2883,7 @@ export const documentRenders: readonly DocumentRender[] = [
     containerId: null,
     batteryRecordId: null,
     evidencePackId: null,
+    obligationDeadlineId: null,
     templateKey: "shipping_paper.us.ground",
     templateVersion: "2026.07",
     rendererName: "react-pdf",
@@ -2908,6 +2914,7 @@ export const documentRenders: readonly DocumentRender[] = [
     containerId: ID.CONTAINER.soundDrum,
     batteryRecordId: null,
     evidencePackId: null,
+    obligationDeadlineId: null,
     templateKey: "container_label.us-wa",
     templateVersion: "2026.06",
     rendererName: "react-pdf",
@@ -3345,3 +3352,14 @@ export const producerProducts: readonly ProducerProduct[] = [
 ];
 export const SEEDED_OBLIGATIONS_AT = B1B_12.SEEDED_OBLIGATIONS_AT;
 export const SEEDED_COMPLETION = B1B_12.SEEDED_COMPLETION;
+
+// ---------------------------------------------------------------------------
+// Filings — b1b-13 (Rules 8.17–8.23; D-81)
+// ---------------------------------------------------------------------------
+
+/** Priya's sales dataset (Rule 8.17): 2025 everywhere, Vermont's 2024, one correction. */
+export const producerSalesRecords: readonly ProducerSalesRecord[] = [
+  ...B1B_13.producerSalesRecords,
+];
+/** California's notice and its completion — computed in `../producer-seed.ts`. */
+export const SEEDED_PACKET = B1B_13.SEEDED_PACKET;

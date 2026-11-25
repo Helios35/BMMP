@@ -104,7 +104,7 @@ src/app/
 └── api/                                      route handlers only — no UI
 ```
 
-**20 routes. That is the complete B1a surface.** Anything a user needs to do in B1a happens on one of these twenty pages. If a build brief implies a twenty-first, that is a decision-log entry, not a builder's call.
+**21 routes. That is the complete surface.** Anything a user needs to do happens on one of these twenty-one pages. If a build brief implies a twenty-second, that is a decision-log entry, not a builder's call (D-78).
 
 ### 1.2 Depth
 
@@ -457,6 +457,8 @@ Derived from the FIXED table in `_ANCHORS.md` §5, with "any member" expanded to
 | `/audit` | — | R | — | — | R | R | **P1 cannot read the audit log.** Export is available to all three who can. |
 | `/obligations` | — | R | **W** | — | R | **W** | B1b, D-78. A nav item "Obligations" for these four. |
 
+`/documents/[id]` for a filing packet or annual report follows `/obligations` access (Rule 8.22).
+
 ### 5.3 Enforcement rules
 
 1. **Authentication gate.** Middleware guards the entire `(app)` group. Unauthenticated → `/sign-in?next=<path>`, and the user lands on their intended page after signing in.
@@ -535,7 +537,7 @@ Behavioural and visual treatment lives in `UX_SPEC.md` §5. These are the **rout
 3. **Nothing reaches past `src/data`.** Every route in this document is built against the `DataAdapter` contract (`PROJECT_SETUP_BMMP.md` §3.2). CI enforces it.
 4. **Filter, sort, step and tab state lives in the URL.** Every list, every stepper, every tabbed detail. A warehouse user sends a colleague a link; a lost connection restores a page; an audit row deep-links into the exact view it describes.
 5. **Every mutating action writes an `audit_event`**, including denials and blocked attempts (BR §12). No role, including P6, may edit or delete an audit event (Rule 1.21).
-6. **No hazard surface in B1a.** `/batteries/[id]` reserves the space; `hazard_ranking` is `[B2]`. When it lands it is a **relative ranking with a stated basis per factor** — never a probability, percentage, likelihood or risk of fire, in the UI, an export, an API response or a PDF (`_ANCHORS.md` §7.1).
+6. **The hazard surface is a ranking.** `hazard_ranking` (Rules 10.19–10.26) shows on the battery and container pages as a **relative ranking with a stated basis per factor** — never a probability, percentage, likelihood or risk of fire, in the UI, an export, an API response or a PDF (`_ANCHORS.md` §7.1).
 6a. **Every alert on screen is an `alert` record.** The dashboard region, the alert bell, the `/containers?filter=alerting` deep link and every storage-clock or fire-code volume warning read the same `alert` rows. No screen derives an alert on render, and no two screens compute the same alert differently. Its target role is what makes Rule 4.14 true — P2 always, P1 for containers at their site — without each screen re-deriving who should see what.
 6b. **A format band is a `format_classification`, never a field on the battery.** It is keyed on `(battery_record, jurisdiction, rule_version)` because **the same battery classifies differently in different states** (`_ANCHORS.md` §3; Rule 3.5). No B1a screen renders one — the format classifier is `[B1b]` BR §8 — but no B1a screen may present a single organization-wide size or format value either, because doing so bakes in the assumption the entity exists to prevent. `/catalog/[id]` reserves the space; `/settings/organization` shows the jurisdiction profile per **site**, not per organization.
 7. **No jurisdiction value is a literal.** Thresholds, deadlines, citations and units are read from `jurisdiction_rule` and `rule_version`. A hard-coded state threshold is a review rejection (`PROJECT_SETUP_BMMP.md` §8.1).

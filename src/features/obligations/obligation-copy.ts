@@ -12,6 +12,7 @@ export const EXPORT = "Export";
 export const TAB_DEADLINES = "Deadlines";
 export const TAB_STATES = "States";
 export const TAB_PRODUCTS = "Products";
+export const TAB_SALES = "Sales";
 
 export const DEADLINES_CAPTION = "Obligation deadlines";
 export const STATES_CAPTION = "States the products are sold in";
@@ -81,3 +82,62 @@ export const OBLIGATIONS_HEADING = "Obligations";
 export const PRODUCTS_IN_STATE = "Products sold here";
 export const PRODUCT_RAN_BUT_CHECK_FAILED =
   "Saved. The check did not finish — press Check now.";
+
+// --- Sales (Rule 8.17) -----------------------------------------------------------------------
+
+export const SALES_CAPTION = "Units sold, by product, state and year";
+export const RECORD_SALES = "Record sales";
+export const RECORDING = "Recording…";
+export const SALES_YEAR = "Year";
+/** The year filter's default — short enough for the filter's width. */
+export function latestYearLabel(year: number): string {
+  return `${String(year)} (latest)`;
+}
+export const SALES_BODY =
+  "Units sold, offered for sale or distributed in or into the state that calendar year — a whole number, zero allowed. Weight and energy are worked out from the catalog entry, never typed.";
+export const SALES_PAIR = "Product and state";
+export const SALES_PAIR_PLACEHOLDER = "Choose a product and state";
+export const SALES_UNITS = "Units";
+export const SALES_UNITS_HINT =
+  "A whole number. Zero is an entry; a blank is not.";
+export const SALES_NOTE = "Where the number came from";
+export const SALES_NOTE_HINT =
+  "A distributor report, an order ledger, an estimate and its basis.";
+export const SALES_NOTE_REQUIRED =
+  "Say where the number came from — the note is required.";
+export const SALES_UNITS_REQUIRED = "Units are a whole number, zero or more.";
+export const SALES_REPLACED = "Replaced";
+export const SALES_NOT_ON_FILE_FIXER =
+  "No entry for this year. A missing entry is never read as zero.";
+export const ZERO_SALES_TITLE = "No products to record sales for";
+export const SALES_ACT_REFUSAL =
+  "Your role reads the sales dataset and does not change it. A Producer Compliance Officer or an Admin can record sales.";
+
+// --- Packets (Rules 8.19–8.21) ---------------------------------------------------------------
+
+export const MAKE_PACKET = "Make packet";
+export const ISSUE_PACKET = "Issue packet";
+export const ISSUING = "Issuing…";
+export const PREPARING = "Preparing the packet…";
+export const PACKET_PERIOD = "Period";
+export const PACKET_YEAR = "Calendar year this report covers";
+export const PACKET_YEAR_PLACEHOLDER = "Pick a year";
+export const PACKET_ITEMS = "What the filing asks for";
+export const PACKET_ISSUED = "Issued. It did not mark the deadline done.";
+export const OPEN_PACKET = "Open the packet";
+export const PACKETS_UNDER_DEADLINE = "Packets";
+export const PACKET_NO_DRAFT =
+  "Issuing stores the packet as a document, with the rule versions and the sales it used. There is no draft; a later change means a new packet that replaces this one.";
+export const EVIDENCE = "Evidence (optional)";
+export const EVIDENCE_NONE = "No packet";
+export const EVIDENCE_HINT =
+  "Link an issued packet of this deadline as what was filed. A packet never marks a deadline done on its own.";
+
+// --- A product's plan (Rule 8.23) ------------------------------------------------------------
+
+export const PLAN = "Plan";
+export const PLAN_HEADING = "Every duty this product carries, by date";
+export const PLAN_EMPTY =
+  "No obligation applies to this product in the states it is sold in.";
+export const PLAN_CANT_TELL =
+  "Can't tell yet whether these apply to this product";

@@ -773,6 +773,7 @@ export const documentRenders: readonly DocumentRender[] = [
     containerId: null,
     batteryRecordId: null,
     evidencePackId: null,
+    obligationDeadlineId: null,
     templateKey: "shipping_paper.us.air",
     templateVersion: "2026.10",
     rendererName: "react-pdf",

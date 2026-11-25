@@ -19,6 +19,10 @@ export const PRODUCER_ACTIONS = [
   "check_now",
   "mark_deadline",
   "export_obligations",
+  /** Rules 8.17, 8.22 — P3 and P6 record sales. */
+  "record_sales",
+  /** Rules 8.19, 8.22 — P3 and P6 make and issue packets. */
+  "make_packets",
 ] as const;
 
 export type ProducerAction = (typeof PRODUCER_ACTIONS)[number];
@@ -30,12 +34,16 @@ const BY_ROLE: Readonly<Partial<Record<RoleCode, readonly ProducerAction[]>>> =
       "check_now",
       "mark_deadline",
       "export_obligations",
+      "record_sales",
+      "make_packets",
     ],
     platform_admin: [
       "manage_products",
       "check_now",
       "mark_deadline",
       "export_obligations",
+      "record_sales",
+      "make_packets",
     ],
     facility_manager: ["export_obligations"],
     auditor: ["export_obligations"],

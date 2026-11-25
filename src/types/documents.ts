@@ -279,6 +279,12 @@ export interface DocumentRender extends TenantScoped, Created {
   readonly containerId: Uuid | null;
   readonly batteryRecordId: Uuid | null;
   readonly evidencePackId: Uuid | null;
+  /**
+   * A filing packet or annual report belongs to one deadline — the arc's
+   * fifth column (`TECHNICAL_SPEC.md` §8.2; Rule 8.19). Argued for the first
+   * migration in `BUILD_NOTES_b1b-13-filings.md` §3.
+   */
+  readonly obligationDeadlineId: Uuid | null;
   readonly templateKey: string;
   /** Bumped on change; **never silently alters an issued document**. */
   readonly templateVersion: string;

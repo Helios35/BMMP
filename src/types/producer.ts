@@ -102,6 +102,40 @@ export interface ObligationDeadline extends TenantScoped, Timestamped {
 }
 
 /**
+ * One entry in a producer's sales dataset — Rule 8.17; `_ANCHORS.md` §3
+ * (`producer_sales_record`, B1b, D-81).
+ *
+ * A product, a state, a calendar year and **the number of units** sold,
+ * offered for sale or distributed in or into that state that year, with a
+ * note saying where the number came from. **Only units are typed**: weight
+ * and energy are worked out from the catalog entry, never stored here.
+ *
+ * - **A missing entry is a gap, never zero.** Zero is an entry someone typed.
+ * - **A correction is a new entry that replaces the old one.** The old one
+ *   is kept, and its `supersededById` points at its replacement — the only
+ *   update the row ever takes, by trigger (`TECHNICAL_SPEC.md` §9.5).
+ *
+ * Argued for the first migration in `BUILD_NOTES_b1b-13-filings.md` §3.
+ */
+export interface ProducerSalesRecord extends TenantScoped {
+  readonly id: Uuid;
+  readonly producerProductId: Uuid;
+  readonly jurisdictionId: Uuid;
+  /** A calendar year. */
+  readonly year: number;
+  /** A whole number, zero allowed. */
+  readonly units: number;
+  /** Where the number came from. Required. */
+  readonly basisNote: string;
+  readonly recordedAt: IsoTimestamp;
+  readonly recordedBy: Uuid;
+  /** Set when a correction replaces it — kept, shown as replaced. */
+  readonly supersededById: Uuid | null;
+  readonly supersededAt: IsoTimestamp | null;
+  readonly createdAt: IsoTimestamp;
+}
+
+/**
  * The underwriter/auditor export · B1b.
  *
  * **It contains records that already exist; it never creates new assertions**,

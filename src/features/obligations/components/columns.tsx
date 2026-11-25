@@ -6,17 +6,29 @@ import { StatusBadge } from "@/components/status/status-badge";
 import { MISSING_VALUE_FIXER } from "@/domain/producer";
 import type { RoleCode } from "@/domain/taxonomy/role";
 
+import { NOT_ON_FILE } from "@/domain/producer/filing-words";
+
 import {
   EDIT_STATES,
+  MAKE_PACKET,
   MARK_DONE,
   NOT_CHECKED_YET,
+  PACKETS_UNDER_DEADLINE,
+  PLAN,
+  RECORD_SALES,
   REMOVE,
   REOPEN,
+  SALES_NOT_ON_FILE_FIXER,
+  SALES_REPLACED,
 } from "../obligation-copy";
+import type { FilingSummary, PacketLink } from "../packet-view";
+import type { SalesRowView } from "../sales-view";
 import type { StateOption } from "./product-dialogs";
 import { EditStatesDialog } from "./product-dialogs";
+import { MakePacketDialog } from "./make-packet-dialog";
 import { MarkDoneDialog } from "./mark-done-dialog";
 import { producerControl } from "./obligation-controls";
+import { RecordSalesDialog, type SalesPair } from "./record-sales-dialog";
 import { RemoveProduct } from "./remove-product";
 import { ReopenDeadline } from "./reopen-deadline";
 import type { DeadlineView, ProductView, StateView } from "../view";
@@ -32,10 +44,41 @@ import type { DeadlineView, ProductView, StateView } from "../view";
 const WRAP_WIDE = "block min-w-56 max-w-[44ch] whitespace-normal";
 const WRAP_NARROW = "block min-w-32 max-w-[28ch] whitespace-normal";
 
+/** The packets listed under a deadline, each opening at `/documents/[id]` (Rule 8.19). */
+function PacketList({
+  packets,
+}: {
+  readonly packets: readonly PacketLink[];
+}): ReactNode {
+  if (packets.length === 0) return null;
+  return (
+    <span className="mt-1 flex flex-col gap-1" data-deadline-packets="true">
+      <span className="text-caption text-muted-foreground">
+        {PACKETS_UNDER_DEADLINE}
+      </span>
+      {packets.map((packet) => (
+        <Link
+          key={packet.id}
+          href={packet.href}
+          className="text-caption underline underline-offset-4"
+          data-deadline-packet={packet.id}
+          data-packet-status={packet.status}
+        >
+          {packet.title} · {packet.statusLabel} · {packet.issuedText}
+        </Link>
+      ))}
+    </span>
+  );
+}
+
 export function deadlineColumns(input: {
   readonly role: RoleCode;
   readonly today: string;
   readonly people: ReadonlyMap<string, string>;
+  /** Each deadline's packets (Rule 8.19). */
+  readonly packets: ReadonlyMap<string, readonly PacketLink[]>;
+  /** The filing in force for each obligation that has one (Rule 8.18). */
+  readonly filings: ReadonlyMap<string, FilingSummary>;
 }): readonly RecordTableColumn<DeadlineView>[] {
   return [
     {
@@ -66,8 +109,12 @@ export function deadlineColumns(input: {
           {row.obligationStatus === "undetermined" ? (
             <span className="block text-caption text-muted-foreground">
               Can&apos;t tell yet whether it applies — open the States tab.
+              {input.filings.has(row.obligationId)
+                ? " No packet until it can be told (Rule 8.19)."
+                : null}
             </span>
           ) : null}
+          <PacketList packets={input.packets.get(row.id) ?? []} />
         </span>
       ),
     },
@@ -100,6 +147,23 @@ export function deadlineColumns(input: {
               {row.completionReference === null
                 ? ""
                 : ` · ${row.completionReference}`}
+              {row.evidenceDocumentRenderId === null ? null : (
+                <>
+                  {" · "}
+                  <Link
+                    href={`/documents/${row.evidenceDocumentRenderId}`}
+                    className="underline underline-offset-4"
+                    data-deadline-evidence={row.evidenceDocumentRenderId}
+                  >
+                    Evidence:{" "}
+                    {input.packets
+                      .get(row.id)
+                      ?.find(
+                        (packet) => packet.id === row.evidenceDocumentRenderId,
+                      )?.title ?? "the packet"}
+                  </Link>
+                </>
+              )}
             </span>
           ) : null}
         </span>
@@ -128,23 +192,55 @@ export function deadlineColumns(input: {
 
 function deadlineActions(
   row: DeadlineView,
-  input: { readonly role: RoleCode; readonly today: string },
+  input: {
+    readonly role: RoleCode;
+    readonly today: string;
+    readonly packets: ReadonlyMap<string, readonly PacketLink[]>;
+    readonly filings: ReadonlyMap<string, FilingSummary>;
+  },
 ): ReactNode {
   if (row.standing === "open" || row.standing === "overdue") {
-    return producerControl({
-      role: input.role,
-      action: "mark_deadline",
-      isDestructive: false,
-      label: MARK_DONE,
-      dataAttributes: { "data-mark-done": row.id },
-      live: () => (
-        <MarkDoneDialog
-          deadlineId={row.id}
-          duty={row.duty}
-          today={input.today}
-        />
-      ),
-    });
+    // A packet for a deadline whose obligation applies and has a filing in
+    // the rule data (Rule 8.19) — never one that can't be told.
+    const packetable =
+      row.obligationStatus === "applies" && input.filings.has(row.obligationId);
+    const issued = (input.packets.get(row.id) ?? []).filter(
+      (packet) => packet.status === "issued",
+    );
+    return (
+      <div className="flex flex-wrap gap-2">
+        {packetable
+          ? producerControl({
+              role: input.role,
+              action: "make_packets",
+              isDestructive: false,
+              label: MAKE_PACKET,
+              dataAttributes: { "data-make-packet": row.id },
+              live: () => (
+                <MakePacketDialog deadlineId={row.id} duty={row.duty} />
+              ),
+            })
+          : null}
+        {producerControl({
+          role: input.role,
+          action: "mark_deadline",
+          isDestructive: false,
+          label: MARK_DONE,
+          dataAttributes: { "data-mark-done": row.id },
+          live: () => (
+            <MarkDoneDialog
+              deadlineId={row.id}
+              duty={row.duty}
+              today={input.today}
+              packets={issued.map((packet) => ({
+                id: packet.id,
+                label: `${packet.title} — ${packet.issuedText}`,
+              }))}
+            />
+          ),
+        })}
+      </div>
+    );
   }
   if (row.standing === "completed") {
     return producerControl({
@@ -233,13 +329,22 @@ export function productColumns(input: {
       header: "Product",
       primary: true,
       cell: (row) => (
-        <Link
-          href={`/catalog/${row.catalogEntryId}`}
-          className="underline-offset-4 hover:underline"
-          data-product-entry={row.catalogEntryId}
-        >
-          {row.label}
-        </Link>
+        <span className="flex flex-col gap-1">
+          <Link
+            href={`/catalog/${row.catalogEntryId}`}
+            className="underline-offset-4 hover:underline"
+            data-product-entry={row.catalogEntryId}
+          >
+            {row.label}
+          </Link>
+          <Link
+            href={`/obligations?tab=products&product=${encodeURIComponent(row.id)}`}
+            className="text-caption underline underline-offset-4"
+            data-product-plan-link={row.id}
+          >
+            {PLAN}
+          </Link>
+        </span>
       ),
     },
     {
@@ -319,6 +424,131 @@ export function productColumns(input: {
           })}
         </div>
       ),
+    },
+  ];
+}
+
+/** The pair a row records sales for, with what is on file now (Rule 8.17). */
+export function salesPairOf(
+  row: SalesRowView,
+  correction: (row: SalesRowView) => string | null,
+): SalesPair {
+  return {
+    key: row.key,
+    productId: row.productId,
+    jurisdictionId: row.state.jurisdictionId,
+    label: `${row.productLabel} — ${row.state.name}`,
+    correction: correction(row),
+  };
+}
+
+export function salesColumns(input: {
+  readonly role: RoleCode;
+  readonly year: number;
+  readonly correction: (row: SalesRowView) => string | null;
+}): readonly RecordTableColumn<SalesRowView>[] {
+  return [
+    {
+      id: "product",
+      header: "Product",
+      primary: true,
+      cell: (row) => (
+        <span
+          data-sales-row={row.key}
+          data-sales-replaced={String(row.replaced)}
+        >
+          {row.productLabel}
+        </span>
+      ),
+    },
+    {
+      id: "state",
+      header: "State",
+      secondary: true,
+      cell: (row) => row.state.name,
+    },
+    {
+      id: "units",
+      header: "Units",
+      status: true,
+      cell: (row) =>
+        row.entry === null ? (
+          <span className="flex flex-col items-start gap-1">
+            <span
+              className="rounded-md border border-border px-2 py-1 text-label"
+              data-sales-not-on-file="true"
+            >
+              {NOT_ON_FILE}
+            </span>
+            <span className="text-caption text-muted-foreground">
+              {SALES_NOT_ON_FILE_FIXER}
+            </span>
+          </span>
+        ) : (
+          <span
+            className="flex flex-col items-start gap-1"
+            data-sales-units={row.entry.units}
+          >
+            <span className={row.replaced ? "line-through" : undefined}>
+              {row.entry.unitsText}
+            </span>
+            {row.replaced ? (
+              <span
+                className="text-caption text-muted-foreground"
+                data-sales-replaced-label="true"
+              >
+                {SALES_REPLACED}
+                {row.replacedAtText === null ? "" : ` ${row.replacedAtText}`}
+              </span>
+            ) : null}
+          </span>
+        ),
+    },
+    {
+      id: "note",
+      header: "Note",
+      cell: (row) => (
+        <span className={WRAP_WIDE}>
+          {row.entry === null ? "—" : row.entry.basisNote}
+        </span>
+      ),
+    },
+    {
+      id: "recorded",
+      header: "Recorded",
+      cell: (row) =>
+        row.entry === null ? (
+          "—"
+        ) : (
+          <span className={`${WRAP_NARROW} text-caption`}>
+            {row.entry.recordedBy}
+            <span className="block text-muted-foreground">
+              {row.entry.recordedAtText}
+            </span>
+          </span>
+        ),
+    },
+    {
+      id: "actions",
+      header: "Actions",
+      srOnlyHeader: true,
+      cell: (row) =>
+        row.replaced
+          ? null
+          : producerControl({
+              role: input.role,
+              action: "record_sales",
+              isDestructive: false,
+              label: RECORD_SALES,
+              dataAttributes: { "data-record-sales": row.key },
+              live: () => (
+                <RecordSalesDialog
+                  pairs={[salesPairOf(row, input.correction)]}
+                  year={input.year}
+                  preset={row.key}
+                />
+              ),
+            }),
     },
   ];
 }

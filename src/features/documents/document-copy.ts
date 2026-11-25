@@ -23,6 +23,13 @@ export const DRAFT_RENDER_DETAIL =
 export const NO_STORED_FILE =
   "No stored file exists for this render — it was recorded before document generation. The page below is composed from its stored rows; it is not the issued file, and it has no verification code to check.";
 
+/** A filing packet with no stored file — the seeded fixture's case (b1b-13). */
+export const NO_STORED_FILE_FILING =
+  "No stored file exists for this packet. The page below is composed from its stored input — the content it was issued with; it is not the issued file, and it has no verification code to check.";
+
+/** Above a stored packet's pages: its content as text, from the same stored input. */
+export const FILING_CONTENT_HEADING = "What this packet says";
+
 export const INTEGRITY_FAILED_TITLE =
   "This document failed its integrity check";
 export const INTEGRITY_FAILED_BODY =
